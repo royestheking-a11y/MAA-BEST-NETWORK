@@ -27,8 +27,10 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
   const [darkWallMode, setDarkWallMode] = useState(false);
   const [toast, setToast] = useState("");
 
-  const totalBandwidth = ((telemetry.mikrotik.interfaces[0]?.rxMbps || 465.1) / 1000).toFixed(2);
-  const bdixBandwidth = ((telemetry.mikrotik.interfaces[1]?.rxMbps || 902.0) / 1000).toFixed(2);
+  const totalBandwidthNum = (telemetry.mikrotik.interfaces[0]?.rxMbps || 465.1) / 1000;
+  const totalBandwidth = totalBandwidthNum.toFixed(2);
+  const bdixBandwidthNum = (telemetry.mikrotik.interfaces[1]?.rxMbps || 902.0) / 1000;
+  const bdixBandwidth = bdixBandwidthNum.toFixed(2);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -160,7 +162,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
             </div>
           </div>
           <div className="w-full rounded-full h-2 overflow-hidden" style={{ background: "var(--muted)" }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(totalBandwidth / 60) * 100}%`, background: "#2563EB" }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(totalBandwidthNum / 60) * 100}%`, background: "#2563EB" }} />
           </div>
         </div>
 
@@ -183,7 +185,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
             </div>
           </div>
           <div className="w-full rounded-full h-2 overflow-hidden" style={{ background: "var(--muted)" }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(bdixBandwidth / 40) * 100}%`, background: "#D97706" }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(bdixBandwidthNum / 40) * 100}%`, background: "#D97706" }} />
           </div>
         </div>
 
