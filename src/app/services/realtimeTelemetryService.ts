@@ -130,7 +130,9 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 2500) {
 
   useEffect(() => {
     let isMounted = true;
-    const gatewayBase = (import.meta as any).env?.VITE_GATEWAY_URL || "";
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const defaultGateway = isLocal ? "" : "https://maa-best-network.onrender.com";
+    const gatewayBase = (import.meta as any).env?.VITE_GATEWAY_URL || defaultGateway;
     const streamEndpoint = `${gatewayBase}/api/realtime/stream`;
     const statusEndpoint = `${gatewayBase}/api/realtime/live-status`;
 
