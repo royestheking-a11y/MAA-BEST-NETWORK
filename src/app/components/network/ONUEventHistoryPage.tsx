@@ -70,6 +70,8 @@ const EVENT_CONFIG: Record<EventType, { label: string; bg: string; text: string;
   lof: { label: "LOF Alarm", bg: "rgba(217,119,6,0.14)", text: "#D97706", icon: AlertTriangle },
 };
 
+import { AUTHENTIC_NETX_ONUS } from "../../data/netxOnuData";
+
 export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
   const { customers, addCustomer } = useCustomerContext();
 
@@ -88,75 +90,88 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
   const [newCustPhone, setNewCustPhone] = useState("");
   const [newOnuSerial, setNewOnuSerial] = useState("");
   const [newOnuMac, setNewOnuMac] = useState("");
-  const [newVendor, setNewVendor] = useState("Huawei");
-  const [newModel, setNewModel] = useState("EG8145X6 Dual-Band Gigabit");
+  const [newVendor, setNewVendor] = useState("BDCOM EPON");
+  const [newModel, setNewModel] = useState("BDCOM 1GE EPON ONT");
   const [newZone, setNewZone] = useState("Somitir Hat");
   const [newSplitter, setNewSplitter] = useState("TJ-SOMITIR-01");
-  const [newOlt, setNewOlt] = useState("OLT-SomitirHat-01");
-  const [newPonPort, setNewPonPort] = useState("PON 1/1/1");
+  const [newOlt, setNewOlt] = useState("OLT1");
+  const [newPonPort, setNewPonPort] = useState("epon 0/1");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  // Convert real customers into rich ONU devices
+  // Convert 295 authentic NetX ONUs into rich spatial devices
   const onuDevices: OnuDevice[] = useMemo(() => {
-    return customers.map((c, i) => {
-      const isOffline = c.status === "offline" || (c.status as string) === "disconnected";
-      const isSuspended = c.status === "suspended";
-      const isWeak = i % 37 === 0;
+    const custMap = new Map<string, Customer>();
+    customers.forEach(c => {
+      if (c.name) custMap.set(c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
+      if (c.pppUser) custMap.set(c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
+    });
 
-      let health: OnuHealth = "good";
-      let rxPower = -18.2 - ((i % 8) * 0.45);
-      let lastEvent = "Link Operational / Normal Light";
-      let lastEventTime = "Connected now";
+    return AUTHENTIC_NETX_ONUS.map((o, i) => {
+      const cleanCust = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const matchedCust = custMap.get(cleanCust);
 
-      if (isOffline) {
-        health = "issue";
-        rxPower = -40.0;
-        lastEvent = "LOS Alarm (Fiber Drop Disconnected)";
-        lastEventTime = "24 mins ago";
-      } else if (isSuspended) {
-        health = "issue";
-        rxPower = -38.5;
-        lastEvent = "Power Off / Service Suspended";
-        lastEventTime = "1 hour ago";
-      } else if (isWeak) {
-        health = "warning";
-        rxPower = -28.4;
-        lastEvent = "Signal Degraded (-28.4 dBm)";
-        lastEventTime = "12 mins ago";
+      const isOnline = o.status === "online";
+      let rxNum = -22.0;
+      if (o.rxPower && o.rxPower.includes("dBm")) {
+        const parsed = parseFloat(o.rxPower.replace(/[^0-9.-]/g, ''));
+        if (!isNaN(parsed)) rxNum = parsed;
       }
 
+      let health: OnuHealth = "good";
+      let lastEvent = `Operational on ${o.oltServer} (${o.ponPort})`;
+      let lastEventTime = "Live Connected";
+
+      if (!isOnline) {
+        health = "issue";
+        lastEvent = `LOS Alarm / Offline on ${o.oltServer} (${o.ponPort})`;
+        lastEventTime = `${(i % 55) + 5} mins ago`;
+      } else if (rxNum < -27.0) {
+        health = "warning";
+        lastEvent = `Optical Signal Degraded (${o.rxPower})`;
+        lastEventTime = `${(i % 20) + 2} mins ago`;
+      }
+
+      const zoneName = matchedCust?.zone || (i % 2 === 0 ? "Madaripur Sadar" : "Somitir Hat");
+      const clientCode = matchedCust?.clientCode || matchedCust?.id || `ONU-${(i + 1).toString().padStart(4, '0')}`;
+
+      // Spatial distribution around Bangladesh / Madaripur NOC
+      const col = i % 15;
+      const row = Math.floor(i / 15);
+      const mapX = 80 + (col * 58) + ((i * 17) % 30);
+      const mapY = 70 + (row * 28) + ((i * 13) % 20);
+
       return {
-        id: `ONU-${c.clientCode || c.id}`,
-        name: `${c.name} (${c.clientCode || c.id})`,
-        customer: c.name,
-        customerId: c.clientCode || c.id,
-        phone: c.phone,
-        address: c.address || `${c.subzone || c.zone}, Madaripur`,
-        zone: c.zone || "Somitir Hat",
-        olt: c.olt || "OLT-SomitirHat-01",
-        ponPort: c.ponPort || `PON 1/1/${(i % 8) + 1}`,
-        splitterId: c.splitterBox || (c.zone?.includes("Kalkini") ? "TJ-KALKINI-02" : "TJ-SOMITIR-01"),
-        mac: c.mac || `44:D9:E7:${(i + 10).toString(16).padStart(2, '0').toUpperCase()}:12:05`,
-        serial: c.deviceSerial || `MBN-ONU-${c.clientCode || c.id}`,
-        vendor: c.deviceVendor || "Huawei",
-        model: c.deviceType || "Huawei EG8145X6",
+        id: `ONU-${o.mac}`,
+        name: o.customer !== "— Unassigned —" ? `${o.customer} (${o.mac})` : `Unassigned ONU (${o.mac})`,
+        customer: o.customer,
+        customerId: clientCode,
+        phone: matchedCust?.phone || "+880 1711-000000",
+        address: matchedCust?.address || `${zoneName}, Madaripur`,
+        zone: zoneName,
+        olt: o.oltServer,
+        ponPort: o.ponPort,
+        splitterId: matchedCust?.splitterBox || `SPL-${o.oltServer}-${o.ponPort.replace(/\s+/g, '-')}`,
+        mac: o.mac,
+        serial: matchedCust?.deviceSerial || `BDCOM-${o.mac.replace(/:/g, '').toUpperCase().slice(0, 8)}`,
+        vendor: "BDCOM EPON",
+        model: "EPON ONU 1GE/4GE",
         health,
-        rxPower: Number(rxPower.toFixed(1)),
-        txPower: 2.3,
-        temperature: 38 + (i % 10),
+        rxPower: Number(rxNum.toFixed(1)),
+        txPower: 2.4,
+        temperature: 36 + (i % 8),
         lastEvent,
         lastEventTime,
-        mapX: 200 + ((i * 35) % 600),
-        mapY: 100 + ((i * 25) % 450),
+        mapX: Math.min(Math.max(mapX, 50), 950),
+        mapY: Math.min(Math.max(mapY, 40), 610),
       };
     });
   }, [customers]);
 
-  // Generate live optical events log
+  // Generate live optical events log from authentic NetX fleet
   const events: ONUEvent[] = useMemo(() => {
     const list: ONUEvent[] = [];
-    onuDevices.slice(0, 50).forEach((d, idx) => {
+    onuDevices.forEach((d, idx) => {
       if (d.health === "issue") {
         list.push({
           id: `EVT-${1000 + idx}`,
@@ -170,11 +185,11 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           customerId: d.customerId,
           zone: d.zone,
           eventType: "los",
-          timestamp: "12 mins ago",
+          timestamp: d.lastEventTime,
           rxPower: `${d.rxPower} dBm`,
-          txPower: "+2.3 dBm",
-          description: "Optical Loss of Signal (LOS) detected. Attenuation > 38 dB.",
-          duration: "12m",
+          txPower: "+2.4 dBm",
+          description: `Optical Loss of Signal (LOS) on ${d.olt} (${d.ponPort}). Attenuation > 38 dB.`,
+          duration: `${(idx % 45) + 5}m`,
         });
       } else if (d.health === "warning") {
         list.push({
@@ -189,13 +204,13 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           customerId: d.customerId,
           zone: d.zone,
           eventType: "signal_change",
-          timestamp: "28 mins ago",
+          timestamp: d.lastEventTime,
           rxPower: `${d.rxPower} dBm`,
-          txPower: "+2.3 dBm",
-          description: "Optical power degraded below -27 dBm threshold. Splice inspection required.",
+          txPower: "+2.4 dBm",
+          description: `Optical power degraded to ${d.rxPower} dBm below -27 dBm threshold on ${d.olt} (${d.ponPort}).`,
         });
       } else {
-        if (idx % 3 === 0) {
+        if (idx % 2 === 0) {
           list.push({
             id: `EVT-${3000 + idx}`,
             onuId: d.id,
@@ -208,10 +223,10 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
             customerId: d.customerId,
             zone: d.zone,
             eventType: "online",
-            timestamp: `${idx * 4 + 2}m ago`,
+            timestamp: `${(idx * 3) % 60 + 2}m ago`,
             rxPower: `${d.rxPower} dBm`,
-            txPower: "+2.3 dBm",
-            description: `GPON O5 State Reached. Link operational at ${d.rxPower} dBm on ${d.ponPort}.`,
+            txPower: "+2.4 dBm",
+            description: `EPON O5 State Reached. Link active at ${d.rxPower} dBm on ${d.olt} (${d.ponPort}).`,
           });
         }
       }
@@ -224,30 +239,62 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
   }, [onuDevices, selectedOnuId]);
 
   const filteredDevices = useMemo(() => {
+    const rawQ = search.trim().toLowerCase();
+    const cleanQ = rawQ.replace(/[^a-z0-9]/g, '');
+
     return onuDevices.filter(d => {
       const matchHealth = healthFilter === "all" || d.health === healthFilter;
-      const matchSearch =
-        !search ||
-        d.id.toLowerCase().includes(search.toLowerCase()) ||
-        d.customer.toLowerCase().includes(search.toLowerCase()) ||
-        d.mac.includes(search) ||
-        d.serial.toLowerCase().includes(search.toLowerCase()) ||
-        d.zone.toLowerCase().includes(search.toLowerCase());
-      return matchHealth && matchSearch;
+      if (!matchHealth) return false;
+      if (!rawQ) return true;
+
+      const cleanMac = d.mac.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanCust = d.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanPon = d.ponPort.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanOlt = d.olt.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      return (
+        d.id.toLowerCase().includes(rawQ) ||
+        d.customer.toLowerCase().includes(rawQ) ||
+        cleanCust.includes(cleanQ) ||
+        d.mac.toLowerCase().includes(rawQ) ||
+        cleanMac.includes(cleanQ) ||
+        d.ponPort.toLowerCase().includes(rawQ) ||
+        cleanPon.includes(cleanQ) ||
+        d.olt.toLowerCase().includes(rawQ) ||
+        cleanOlt.includes(cleanQ) ||
+        d.serial.toLowerCase().includes(rawQ) ||
+        d.zone.toLowerCase().includes(rawQ)
+      );
     });
   }, [onuDevices, healthFilter, search]);
 
   const filteredEvents = useMemo(() => {
+    const rawQ = search.trim().toLowerCase();
+    const cleanQ = rawQ.replace(/[^a-z0-9]/g, '');
+
     return events.filter(e => {
-      const matchSearch =
-        !search ||
-        e.onuId.toLowerCase().includes(search.toLowerCase()) ||
-        e.customer.toLowerCase().includes(search.toLowerCase()) ||
-        e.mac.includes(search) ||
-        e.serial.includes(search);
       const matchEvent = eventFilter === "all" || e.eventType === eventFilter;
       const matchOnu = !selectedOnuId || e.onuId === selectedOnuId;
-      return matchSearch && matchEvent && matchOnu;
+      if (!matchEvent || !matchOnu) return false;
+      if (!rawQ) return true;
+
+      const cleanMac = e.mac.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanCust = e.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanPon = e.ponPort.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanOlt = e.olt.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      return (
+        e.onuId.toLowerCase().includes(rawQ) ||
+        e.customer.toLowerCase().includes(rawQ) ||
+        cleanCust.includes(cleanQ) ||
+        e.mac.toLowerCase().includes(rawQ) ||
+        cleanMac.includes(cleanQ) ||
+        e.ponPort.toLowerCase().includes(rawQ) ||
+        cleanPon.includes(cleanQ) ||
+        e.olt.toLowerCase().includes(rawQ) ||
+        cleanOlt.includes(cleanQ) ||
+        e.serial.toLowerCase().includes(rawQ)
+      );
     });
   }, [events, search, eventFilter, selectedOnuId]);
 
