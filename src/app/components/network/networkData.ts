@@ -142,7 +142,7 @@ export const INITIAL_OLTS: OltDevice[] = [
     ip: "103.12.173.136",
     port: 1894,
     connectionProtocol: "Telnet",
-    username: "admin",
+    username: "mbn@netx.com",
     password: "••••••••",
     snmpCommunity: "public",
     snmpPort: 161,
