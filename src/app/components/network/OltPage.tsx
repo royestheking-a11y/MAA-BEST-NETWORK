@@ -60,6 +60,22 @@ export interface OltOnuRecord {
 const INITIAL_DISCOVERED: DiscoveredOnu[] = [];
 const SAMPLE_ONUS: OnuTelemetry[] = [];
 
+const REAL_TOP_ONUS: OltOnuRecord[] = [
+  { id: "onu-netx-1", mac: "4c:46:d1:55:08:25", ponPort: "epon 0/1", status: "offline", rxPower: "-26.7 dBm", customer: "Mbn@abdurrobkha", customerId: "MBN0150", oltServer: "OLT1" },
+  { id: "onu-netx-2", mac: "00:d3:9e:e2:64:e4", ponPort: "epon 0/1", status: "offline", rxPower: "-24.4 dBm", customer: "Mbn@popibegum", customerId: "MBN0119", oltServer: "OLT1" },
+  { id: "onu-netx-3", mac: "82:46:42:30:c5:48", ponPort: "epon 0/1", status: "offline", rxPower: "-15.3 dBm", customer: "Mbn@sumon", customerId: "MBN0151", oltServer: "OLT1" },
+  { id: "onu-netx-4", mac: "82:46:21:10:0e:98", ponPort: "epon 0/1", status: "offline", rxPower: "-26.3 dBm", customer: "Mbn@jasim", customerId: "MBN0090", oltServer: "OLT1" },
+  { id: "onu-netx-5", mac: "a2:3d:09:1b:a7:d0", ponPort: "epon 0/1", status: "offline", rxPower: "-22.5 dBm", customer: "Mbn@sobuj", customerId: "MBN0052", oltServer: "OLT1" },
+  { id: "onu-netx-6", mac: "00:d5:9e:d5:82:44", ponPort: "epon 0/1", status: "offline", rxPower: "-26.9 dBm", customer: "— Unassigned —", oltServer: "OLT1" },
+  { id: "onu-netx-7", mac: "4c:f9:a7:67:68:7b", ponPort: "epon 0/1", status: "offline", rxPower: "-25 dBm", customer: "Mbn@arifhosainsuman", customerId: "MBN0077", oltServer: "OLT1" },
+  { id: "onu-netx-8", mac: "a2:3e:03:0a:1e:10", ponPort: "epon 0/1", status: "offline", rxPower: "-16.9 dBm", customer: "Mbn@akterhossain", customerId: "MBN0114", oltServer: "OLT1" },
+  { id: "onu-netx-9", mac: "a0:7d:12:15:db:20", ponPort: "epon 0/1", status: "offline", rxPower: "-23.5 dBm", customer: "Mbn@rajib", customerId: "MBN0051", oltServer: "OLT1" },
+  { id: "onu-netx-10", mac: "b4:64:15:bb:14:fb", ponPort: "epon 0/1", status: "offline", rxPower: "-24.5 dBm", customer: "Mbn@alalmirdha", customerId: "MBN0154", oltServer: "OLT1" },
+  { id: "onu-netx-11", mac: "40:92:49:8a:34:b5", ponPort: "epon 0/1", status: "offline", rxPower: "-25.5 dBm", customer: "Mbn@romjanhawlader", customerId: "MBN0041", oltServer: "OLT1" },
+  { id: "onu-netx-12", mac: "f8:e8:11:2c:c1:9c", ponPort: "epon 0/1", status: "offline", rxPower: "—", customer: "— Unassigned —", oltServer: "OLT2" },
+  { id: "onu-netx-13", mac: "a2:3d:12:12:5c:d0", ponPort: "epon 0/1", status: "offline", rxPower: "—", customer: "— Unassigned —", oltServer: "OLT2" },
+];
+
 export function OltPage({ onNavigate }: OltPageProps) {
   const { customers } = useCustomerContext();
   const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(2500);
@@ -69,15 +85,21 @@ export function OltPage({ onNavigate }: OltPageProps) {
   const [onus, setOnus] = useState<OnuTelemetry[]>(SAMPLE_ONUS);
   const [activeTab, setActiveTab] = useState<"olts" | "discovery" | "diagnostics">("olts");
   
-  // ONU List Table State (matching screenshot)
-  // ONU List Table State (dynamically mapped from all 192+ real subscriber accounts across OLT1 and OLT2)
-  const [onuList, setOnuList] = useState<OltOnuRecord[]>(() => {
-    return customers.map((c, i) => {
+  // Helper to build ONU List matching NetX hardware registry
+  const buildOnuList = (custList: typeof customers) => {
+    const assignedMacs = new Set(REAL_TOP_ONUS.map(o => o.mac.toLowerCase()));
+    const additionalOnus: OltOnuRecord[] = [];
+
+    custList.forEach((c, i) => {
+      const cMac = (c.mac || "").toLowerCase();
+      if (assignedMacs.has(cMac)) return; // already in top list
+      
       const isOnline = c.status === "active" || c.netStatus === "online";
       const isOlt1 = (c.olt || "OLT1").toUpperCase().includes("1") || i % 2 === 0;
       const rxVal = c.onuSignal || (isOnline ? `-${(18.2 + (i % 8) * 0.9).toFixed(1)} dBm` : "—");
       const pppUser = c.pppUser || `Mbn@${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-      return {
+
+      additionalOnus.push({
         id: `onu-${c.id}`,
         mac: c.mac || `4c:46:d1:${(i % 89 + 10).toString(16).padStart(2, '0')}:${(i % 55 + 10).toString(16).padStart(2, '0')}:25`,
         ponPort: c.ponPort || `epon 0/${(i % 4) + 1}`,
@@ -86,9 +108,14 @@ export function OltPage({ onNavigate }: OltPageProps) {
         customer: pppUser,
         customerId: c.clientCode || c.id,
         oltServer: isOlt1 ? "OLT1" : "OLT2",
-      };
+      });
     });
-  });
+
+    return [...REAL_TOP_ONUS, ...additionalOnus];
+  };
+
+  // ONU List Table State (matching exact NetX hardware table)
+  const [onuList, setOnuList] = useState<OltOnuRecord[]>(() => buildOnuList(customers));
 
   // Keep OLTs in sync with live telemetry
   useEffect(() => {
@@ -118,37 +145,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
   // Keep ONU List in sync if customer accounts update
   useEffect(() => {
     if (customers.length > 0) {
-      setOnuList(prevList => {
-        const existingMap = new Map(prevList.map(o => [o.id, o]));
-        return customers.map((c, i) => {
-          const isOnline = c.status === "active" || c.netStatus === "online";
-          const isOlt1 = (c.olt || "OLT1").toUpperCase().includes("1") || i % 2 === 0;
-          const rxVal = c.onuSignal || (isOnline ? `-${(18.2 + (i % 8) * 0.9).toFixed(1)} dBm` : "—");
-          const pppUser = c.pppUser || `Mbn@${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-          const existing = existingMap.get(`onu-${c.id}`);
-
-          if (existing) {
-            return {
-              ...existing,
-              status: existing.adminDisabled ? "offline" : (isOnline ? "online" : "offline"),
-              customer: pppUser,
-              customerId: c.clientCode || c.id,
-              oltServer: isOlt1 ? "OLT1" : "OLT2",
-            };
-          }
-
-          return {
-            id: `onu-${c.id}`,
-            mac: c.mac || `4c:46:d1:${(i % 89 + 10).toString(16).padStart(2, '0')}:${(i % 55 + 10).toString(16).padStart(2, '0')}:25`,
-            ponPort: c.ponPort || `epon 0/${(i % 4) + 1}`,
-            status: isOnline ? "online" : "offline",
-            rxPower: isOnline ? rxVal : "—",
-            customer: pppUser,
-            customerId: c.clientCode || c.id,
-            oltServer: isOlt1 ? "OLT1" : "OLT2",
-          };
-        });
-      });
+      setOnuList(buildOnuList(customers));
     }
   }, [customers]);
 

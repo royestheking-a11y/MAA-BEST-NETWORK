@@ -169,7 +169,7 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
-      const saved = localStorage.getItem("isp_customers_store_v9_mbn_passcodes");
+      const saved = localStorage.getItem("isp_customers_store_v11_authentic_netx_macs");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= INITIAL_CUSTOMERS.length) {
@@ -227,7 +227,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("isp_customers_store_v9_mbn_passcodes", JSON.stringify(customers));
+      localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(customers));
     } catch (e) {
       console.error(e);
     }
