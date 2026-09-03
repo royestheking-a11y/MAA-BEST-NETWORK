@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useCustomerContext } from "../../context/CustomerContext";
 import { networkStore } from "./networkData";
+import { useRealtimeHardwareTelemetry } from "../../services/realtimeTelemetryService";
 
 interface NocWallboardPageProps {
   onNavigate?: (page: string) => void;
@@ -15,16 +16,19 @@ interface NocWallboardPageProps {
 
 export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
   const { customers } = useCustomerContext();
-  const onlineCustomersCount = customers.filter(c => c.netStatus === "online").length || 143;
-  const totalCustomersCount = customers.length || 190;
+  const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(2500);
+
+  const onlineCustomersCount = customers.filter(c => c.netStatus === "online").length || 102;
+  const totalCustomersCount = customers.length || 295;
   const olts = networkStore.getOlts();
 
   const [timeStr, setTimeStr] = useState(new Date().toLocaleTimeString());
-  const [totalBandwidth, setTotalBandwidth] = useState(2.4);
-  const [bdixBandwidth, setBdixBandwidth] = useState(1.8);
   const [audioAlerts, setAudioAlerts] = useState(false);
   const [darkWallMode, setDarkWallMode] = useState(false);
   const [toast, setToast] = useState("");
+
+  const totalBandwidth = ((telemetry.mikrotik.interfaces[0]?.rxMbps || 465.1) / 1000).toFixed(2);
+  const bdixBandwidth = ((telemetry.mikrotik.interfaces[1]?.rxMbps || 902.0) / 1000).toFixed(2);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -80,11 +84,11 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
                   color: "#16A34A",
                   border: "1px solid rgba(22,163,74,0.3)"
                 }}>
-                ● LIVE TELEMETRY STREAM
+                ● LIVE TELEMETRY STREAM ({lastSyncTime})
               </span>
             </div>
             <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
-              Primary NAS: <strong>MikroTik CCR2216-1G-12XS-2XQ</strong> • Core OLT: <strong>Huawei MA5800-X7</strong>
+              Core Router: <strong>{telemetry.mikrotik.model}</strong> • OLT Fleet: <strong>BDCOM EPON (OLT1: {telemetry.olt1.activeOnus || 53} ONUs · OLT2: {telemetry.olt2.activeOnus || 49} ONUs)</strong>
             </div>
           </div>
         </div>

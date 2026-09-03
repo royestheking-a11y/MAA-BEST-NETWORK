@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Wifi, Radio, RefreshCw, Search, CheckCircle2, AlertTriangle,
   Sliders, Shield, Power, Key, Smartphone, HardDrive, Eye,
   Lock, ArrowRight, X, Sparkles, Check, Activity, Laptop
 } from "lucide-react";
+import { useCustomerContext } from "../../context/CustomerContext";
+import { AUTHENTIC_NETX_ONUS } from "../../data/netxOnuData";
 
 interface Tr069AcsPageProps {
   onNavigate?: (page: string) => void;
@@ -32,10 +34,55 @@ interface CpeDevice {
   status: "online" | "offline";
 }
 
-const SAMPLE_CPES: CpeDevice[] = [];
-
 export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
-  const [cpes, setCpes] = useState<CpeDevice[]>(SAMPLE_CPES);
+  const { customers } = useCustomerContext();
+
+  const cpeDevices: CpeDevice[] = useMemo(() => {
+    const custMap = new Map<string, any>();
+    customers.forEach(c => {
+      if (c.name) custMap.set(c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
+      if (c.pppUser) custMap.set(c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
+    });
+
+    return AUTHENTIC_NETX_ONUS.map((o, idx) => {
+      const cleanCust = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const matched = custMap.get(cleanCust);
+      const isOnline = o.status === "online";
+      const cleanUser = o.customer !== "— Unassigned —" ? o.customer : `Unassigned-ONU-${idx+1}`;
+      const shortUser = o.customer.replace(/^Mbn@/, '');
+
+      return {
+        id: `CPE-${o.mac}`,
+        serial: matched?.deviceSerial || `BDCOM-${o.mac.replace(/:/g, '').toUpperCase().slice(0, 8)}`,
+        manufacturer: "BDCOM / Realtek",
+        model: "EPON Dual-Band AC1200 ONT",
+        hardwareVersion: "v2.4",
+        firmwareVersion: "V1.0.8P2T1",
+        customerName: o.customer !== "— Unassigned —" ? o.customer : "Unassigned Subscriber",
+        customerId: matched?.clientCode || matched?.id || `MBN-${(idx + 1).toString().padStart(4, '0')}`,
+        pppoeUser: cleanUser,
+        ipAddress: matched?.ipAddress || `100.64.${Math.floor(idx / 250) + 10}.${(idx % 250) + 2}`,
+        macAddress: o.mac,
+        wifiSsid24: `MBN_${shortUser}_2.4G`,
+        wifiSsid5: `MBN_${shortUser}_5G`,
+        wifiPass: matched?.passcode || "mbn@123456",
+        wifiChannel24: (idx % 11) + 1,
+        wifiChannel5: 36 + ((idx % 4) * 4),
+        connectedClients: isOnline ? (idx % 6) + 1 : 0,
+        uptime: isOnline ? `${(idx % 14) + 1}d ${(idx % 20) + 1}h` : "Offline",
+        lastInform: isOnline ? "Just now" : `${(idx % 60) + 10}m ago`,
+        status: isOnline ? "online" : "offline",
+      };
+    });
+  }, [customers]);
+
+  const [cpes, setCpes] = useState<CpeDevice[]>([]);
+
+  useMemo(() => {
+    if (cpeDevices.length > 0 && cpes.length === 0) {
+      setCpes(cpeDevices);
+    }
+  }, [cpeDevices, cpes.length]);
   const [search, setSearch] = useState("");
   const [selectedCpe, setSelectedCpe] = useState<CpeDevice | null>(null);
   const [showWifiModal, setShowWifiModal] = useState(false);

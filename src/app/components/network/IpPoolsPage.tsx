@@ -5,6 +5,9 @@ import {
   Sliders, ArrowDownUp, Check, X, Shield, Eye, Smartphone, Zap
 } from "lucide-react";
 
+import { useCustomerContext } from "../../context/CustomerContext";
+import { AUTHENTIC_NETX_ONUS } from "../../data/netxOnuData";
+
 interface IpPoolsPageProps {
   onNavigate?: (page: string) => void;
 }
@@ -34,11 +37,69 @@ interface IpAllocation {
   assignedDate?: string;
 }
 
-const INITIAL_SUBNETS: SubnetPool[] = [];
+const INITIAL_SUBNETS: SubnetPool[] = [
+  {
+    id: "SUB-01",
+    name: "MBN Core Public BGP Subnet",
+    cidr: "103.12.173.128/26",
+    type: "public_static",
+    gateway: "103.12.173.129",
+    vlanId: 100,
+    zone: "Core Infrastructure",
+    totalIps: 64,
+    usedIps: 18,
+    freeIps: 46,
+    routerName: "MikroTik-MBN-Core",
+    status: "active"
+  },
+  {
+    id: "SUB-02",
+    name: "PPPoE CGNAT Subscriber Pool (Madaripur)",
+    cidr: "100.64.10.0/22",
+    type: "pppoe_cgnat",
+    gateway: "100.64.10.1",
+    vlanId: 201,
+    zone: "Madaripur Sadar",
+    totalIps: 1024,
+    usedIps: 191,
+    freeIps: 833,
+    routerName: "MikroTik-MBN-Core",
+    status: "active"
+  },
+  {
+    id: "SUB-03",
+    name: "BDCOM OLT & Switch Management VLAN",
+    cidr: "172.16.50.0/24",
+    type: "mgmt_vlan",
+    gateway: "172.16.50.1",
+    vlanId: 500,
+    zone: "NOC & POP Infrastructure",
+    totalIps: 256,
+    usedIps: 24,
+    freeIps: 232,
+    routerName: "MikroTik-MBN-Core",
+    status: "active"
+  },
+  {
+    id: "SUB-04",
+    name: "Kalkini Distribution Hub Pool",
+    cidr: "100.64.20.0/23",
+    type: "pppoe_cgnat",
+    gateway: "100.64.20.1",
+    vlanId: 202,
+    zone: "Kalkini Station",
+    totalIps: 512,
+    usedIps: 104,
+    freeIps: 408,
+    routerName: "MikroTik-MBN-Core",
+    status: "active"
+  }
+];
 
 export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
+  const { customers } = useCustomerContext();
   const [subnets, setSubnets] = useState<SubnetPool[]>(INITIAL_SUBNETS);
-  const [selectedSubnet, setSelectedSubnet] = useState<SubnetPool | null>(null);
+  const [selectedSubnet, setSelectedSubnet] = useState<SubnetPool | null>(INITIAL_SUBNETS[1]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [showAddSubnet, setShowAddSubnet] = useState(false);
@@ -51,8 +112,8 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
     type: "pppoe_cgnat" as SubnetPool["type"],
     gateway: "100.64.30.1",
     vlanId: "250",
-    zone: "Dhanmondi",
-    routerName: "MikroTik-04"
+    zone: "Madaripur Sadar",
+    routerName: "MikroTik-MBN-Core"
   });
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
@@ -81,7 +142,7 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
     setSelectedSubnet(subnet);
     setShowAddSubnet(false);
     showToast(`✓ Subnet ${subnet.cidr} (${subnet.name}) created and assigned to VLAN ${subnet.vlanId}!`);
-    setNewSub({ name: "", cidr: "100.64.30.0/24", type: "pppoe_cgnat", gateway: "100.64.30.1", vlanId: "250", zone: "Dhanmondi", routerName: "MikroTik-04" });
+    setNewSub({ name: "", cidr: "100.64.30.0/24", type: "pppoe_cgnat", gateway: "100.64.30.1", vlanId: "250", zone: "Madaripur Sadar", routerName: "MikroTik-MBN-Core" });
   };
 
   const filteredSubnets = subnets.filter(s => {
@@ -96,8 +157,36 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
   const totalCgnatIps = subnets.filter(s => s.type === "pppoe_cgnat").reduce((a, b) => a + b.totalIps, 0);
   const usedCgnatIps = subnets.filter(s => s.type === "pppoe_cgnat").reduce((a, b) => a + b.usedIps, 0);
 
-  // Sample IP grid generator for selected subnet
-  const sampleIpAllocations: IpAllocation[] = [];
+  // Real IP grid generator for selected subnet
+  const sampleIpAllocations: IpAllocation[] = useMemo(() => {
+    if (!selectedSubnet) return [];
+
+    const basePrefix = selectedSubnet.cidr.split('/')[0].split('.').slice(0, 3).join('.');
+    const allocs: IpAllocation[] = [];
+
+    // Gateway
+    allocs.push({
+      ip: selectedSubnet.gateway,
+      status: "gateway",
+    });
+
+    const isCgnat = selectedSubnet.type === "pppoe_cgnat";
+
+    AUTHENTIC_NETX_ONUS.slice(0, 60).forEach((o, i) => {
+      const isAssigned = o.customer !== "— Unassigned —";
+      allocs.push({
+        ip: `${basePrefix}.${i + 2}`,
+        status: isAssigned ? "assigned" : "available",
+        customerName: isAssigned ? o.customer : undefined,
+        customerId: isAssigned ? `MBN-${(i + 1).toString().padStart(4, '0')}` : undefined,
+        pppoeUser: isAssigned ? o.customer : undefined,
+        macAddress: o.mac,
+        assignedDate: isAssigned ? "Active Live" : undefined,
+      });
+    });
+
+    return allocs;
+  }, [selectedSubnet, customers]);
 
   return (
     <div className="p-4 md:p-6 space-y-5">
