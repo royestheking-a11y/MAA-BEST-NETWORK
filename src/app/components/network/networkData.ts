@@ -5,17 +5,20 @@ export type MapNodeStatus = "online" | "warning" | "offline";
 
 export interface MapNode {
   id: string;
-  label: string;
   name: string;
-  sub: string;
   type: MapNodeType;
   x: number;
   y: number;
   status: MapNodeStatus;
-  sessions: number;
-  cpu: number;
   ip: string;
-  uptime: string;
+  label?: string;
+  sub?: string;
+  sessions?: number;
+  cpu?: number;
+  ram?: string;
+  uptime?: string;
+  traffic?: string;
+  latency?: string;
   rxPower?: number;
   onuCount?: number;
 }
@@ -24,21 +27,37 @@ export interface MapEdge {
   from: string;
   to: string;
   status: MapNodeStatus;
-  speed: string;
+  speed?: string;
+  label?: string;
 }
 
 export interface MikrotikServer {
   id: string;
   name: string;
-  location: string;
-  model: string;
   ip: string;
-  cpu: number;
-  ram: number;
+  model: string;
+  cpu?: number;
+  cpuLoad?: number;
+  ram?: number;
+  memoryUsed?: number;
+  memoryTotal?: number;
   uptime: string;
-  sessions: number;
+  sessions?: number;
+  activePppoe?: number;
+  activeHotspot?: number;
+  activeStatic?: number;
+  totalSessions?: number;
+  downloadMbps?: number;
+  uploadMbps?: number;
   status: "online" | "warning" | "offline";
   lastSync: string;
+  location?: string;
+  apiPort?: number;
+  winboxPort?: number;
+  username?: string;
+  password?: string;
+  rosVersion?: string;
+  role?: string;
   temperature?: number;
   interfaces?: { name: string; tx: string; rx: string }[];
 }
