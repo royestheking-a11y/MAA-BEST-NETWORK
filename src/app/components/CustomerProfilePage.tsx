@@ -156,7 +156,115 @@ const inputStyle = {
 };
 
 export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfilePageProps) {
-  const [customer, setCustomer] = useState(initialCustomer);
+  const { customers, activeCustomer } = useCustomerContext();
+
+  const realCustomer = useMemo(() => {
+    if (customerId) {
+      const match = customers.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
+      if (match) return match;
+    }
+    if (activeCustomer) return activeCustomer;
+    return customers[0] || null;
+  }, [customerId, activeCustomer, customers]);
+
+  const [customer, setCustomer] = useState(() => {
+    const c = realCustomer || customers[0];
+    if (!c) return initialCustomer;
+    return {
+      id: c.clientCode || c.id,
+      name: c.name,
+      phone: c.phone || "01711-223344",
+      altPhone: c.phone2 || "—",
+      email: c.email || `${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`,
+      nid: c.nidNo || "19821234567890",
+      address: c.address || "Kalkini, Madaripur",
+      zone: c.zone || "Madaripur",
+      subZone: c.subzone || "Kalkini Somitir Hat",
+      area: c.subzone || "Somitir Hat Bazar",
+      lat: "23.0641",
+      lng: "90.2467",
+      status: (c.status === "active" ? "active" : "offline") as any,
+      notes: c.remarks || "Reliable customer. Verified account.",
+      createdAt: c.joinDate || "12 Aug 2023",
+      pppoeUsername: c.pppUser || `mbn_${c.name.toLowerCase()}`,
+      pppoePassword: c.pppPass || "••••••••",
+      staticIP: c.ip || "103.145.60.47",
+      connectionType: "PPPoE",
+      macAddress: c.mac || "4c:46:d1:55:08:25",
+      mikrotik: c.mikrotik || "MikroTik-01 (Madaripur Core)",
+      olt: c.olt || "OLT1",
+      onu: c.onuSerial || "ONU-0802",
+      onuMac: c.mac || "4c:46:d1:55:08:25",
+      ponPort: c.ponPort || "epon 0/1",
+      onuModel: "BDCOM EPON ONU",
+      onuSerial: c.onuSerial || "BDCM7A1190BC",
+      vlan: "VLAN-100",
+      serviceProfile: "EPON-1G-Profile",
+      rxPower: c.onuSignal || "-19.2 dBm",
+      txPower: "2.1 dBm",
+      distance: "1.24 km",
+      currentStatus: (c.netStatus === "online" || c.status === "active" ? "online" : "offline") as any,
+      uptime: c.sessionUptime || "6d 14h 32m",
+      package: c.profile || "20 Mbps Fiber Standard",
+      packagePrice: c.packagePrice || 1200,
+      vat: 0,
+      lateFee: 0,
+      currentBalance: c.dueAmount || 0,
+      previousDue: 0,
+      lastPaidDate: "01 Aug 2026",
+      lastPaidAmount: c.packagePrice || 1200,
+    };
+  });
+
+  useEffect(() => {
+    if (realCustomer) {
+      setCustomer({
+        id: realCustomer.clientCode || realCustomer.id,
+        name: realCustomer.name,
+        phone: realCustomer.phone || "01711-223344",
+        altPhone: realCustomer.phone2 || "—",
+        email: realCustomer.email || `${realCustomer.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`,
+        nid: realCustomer.nidNo || "19821234567890",
+        address: realCustomer.address || "Kalkini, Madaripur",
+        zone: realCustomer.zone || "Madaripur",
+        subZone: realCustomer.subzone || "Kalkini Somitir Hat",
+        area: realCustomer.subzone || "Somitir Hat Bazar",
+        lat: "23.0641",
+        lng: "90.2467",
+        status: (realCustomer.status === "active" ? "active" : "offline") as any,
+        notes: realCustomer.remarks || "Reliable customer. Verified account.",
+        createdAt: realCustomer.joinDate || "12 Aug 2023",
+        pppoeUsername: realCustomer.pppUser || `mbn_${realCustomer.name.toLowerCase()}`,
+        pppoePassword: realCustomer.pppPass || "••••••••",
+        staticIP: realCustomer.ip || "103.145.60.47",
+        connectionType: "PPPoE",
+        macAddress: realCustomer.mac || "4c:46:d1:55:08:25",
+        mikrotik: realCustomer.mikrotik || "MikroTik-01 (Madaripur Core)",
+        olt: realCustomer.olt || "OLT1",
+        onu: realCustomer.onuSerial || "ONU-0802",
+        onuMac: realCustomer.mac || "4c:46:d1:55:08:25",
+        ponPort: realCustomer.ponPort || "epon 0/1",
+        onuModel: "BDCOM EPON ONU",
+        onuSerial: realCustomer.onuSerial || "BDCM7A1190BC",
+        vlan: "VLAN-100",
+        serviceProfile: "EPON-1G-Profile",
+        rxPower: realCustomer.onuSignal || "-19.2 dBm",
+        txPower: "2.1 dBm",
+        distance: "1.24 km",
+        currentStatus: (realCustomer.netStatus === "online" || realCustomer.status === "active" ? "online" : "offline") as any,
+        uptime: realCustomer.sessionUptime || "6d 14h 32m",
+        package: realCustomer.profile || "20 Mbps Fiber Standard",
+        packagePrice: realCustomer.packagePrice || 1200,
+        vat: 0,
+        lateFee: 0,
+        currentBalance: realCustomer.dueAmount || 0,
+        previousDue: 0,
+        lastPaidDate: "01 Aug 2026",
+        lastPaidAmount: realCustomer.packagePrice || 1200,
+      });
+    }
+  }, [realCustomer]);
+
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [toast, setToast] = useState("");
   const [showActionModal, setShowActionModal] = useState<string | null>(null);

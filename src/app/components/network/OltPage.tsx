@@ -58,28 +58,11 @@ export interface OltOnuRecord {
 }
 
 const INITIAL_DISCOVERED: DiscoveredOnu[] = [];
-
 const SAMPLE_ONUS: OnuTelemetry[] = [];
-
-const INITIAL_ONU_RECORDS: OltOnuRecord[] = [
-  { id: "onu-1", mac: "4c:46:d1:55:08:25", ponPort: "epon 0/1", status: "online", rxPower: "-26.7 dBm", customer: "Mbn@abdurrobkha", oltServer: "OLT1" },
-  { id: "onu-2", mac: "00:d3:9e:e2:64:e4", ponPort: "epon 0/1", status: "online", rxPower: "-24.6 dBm", customer: "Mbn@popibegum", oltServer: "OLT1" },
-  { id: "onu-3", mac: "82:46:42:30:c5:48", ponPort: "epon 0/1", status: "online", rxPower: "-15.5 dBm", customer: "Mbn@sumon", oltServer: "OLT1" },
-  { id: "onu-4", mac: "82:46:21:10:0e:98", ponPort: "epon 0/1", status: "online", rxPower: "-26.3 dBm", customer: "Mbn@jasim", oltServer: "OLT1" },
-  { id: "onu-5", mac: "a2:3d:09:1b:a7:d0", ponPort: "epon 0/1", status: "online", rxPower: "-22.5 dBm", customer: "Mbn@sobuj", oltServer: "OLT1" },
-  { id: "onu-6", mac: "00:d5:9e:d5:82:44", ponPort: "epon 0/1", status: "online", rxPower: "-27.4 dBm", customer: "— Unassigned —", oltServer: "OLT1" },
-  { id: "onu-7", mac: "4c:f9:a7:67:68:7b", ponPort: "epon 0/1", status: "online", rxPower: "-25 dBm", customer: "Mbn@arifhosainsuman", oltServer: "OLT1" },
-  { id: "onu-8", mac: "a2:3e:03:0a:1e:10", ponPort: "epon 0/1", status: "online", rxPower: "-17.3 dBm", customer: "Mbn@akterhossain", oltServer: "OLT1" },
-  { id: "onu-9", mac: "a0:7d:12:15:db:20", ponPort: "epon 0/1", status: "online", rxPower: "-23.5 dBm", customer: "Mbn@rajib", oltServer: "OLT1" },
-  { id: "onu-10", mac: "b4:64:15:bb:14:fb", ponPort: "epon 0/1", status: "online", rxPower: "-24.5 dBm", customer: "Mbn@alalmirdha", oltServer: "OLT1" },
-  { id: "onu-11", mac: "f8:e8:11:2c:c1:9c", ponPort: "epon 0/1", status: "offline", rxPower: "—", customer: "— Unassigned —", oltServer: "OLT2" },
-  { id: "onu-12", mac: "40:92:49:8a:34:b5", ponPort: "epon 0/1", status: "online", rxPower: "-25.5 dBm", customer: "Mbn@romjanhawlader", oltServer: "OLT1" },
-  { id: "onu-13", mac: "a2:3d:12:12:5c:d0", ponPort: "epon 0/1", status: "offline", rxPower: "—", customer: "— Unassigned —", oltServer: "OLT2" },
-];
 
 export function OltPage({ onNavigate }: OltPageProps) {
   const { customers } = useCustomerContext();
-  const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(5000);
+  const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(2500);
 
   const [olts, setOlts] = useState<OltDevice[]>(networkStore.getOlts());
   const [discovered, setDiscovered] = useState<DiscoveredOnu[]>(INITIAL_DISCOVERED);
