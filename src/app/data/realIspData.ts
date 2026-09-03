@@ -120,12 +120,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.52",
-    "mac": "00:d3:9e:14:28:5a",
+    "mac": "4c:f9:a1:d2:b6:ea",
     "pppUser": "mbn@jannat",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-25.8 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "27/06/2026",
@@ -166,7 +166,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0002"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0003",
@@ -618,12 +618,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.58",
-    "mac": "f8:e8:11:3e:6a:c0",
+    "mac": "c0:7e:40:e2:06:61",
     "pppUser": "mbn@mdabubakersiddik",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "—",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "17/07/2026",
@@ -664,7 +664,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0008"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0009",
@@ -774,7 +774,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 17,
@@ -784,12 +784,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.60",
-    "mac": "e0:67:b3:4c:80:e2",
+    "mac": "a2:4e:01:18:2f:00",
     "pppUser": "mbn@hafijul",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-27.2 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "17/06/2026",
@@ -830,7 +830,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0010"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0011",
@@ -950,12 +950,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.62",
-    "mac": "14:14:4b:5a:96:04",
+    "mac": "a2:4f:b2:04:12:88",
     "pppUser": "mbn@mosarafkha",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-22.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "08/07/2026",
@@ -996,7 +996,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0012"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0013",
@@ -1282,12 +1282,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.66",
-    "mac": "82:46:42:76:c2:48",
+    "mac": "4c:f9:a2:2e:4e:eb",
     "pppUser": "mbn@obaidul",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-12.2 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -1328,7 +1328,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0016"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0017",
@@ -1365,12 +1365,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.67",
-    "mac": "a2:3d:09:7d:cd:59",
+    "mac": "80:d4:a5:64:5f:9f",
     "pppUser": "mbn@saharakhatun",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-14.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/08/2026",
@@ -1411,7 +1411,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0017"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0018",
@@ -1614,12 +1614,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.70",
-    "mac": "40:92:49:92:ee:8c",
+    "mac": "4c:46:d1:96:ef:83",
     "pppUser": "mbn@rojibegom",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-29.2 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -1660,7 +1660,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0020"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0021",
@@ -1697,12 +1697,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.71",
-    "mac": "f8:e8:11:99:f9:9d",
+    "mac": "a2:3d:12:12:5c:d0",
     "pppUser": "mbn@salamkhan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-14.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "18/08/2026",
@@ -1946,12 +1946,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.74",
-    "mac": "bc:20:ba:ae:1a:d0",
+    "mac": "4c:f9:a1:ee:c8:36",
     "pppUser": "mbn@aleyabegum",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-22.7 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-17.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -1992,7 +1992,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0024"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0025",
@@ -2185,7 +2185,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 30,
@@ -2195,12 +2195,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.77",
-    "mac": "4c:46:d1:c3:3b:03",
+    "mac": "24:4c:07:5a:23:a7",
     "pppUser": "mbn@mazeda",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-26.9 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "31/07/2026",
@@ -2241,7 +2241,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0027"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0028",
@@ -2351,7 +2351,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 28,
@@ -2361,12 +2361,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.79",
-    "mac": "82:46:42:d1:51:25",
+    "mac": "00:d3:9e:79:75:54",
     "pppUser": "mbn@siamahmed",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-13.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "28/07/2026",
@@ -2407,7 +2407,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0029"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0030",
@@ -2589,7 +2589,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 7,
@@ -2599,12 +2599,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.82",
-    "mac": "b4:64:15:e6:72:58",
+    "mac": "a0:7f:c2:41:4a:f8",
     "pppUser": "mbn@samimchokder",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-21.8 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-24.6 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -2645,7 +2645,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0032"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0033",
@@ -2682,12 +2682,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.83",
-    "mac": "40:92:49:ed:7d:69",
+    "mac": "00:d3:9e:79:1e:ba",
     "pppUser": "mbn@mizanur",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-22.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "04/08/2026",
@@ -2728,7 +2728,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0033"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0034",
@@ -3014,12 +3014,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.87",
-    "mac": "bc:20:ba:09:a9:ad",
+    "mac": "00:d5:9e:e3:6b:d6",
     "pppUser": "mbn@modasser",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-28.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -3351,7 +3351,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.5 dBm",
+    "onuSignal": "-25.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -3668,7 +3668,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 1,
@@ -3678,12 +3678,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.95",
-    "mac": "b4:64:15:41:01:35",
+    "mac": "70:a5:6a:2e:f6:93",
     "pppUser": "mbn@ruma",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-29.2 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -3761,12 +3761,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.96",
-    "mac": "40:92:49:48:0c:46",
+    "mac": "68:8f:84:14:b4:7c",
     "pppUser": "mbn@monirhowlader",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -3807,7 +3807,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0046"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0047",
@@ -3917,7 +3917,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 30,
@@ -3927,12 +3927,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.98",
-    "mac": "00:d5:9e:56:22:68",
+    "mac": "80:d4:a5:62:c6:af",
     "pppUser": "mbn@asma",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-15.8 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -3973,7 +3973,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0048"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0049",
@@ -4010,12 +4010,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.99",
-    "mac": "e0:67:b3:5d:2d:79",
+    "mac": "ac:85:3d:68:c7:c8",
     "pppUser": "mbn@alinur",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.9 dBm",
+    "onuSignal": "-31.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -4056,7 +4056,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0049"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0050",
@@ -4093,12 +4093,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.100",
-    "mac": "bc:20:ba:64:38:8a",
+    "mac": "80:f1:a8:5a:ac:70",
     "pppUser": "mbn@taniyaakter",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-21.8 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-18.9 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "29/07/2026",
@@ -4249,7 +4249,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 10,
@@ -4332,7 +4332,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 3,
@@ -4342,12 +4342,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.103",
-    "mac": "4c:46:d1:79:59:bd",
+    "mac": "4c:46:d1:87:14:77",
     "pppUser": "mbn@abulmoksed",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-27.9 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "03/06/2026",
@@ -4388,7 +4388,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0053"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0054",
@@ -4425,12 +4425,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.104",
-    "mac": "00:d3:9e:80:64:ce",
+    "mac": "00:d3:9e:3d:06:f6",
     "pppUser": "mbn@yeamin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-25.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -4471,7 +4471,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0054"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0055",
@@ -4508,12 +4508,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.105",
-    "mac": "82:46:42:87:6f:df",
+    "mac": "ac:12:8e:90:9c:f0",
     "pppUser": "mbn@krim",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-26.3 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "05/06/2026",
@@ -4554,7 +4554,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0055"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0056",
@@ -4674,12 +4674,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.107",
-    "mac": "a0:7d:12:95:85:01",
+    "mac": "a2:4e:01:18:06:00",
     "pppUser": "mbn@hannankhan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-20.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -4720,7 +4720,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0057"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0058",
@@ -4747,7 +4747,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 1,
@@ -4757,12 +4757,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.108",
-    "mac": "b4:64:15:9c:90:12",
+    "mac": "00:d5:9e:70:77:76",
     "pppUser": "mbn@sajolmia",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -4803,7 +4803,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0058"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0059",
@@ -4840,12 +4840,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.109",
-    "mac": "40:92:49:a3:9b:23",
+    "mac": "00:d5:9e:9e:f1:10",
     "pppUser": "mbn@mueeinal",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-21.8 dBm",
+    "onuSignal": "-23.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "03/06/2026",
@@ -4886,7 +4886,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0059"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0060",
@@ -4913,7 +4913,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 29,
@@ -4923,12 +4923,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.110",
-    "mac": "f8:e8:11:aa:a6:34",
+    "mac": "a2:4e:04:09:9c:f0",
     "pppUser": "mbn@shahida",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-22.7 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-30.4 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -4969,7 +4969,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0060"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0061",
@@ -5006,12 +5006,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.111",
-    "mac": "00:d5:9e:b1:b1:45",
+    "mac": "68:89:c1:5c:63:ba",
     "pppUser": "mbn@mojibarbepari",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-12.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "30/05/2026",
@@ -5079,7 +5079,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 7,
@@ -5089,12 +5089,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.112",
-    "mac": "e0:67:b3:b8:bc:56",
+    "mac": "f8:e8:11:2c:c1:9c",
     "pppUser": "mbn@khukumani",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-15.5 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "07/06/2026",
@@ -5135,7 +5135,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0062"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0063",
@@ -5255,12 +5255,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.114",
-    "mac": "14:14:4b:c6:d2:78",
+    "mac": "f0:98:38:32:1c:2c",
     "pppUser": "mbn@hasanatmian",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-24 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -5301,7 +5301,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0064"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0065",
@@ -5338,12 +5338,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.115",
-    "mac": "28:6c:07:cd:dd:89",
+    "mac": "4c:f9:a1:fc:2e:85",
     "pppUser": "mbn@shazidulalom",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-30.4 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -5384,7 +5384,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0065"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0066",
@@ -5421,12 +5421,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.116",
-    "mac": "4c:46:d1:d4:e8:9a",
+    "mac": "00:d3:9e:77:89:f6",
     "pppUser": "mbn@nayemhasan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-20 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "02/06/2026",
@@ -5467,7 +5467,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0066"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0067",
@@ -5494,7 +5494,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 14,
@@ -5504,12 +5504,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.117",
-    "mac": "00:d3:9e:db:f3:ab",
+    "mac": "a0:8c:a3:e5:ba:02",
     "pppUser": "mbn@rabbihasan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.9 dBm",
+    "onuSignal": "-21.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "10/06/2026",
@@ -5550,7 +5550,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0067"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0068",
@@ -5587,12 +5587,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.118",
-    "mac": "82:46:42:e2:fe:bc",
+    "mac": "4c:f9:a2:a0:b5:75",
     "pppUser": "mbn@saifulsarder",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-21.8 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-27.4 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -5633,7 +5633,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0068"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0069",
@@ -5670,12 +5670,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.119",
-    "mac": "a2:3d:09:e9:09:cd",
+    "mac": "50:5b:1d:b2:43:bc",
     "pppUser": "mbn@nazimuddin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-17 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/07/2026",
@@ -5743,7 +5743,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "online",
+    "netStatus": "offline",
     "duration": "1d:4h:12m:0s",
     "logoutTime": null,
     "billingDate": 9,
@@ -5753,12 +5753,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.120",
-    "mac": "a0:7d:12:f0:14:de",
+    "mac": "a2:4e:03:25:91:b0",
     "pppUser": "mbn@nargisbegum",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.1 dBm",
     "sessionUptime": "1d 4h",
     "monthlyUsageGB": 14.5,
     "joinDate": "01/06/2026",
@@ -5799,7 +5799,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0070"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0071",
@@ -5836,12 +5836,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.121",
-    "mac": "b4:64:15:f7:1f:ef",
+    "mac": "00:d5:9e:76:5a:ea",
     "pppUser": "mbn@anoar",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-21 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -5882,7 +5882,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0071"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0072",
@@ -5919,12 +5919,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.122",
-    "mac": "40:92:49:fe:2a:00",
+    "mac": "94:04:9c:14:97:d9",
     "pppUser": "mbn@akter",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-27.9 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -5965,7 +5965,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0072"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0073",
@@ -5992,7 +5992,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 10,
@@ -6002,12 +6002,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.123",
-    "mac": "f8:e8:11:05:35:11",
+    "mac": "48:ad:08:54:c4:f3",
     "pppUser": "mbn@bilalhossain",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-24.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -6048,7 +6048,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0073"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0074",
@@ -6168,12 +6168,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.125",
-    "mac": "e0:67:b3:13:4b:33",
+    "mac": "4c:ae:1c:79:0b:b0",
     "pppUser": "mbn@kawsarhamid",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-14.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -6214,7 +6214,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0075"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0076",
@@ -6407,7 +6407,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 26,
@@ -6417,12 +6417,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.128",
-    "mac": "28:6c:07:28:6c:66",
+    "mac": "a2:3e:05:09:23:70",
     "pppUser": "mbn@lutfunnesa",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-22.7 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-20.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -6490,7 +6490,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 16,
@@ -6500,12 +6500,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.129",
-    "mac": "4c:46:d1:2f:77:77",
+    "mac": "4c:46:d1:b1:7b:ad",
     "pppUser": "mbn@sonia",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-27.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "16/05/2026",
@@ -6546,7 +6546,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0079"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0080",
@@ -6583,12 +6583,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.130",
-    "mac": "00:d3:9e:36:82:88",
+    "mac": "24:44:27:cf:ff:45",
     "pppUser": "mbn@hanif",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-19.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -6666,12 +6666,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.131",
-    "mac": "82:46:42:3d:8d:99",
+    "mac": "4c:d7:c8:a8:5d:7b",
     "pppUser": "mbn@sabbirhosain",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-25.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -6749,12 +6749,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.132",
-    "mac": "a2:3d:09:44:98:aa",
+    "mac": "4c:f9:a7:24:fe:14",
     "pppUser": "mbn@rakibkhan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-24.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -6795,7 +6795,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0082"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0083",
@@ -6987,12 +6987,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.135",
-    "mac": "40:92:49:59:b9:dd",
+    "mac": "f4:b8:c1:b9:22:0f",
     "pppUser": "mbn@khadizabegum",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.9 dBm",
+    "onuSignal": "-28.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "30/05/2026",
@@ -7070,12 +7070,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.136",
-    "mac": "f8:e8:11:60:c4:ee",
+    "mac": "80:d4:a5:3a:4c:cf",
     "pppUser": "mbn@sajalmollik",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-21.8 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-23 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7116,7 +7116,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0086"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0087",
@@ -7143,7 +7143,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 16,
@@ -7153,12 +7153,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.137",
-    "mac": "00:d5:9e:67:cf:ff",
+    "mac": "48:46:fb:d9:b6:66",
     "pppUser": "mbn@kalambiswas",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-11.9 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7199,7 +7199,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0087"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0088",
@@ -7226,7 +7226,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 4,
@@ -7236,12 +7236,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.138",
-    "mac": "e0:67:b3:6e:da:10",
+    "mac": "00:d3:9e:74:47:36",
     "pppUser": "mbn@halima",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-29.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7282,7 +7282,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0088"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0089",
@@ -7319,12 +7319,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.139",
-    "mac": "bc:20:ba:75:e5:21",
+    "mac": "00:d3:9e:73:68:88",
     "pppUser": "mbn@resmaakter",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-24.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7365,7 +7365,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0089"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0090",
@@ -7485,12 +7485,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.141",
-    "mac": "28:6c:07:83:fb:43",
+    "mac": "b4:64:15:ba:76:6f",
     "pppUser": "mbn@asad",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-21.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7558,7 +7558,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 10,
@@ -7568,12 +7568,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.142",
-    "mac": "4c:46:d1:8a:06:54",
+    "mac": "4c:f9:a7:90:b2:a7",
     "pppUser": "mbn@mdshohag",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-22 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7614,7 +7614,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0092"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0093",
@@ -7651,12 +7651,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.143",
-    "mac": "00:d3:9e:91:11:65",
+    "mac": "30:f3:35:99:0b:ab",
     "pppUser": "mbn@shanta",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-22.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7724,7 +7724,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 9,
@@ -7734,12 +7734,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.144",
-    "mac": "82:46:42:98:1c:76",
+    "mac": "a2:3d:12:12:3a:e0",
     "pppUser": "mbn@abdullah",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7807,7 +7807,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 13,
@@ -7817,12 +7817,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.145",
-    "mac": "a2:3d:09:9f:27:87",
+    "mac": "80:d4:a5:08:1d:af",
     "pppUser": "mbn@lipy",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-21.8 dBm",
+    "onuSignal": "-22 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "13/06/2026",
@@ -7863,7 +7863,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0095"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0096",
@@ -7900,12 +7900,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.146",
-    "mac": "a0:7d:12:a6:32:98",
+    "mac": "4c:f9:a2:c4:56:71",
     "pppUser": "mbn@nasir",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-22.7 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-33 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -7946,7 +7946,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0096"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0097",
@@ -7973,7 +7973,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 2,
@@ -7983,12 +7983,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.147",
-    "mac": "b4:64:15:ad:3d:a9",
+    "mac": "e4:2d:7b:5b:49:ff",
     "pppUser": "mbn@mohasin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-17.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -8029,7 +8029,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0097"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0098",
@@ -8066,12 +8066,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.148",
-    "mac": "40:92:49:b4:48:ba",
+    "mac": "24:4c:07:f2:4c:83",
     "pppUser": "mbn@dinislam",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-25.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "02/06/2026",
@@ -8112,7 +8112,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0098"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0099",
@@ -8222,7 +8222,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 1,
@@ -8232,12 +8232,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.150",
-    "mac": "00:d5:9e:c2:5e:dc",
+    "mac": "00:d3:9e:79:75:ba",
     "pppUser": "mbn@limon",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-32.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -8278,7 +8278,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0100"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0101",
@@ -8315,12 +8315,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.151",
-    "mac": "e0:67:b3:c9:69:ed",
+    "mac": "b4:64:15:ba:c4:ff",
     "pppUser": "mbn@shilpibegum",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-27.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "05/06/2026",
@@ -8361,7 +8361,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0101"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0102",
@@ -8388,7 +8388,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 2,
@@ -8398,12 +8398,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.152",
-    "mac": "bc:20:ba:d0:74:fe",
+    "mac": "a2:4f:05:24:72:c0",
     "pppUser": "mbn@mdsabbirapurbo",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-28.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "02/06/2026",
@@ -8564,12 +8564,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.154",
-    "mac": "28:6c:07:de:8a:20",
+    "mac": "48:ad:08:59:57:fe",
     "pppUser": "mbn@ashikur",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-21.8 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-26.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/07/2026",
@@ -8610,7 +8610,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0104"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0105",
@@ -8647,12 +8647,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.155",
-    "mac": "4c:46:d1:e5:95:31",
+    "mac": "4c:f9:a7:90:f4:9d",
     "pppUser": "mbn@sowkatkhan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-24.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -8730,12 +8730,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.156",
-    "mac": "00:d3:9e:ec:a0:42",
+    "mac": "a2:7e:04:1a:f0:70",
     "pppUser": "mbn@ziyasmin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-33.9 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -8776,7 +8776,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0106"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0107",
@@ -8803,7 +8803,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 19,
@@ -8813,12 +8813,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.157",
-    "mac": "82:46:42:f3:ab:53",
+    "mac": "a2:8d:04:20:e5:c0",
     "pppUser": "mbn@titul",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-31.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "19/05/2026",
@@ -8859,7 +8859,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0107"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0108",
@@ -8896,12 +8896,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.158",
-    "mac": "a2:3d:09:fa:b6:64",
+    "mac": "98:c7:a4:67:5c:9d",
     "pppUser": "mbn@rupiabegum",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-28.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "25/07/2026",
@@ -8942,7 +8942,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0108"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0109",
@@ -8969,7 +8969,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 1,
@@ -8979,12 +8979,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.159",
-    "mac": "a0:7d:12:01:c1:75",
+    "mac": "a2:4e:05:24:06:e0",
     "pppUser": "mbn@khaled",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-13.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -9025,7 +9025,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0109"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0110",
@@ -9052,7 +9052,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 13,
@@ -9062,12 +9062,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.160",
-    "mac": "b4:64:15:08:cc:86",
+    "mac": "4c:f9:a7:aa:0c:ff",
     "pppUser": "mbn@forhadmollah",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "13/06/2026",
@@ -9135,7 +9135,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 20,
@@ -9145,12 +9145,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.161",
-    "mac": "40:92:49:0f:d7:97",
+    "mac": "4c:f9:a7:5a:a7:4d",
     "pppUser": "mbn@almahabub",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-14.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -9191,7 +9191,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0111"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0112",
@@ -9218,7 +9218,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 21,
@@ -9228,12 +9228,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.162",
-    "mac": "f8:e8:11:16:e2:a8",
+    "mac": "4c:46:d1:1d:6a:98",
     "pppUser": "mbn@abdurrahaman",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-24 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "21/08/2026",
@@ -9274,7 +9274,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0112"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0113",
@@ -9311,12 +9311,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.163",
-    "mac": "00:d5:9e:1d:ed:b9",
+    "mac": "a2:4f:01:06:93:20",
     "pppUser": "mbn@shaalam",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-21.8 dBm",
+    "onuSignal": "-33 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "08/07/2026",
@@ -9357,7 +9357,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0113"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0114",
@@ -9477,12 +9477,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.165",
-    "mac": "bc:20:ba:2b:03:db",
+    "mac": "00:d5:9e:e0:06:54",
     "pppUser": "mbn@alamin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-23.7 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -9523,7 +9523,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0115"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0116",
@@ -9560,12 +9560,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.166",
-    "mac": "14:14:4b:32:0e:ec",
+    "mac": "a0:7e:12:22:7c:80",
     "pppUser": "mbn@liza",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-23 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "03/06/2026",
@@ -9606,7 +9606,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0116"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0117",
@@ -9643,12 +9643,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.167",
-    "mac": "28:6c:07:39:19:fd",
+    "mac": "00:d5:9e:9e:38:fc",
     "pppUser": "mbn@motaleb",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-27.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "20/06/2026",
@@ -9726,12 +9726,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.168",
-    "mac": "4c:46:d1:40:24:0e",
+    "mac": "ac:85:3d:df:f1:2d",
     "pppUser": "mbn@ansaruddin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-20.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -9772,7 +9772,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0118"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0119",
@@ -9882,7 +9882,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 27,
@@ -9892,12 +9892,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.170",
-    "mac": "82:46:42:4e:3a:30",
+    "mac": "4c:f9:a1:91:8a:60",
     "pppUser": "mbn@khalilhowlader",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-23.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "27/06/2026",
@@ -9938,7 +9938,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0120"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0121",
@@ -9965,7 +9965,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 5,
@@ -9975,12 +9975,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.171",
-    "mac": "a2:3d:09:55:45:41",
+    "mac": "4c:f9:a7:f5:d3:18",
     "pppUser": "mbn@tanjelabegum",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.9 dBm",
+    "onuSignal": "-27.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "05/06/2026",
@@ -10021,7 +10021,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0121"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0122",
@@ -10131,7 +10131,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 3,
@@ -10141,12 +10141,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.173",
-    "mac": "b4:64:15:63:5b:63",
+    "mac": "a2:4f:05:24:e8:70",
     "pppUser": "mbn@azizulhaque",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-19.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -10187,7 +10187,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0123"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0124",
@@ -10224,12 +10224,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.174",
-    "mac": "40:92:49:6a:66:74",
+    "mac": "b4:64:15:bb:02:9f",
     "pppUser": "mbn@lamiyaakter",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "08/06/2026",
@@ -10270,7 +10270,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0124"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0125",
@@ -10307,12 +10307,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.175",
-    "mac": "f8:e8:11:71:71:85",
+    "mac": "b4:64:15:b5:eb:ca",
     "pppUser": "mbn@aminul",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-19.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -10353,7 +10353,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0125"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0126",
@@ -10390,12 +10390,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.176",
-    "mac": "00:d5:9e:78:7c:96",
+    "mac": "20:3d:b2:5c:3c:1f",
     "pppUser": "mbn@siddikur",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-19.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "30/06/2026",
@@ -10436,7 +10436,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0126"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0127",
@@ -10473,12 +10473,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.177",
-    "mac": "e0:67:b3:7f:87:a7",
+    "mac": "00:d3:9e:75:bd:1c",
     "pppUser": "mbn@imranhossain",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-14.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -10529,7 +10529,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0127"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0128",
@@ -10556,7 +10556,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 1,
@@ -10566,12 +10566,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.178",
-    "mac": "bc:20:ba:86:92:b8",
+    "mac": "a2:4e:05:25:28:b0",
     "pppUser": "mbn@sabujhowlader",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-19.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -10612,7 +10612,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0128"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0129",
@@ -10649,12 +10649,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.179",
-    "mac": "14:14:4b:8d:9d:c9",
+    "mac": "00:d3:9e:79:1e:a8",
     "pppUser": "mbn@reshma",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-22.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -10695,7 +10695,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0129"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0130",
@@ -10732,12 +10732,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.180",
-    "mac": "28:6c:07:94:a8:da",
+    "mac": "a2:3e:08:16:7b:40",
     "pppUser": "mbn@kamalhossain",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-25.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -10778,7 +10778,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0130"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0131",
@@ -10971,7 +10971,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 17,
@@ -10981,12 +10981,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.183",
-    "mac": "82:46:42:a9:c9:0d",
+    "mac": "00:d5:9e:9e:f1:34",
     "pppUser": "mbn@rifatsarder",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-20.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -11027,7 +11027,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0133"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0134",
@@ -11054,7 +11054,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 30,
@@ -11064,12 +11064,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.184",
-    "mac": "a2:3d:09:b0:d4:1e",
+    "mac": "a0:7d:05:30:14:8c",
     "pppUser": "mbn@rahimbepari",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-22.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "30/05/2026",
@@ -11230,12 +11230,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.186",
-    "mac": "b4:64:15:be:ea:40",
+    "mac": "9c:7d:a3:7e:61:c5",
     "pppUser": "mbn@sohelrana",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-24.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -11276,7 +11276,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0136"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0137",
@@ -11313,12 +11313,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.187",
-    "mac": "40:92:49:c5:f5:51",
+    "mac": "38:d4:a5:99:8c:ef",
     "pppUser": "mbn@fahima",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-12.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -11359,7 +11359,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0137"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0138",
@@ -11386,7 +11386,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 31,
@@ -11396,12 +11396,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.188",
-    "mac": "f8:e8:11:cc:00:62",
+    "mac": "a2:3e:08:16:5e:10",
     "pppUser": "mbn@moyemsikder",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-26.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -11479,12 +11479,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.189",
-    "mac": "00:d5:9e:d3:0b:73",
+    "mac": "80:d4:a5:64:65:6f",
     "pppUser": "mbn@jafor",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.9 dBm",
+    "onuSignal": "-20 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "02/06/2026",
@@ -11645,12 +11645,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.191",
-    "mac": "bc:20:ba:e1:21:95",
+    "mac": "a2:3f:07:30:6b:00",
     "pppUser": "mbn@mizanurrahoman",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-18.7 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -11811,12 +11811,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.193",
-    "mac": "28:6c:07:ef:37:b7",
+    "mac": "78:d7:52:40:af:c4",
     "pppUser": "mbn@rahmatullah",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-24.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "04/06/2026",
@@ -11857,7 +11857,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0143"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0144",
@@ -11884,7 +11884,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 10,
@@ -11894,12 +11894,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.194",
-    "mac": "4c:46:d1:f6:42:c8",
+    "mac": "00:d3:9e:8e:e5:6e",
     "pppUser": "mbn@fatema",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-20.4 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "10/07/2026",
@@ -11940,7 +11940,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0144"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0145",
@@ -11977,12 +11977,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.195",
-    "mac": "00:d3:9e:fd:4d:d9",
+    "mac": "ac:85:3d:42:b1:23",
     "pppUser": "mbn@rifathossin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-28.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -12023,7 +12023,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0145"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0146",
@@ -12050,7 +12050,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 4,
@@ -12060,12 +12060,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.196",
-    "mac": "82:46:42:04:58:ea",
+    "mac": "1c:01:a7:93:dd:1e",
     "pppUser": "mbn@makfaruddin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-26.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "04/06/2026",
@@ -12143,12 +12143,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.197",
-    "mac": "a2:3d:09:0b:63:fb",
+    "mac": "50:5b:1d:39:d2:7f",
     "pppUser": "mbn@mdtakiburrahman",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-26.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "24/07/2026",
@@ -12189,7 +12189,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0147"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0148",
@@ -12226,12 +12226,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.198",
-    "mac": "a0:7d:12:12:6e:0c",
+    "mac": "a0:8c:a1:5a:8b:e0",
     "pppUser": "mbn@forkan",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-14.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "20/06/2026",
@@ -12272,7 +12272,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0148"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0149",
@@ -12558,12 +12558,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.202",
-    "mac": "00:d5:9e:2e:9a:50",
+    "mac": "b4:64:15:ba:bc:47",
     "pppUser": "mbn@ataurrahaman",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-25.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "06/06/2026",
@@ -12604,7 +12604,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0152"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0153",
@@ -12631,7 +12631,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 29,
@@ -12641,12 +12641,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.203",
-    "mac": "e0:67:b3:35:a5:61",
+    "mac": "f0:2f:a7:05:14:ae",
     "pppUser": "mbn@didarbepari",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-21.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -12687,7 +12687,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0153"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0154",
@@ -12807,12 +12807,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.205",
-    "mac": "14:14:4b:43:bb:83",
+    "mac": "a0:94:6a:04:53:59",
     "pppUser": "mbn@abdulalim",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-15.7 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "19/05/2026",
@@ -12853,7 +12853,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0155"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0156",
@@ -13129,7 +13129,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 10,
@@ -13139,12 +13139,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.209",
-    "mac": "82:46:42:5f:e7:c7",
+    "mac": "4c:f9:a6:88:47:2b",
     "pppUser": "mbn@rehana",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-22.7 dBm",
+    "onuSignal": "-26.9 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "07/06/2026",
@@ -13185,7 +13185,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0159"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0160",
@@ -13212,7 +13212,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 9,
@@ -13222,12 +13222,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.210",
-    "mac": "a2:3d:09:66:f2:d8",
+    "mac": "a2:4f:a2:71:dd:60",
     "pppUser": "mbn@rabiulawal",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -13268,7 +13268,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0160"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0161",
@@ -13305,12 +13305,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.211",
-    "mac": "a0:7d:12:6d:fd:e9",
+    "mac": "a0:7f:b1:60:c4:60",
     "pppUser": "mbn@arshedali",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-27.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -13351,7 +13351,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0161"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0162",
@@ -13388,12 +13388,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.212",
-    "mac": "b4:64:15:74:08:fa",
+    "mac": "f4:b8:c4:f5:11:d5",
     "pppUser": "mbn@shoyeb",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-22 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "05/06/2026",
@@ -13434,7 +13434,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0162"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0163",
@@ -13471,12 +13471,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.213",
-    "mac": "40:92:49:7b:13:0b",
+    "mac": "4c:f9:a7:e0:f3:cb",
     "pppUser": "mbn@mdnuralamtalukder",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-18.2 dBm",
+    "onuSignal": "-26.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "25/05/2026",
@@ -13517,7 +13517,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0163"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0164",
@@ -13554,12 +13554,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.214",
-    "mac": "f8:e8:11:82:1e:1c",
+    "mac": "80:d4:a5:64:65:5f",
     "pppUser": "mbn@ferdus",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -13600,7 +13600,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0164"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0165",
@@ -13627,7 +13627,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 13,
@@ -13637,12 +13637,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.215",
-    "mac": "00:d5:9e:89:29:2d",
+    "mac": "a0:7e:12:22:81:60",
     "pppUser": "mbn@kazikhalilur",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-29.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "12/06/2026",
@@ -13683,7 +13683,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0165"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0166",
@@ -13720,12 +13720,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.216",
-    "mac": "e0:67:b3:90:34:3e",
+    "mac": "00:d5:9e:62:ed:58",
     "pppUser": "mbn@abubakkarkazi",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-23.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "12/06/2026",
@@ -13766,7 +13766,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0166"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0167",
@@ -13793,7 +13793,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 14,
@@ -13803,12 +13803,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.217",
-    "mac": "bc:20:ba:97:3f:4f",
+    "mac": "00:d5:9e:60:75:1e",
     "pppUser": "mbn@mohammadali",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-21.8 dBm",
+    "onuSignal": "-17.8 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -13849,7 +13849,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0167"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0168",
@@ -13886,12 +13886,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.218",
-    "mac": "14:14:4b:9e:4a:60",
+    "mac": "a2:3e:05:14:99:60",
     "pppUser": "mbn@lima",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-22.7 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-20.9 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -13969,12 +13969,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.219",
-    "mac": "28:6c:07:a5:55:71",
+    "mac": "4c:46:d1:1e:51:d0",
     "pppUser": "mbn@ismailmridha",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-23.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "26/07/2026",
@@ -14015,7 +14015,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0169"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0170",
@@ -14042,7 +14042,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 20,
@@ -14052,12 +14052,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.220",
-    "mac": "4c:46:d1:ac:60:82",
+    "mac": "b4:64:15:b5:07:46",
     "pppUser": "mbn@mdabulhossain",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-20.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "20/05/2026",
@@ -14125,7 +14125,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 20,
@@ -14135,12 +14135,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.221",
-    "mac": "00:d3:9e:b3:6b:93",
+    "mac": "40:92:49:ad:d0:9d",
     "pppUser": "mbn@habiburrahman",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-20.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "19/05/2026",
@@ -14181,7 +14181,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0171"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0172",
@@ -14218,12 +14218,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.222",
-    "mac": "82:46:42:ba:76:a4",
+    "mac": "ac:85:3d:b8:79:f2",
     "pppUser": "mbn@sadeka",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-21.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "02/06/2026",
@@ -14264,7 +14264,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0172"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0173",
@@ -14301,12 +14301,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.223",
-    "mac": "a2:3d:09:c1:81:b5",
+    "mac": "4c:46:d1:f5:d6:96",
     "pppUser": "mbn@mdesahakhawlader",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-21.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "15/06/2026",
@@ -14384,12 +14384,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.224",
-    "mac": "a0:7d:12:c8:8c:c6",
+    "mac": "00:d5:9e:9d:6e:04",
     "pppUser": "mbn@layla",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.0 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-17.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -14430,7 +14430,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0174"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/4"
   },
   {
     "id": "MBN0175",
@@ -14539,12 +14539,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.226",
-    "mac": "40:92:49:d6:a2:e8",
+    "mac": "0c:a0:dc:e8:a3:ba",
     "pppUser": "mbn@kamalmerdha",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-21.8 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-27.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "14/05/2026",
@@ -14705,12 +14705,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.228",
-    "mac": "00:d5:9e:e4:b8:0a",
+    "mac": "4c:f9:a4:aa:e0:24",
     "pppUser": "mbn@sahidulislam",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-23.6 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-12.7 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -14778,7 +14778,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 8,
@@ -14788,12 +14788,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.229",
-    "mac": "e0:67:b3:eb:c3:1b",
+    "mac": "a2:3d:12:16:82:f0",
     "pppUser": "mbn@imran",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-24.5 dBm",
+    "onuSignal": "-27.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "08/06/2026",
@@ -14834,7 +14834,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0179"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0180",
@@ -14871,12 +14871,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.230",
-    "mac": "bc:20:ba:f2:ce:2c",
+    "mac": "4c:f9:b4:94:6f:80",
     "pppUser": "mbn@samimusman",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-25.4 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-23 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "15/06/2026",
@@ -14917,7 +14917,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0180"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0181",
@@ -15027,7 +15027,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 1,
@@ -15037,12 +15037,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.232",
-    "mac": "28:6c:07:00:e4:4e",
+    "mac": "80:d4:a5:08:31:cf",
     "pppUser": "mbn@sazzadahamed",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-19.1 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-23.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -15110,7 +15110,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 11,
@@ -15120,12 +15120,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.233",
-    "mac": "4c:46:d1:07:ef:5f",
+    "mac": "4c:46:d1:96:ee:1b",
     "pppUser": "mbn@shahanazparvin",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-20.0 dBm",
+    "onuSignal": "-20.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "11/08/2026",
@@ -15166,7 +15166,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0183"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0184",
@@ -15203,12 +15203,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 500,
     "due": 500,
     "ipAddress": "10.200.201.234",
-    "mac": "00:d3:9e:0e:fa:70",
+    "mac": "b4:64:15:ba:83:93",
     "pppUser": "mbn@mstdola",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-20.9 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-28.2 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -15249,7 +15249,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0184"
       }
     ],
-    "ponPort": "epon 0/4"
+    "ponPort": "epon 0/3"
   },
   {
     "id": "MBN0185",
@@ -15286,12 +15286,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.235",
-    "mac": "82:46:42:15:05:81",
+    "mac": "a2:4f:10:14:61:c0",
     "pppUser": "mbn@brac",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-21.8 dBm",
+    "onuSignal": "-19.6 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -15332,7 +15332,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0185"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0186",
@@ -15369,12 +15369,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.236",
-    "mac": "a2:3d:09:1c:10:92",
+    "mac": "fc:e3:3c:0d:10:08",
     "pppUser": "mbn@zalilmridha",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-22.7 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-15.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "20/06/2026",
@@ -15415,7 +15415,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0186"
       }
     ],
-    "ponPort": "epon 0/2"
+    "ponPort": "epon 0/1"
   },
   {
     "id": "MBN0187",
@@ -15442,7 +15442,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 4,
@@ -15452,12 +15452,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.237",
-    "mac": "a0:7d:12:23:1b:a3",
+    "mac": "4c:d7:c8:e3:14:5c",
     "pppUser": "mbn@salma",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-23.6 dBm",
+    "onuSignal": "-21.1 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -15498,7 +15498,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0187"
       }
     ],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0188",
@@ -15535,12 +15535,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.238",
-    "mac": "b4:64:15:2a:26:b4",
+    "mac": "4c:f9:a2:94:35:09",
     "pppUser": "mbn@mahabulmia",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-24.5 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-18 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -15608,7 +15608,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 10,
@@ -15618,12 +15618,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.239",
-    "mac": "40:92:49:31:31:c5",
+    "mac": "4c:f9:a4:39:0b:31",
     "pppUser": "mbn@farzanadina",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-25.4 dBm",
+    "onuSignal": "-25.5 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "01/06/2026",
@@ -15664,7 +15664,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
         "invoiceId": "INV-2026-08-MBN0189"
       }
     ],
-    "ponPort": "epon 0/1"
+    "ponPort": "epon 0/2"
   },
   {
     "id": "MBN0190",
@@ -15691,7 +15691,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "price": 500,
     "monthlyBill": 500,
     "status": "active",
-    "netStatus": "offline",
+    "netStatus": "online",
     "duration": "0d:0h:0m:0s",
     "logoutTime": "01/09/2026 06:00:00 AM",
     "billingDate": 16,
@@ -15701,12 +15701,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 0,
     "due": 0,
     "ipAddress": "10.200.201.240",
-    "mac": "f8:e8:11:38:3c:d6",
+    "mac": "4c:46:d1:1d:d0:44",
     "pppUser": "mbn@khadizaakter",
     "pppPass": "01616664121",
     "mikrotik": "Active",
-    "olt": "OLT2",
-    "onuSignal": "-18.2 dBm",
+    "olt": "OLT1",
+    "onuSignal": "-17.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "16/06/2026",
@@ -15784,12 +15784,12 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
     "dueAmount": 1000,
     "due": 1000,
     "ipAddress": "10.200.201.241",
-    "mac": "00:d5:9e:3f:47:e7",
+    "mac": "4c:46:d1:98:0e:c3",
     "pppUser": "mbn@aminulislam",
     "pppPass": "01616664121",
     "mikrotik": "Active",
     "olt": "OLT1",
-    "onuSignal": "-19.1 dBm",
+    "onuSignal": "-25.3 dBm",
     "sessionUptime": "0d",
     "monthlyUsageGB": 0,
     "joinDate": "31/08/2026",
@@ -15819,7 +15819,7 @@ export const REAL_ISP_CUSTOMERS: Customer[] = [
       }
     ],
     "paymentHistory": [],
-    "ponPort": "epon 0/3"
+    "ponPort": "epon 0/1"
   }
 ];
 
