@@ -96,4 +96,19 @@ server.listen(PORT, () => {
   console.log(`[MBN Telemetry Gateway] Realtime SSE Stream on http://localhost:${PORT}/api/realtime/stream`);
   console.log(`[MBN Telemetry Gateway] High-speed endpoint on http://localhost:${PORT}/api/realtime/live-status`);
   console.log(`[MBN Telemetry Gateway] Connected to BDCOM OLT 1 (103.12.173.136:1895)`);
+
+  // Autonomous Built-in Self-Ping Keep-Alive (every 8 minutes)
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || "https://maa-best-network.onrender.com";
+  console.log(`[Self-Ping Engine] Initialized keep-alive loop for ${SELF_URL}/health`);
+
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${SELF_URL}/health`, { signal: AbortSignal.timeout(10000) });
+      if (res.ok) {
+        console.log(`[Self-Ping Keep-Alive] Pinged ${SELF_URL}/health at ${new Date().toLocaleTimeString()} (HTTP ${res.status})`);
+      }
+    } catch (err) {
+      console.log(`[Self-Ping Keep-Alive] Ping notice:`, err.message);
+    }
+  }, 8 * 60 * 1000); // 8 minutes (Render sleeps at 15 minutes)
 });
