@@ -87,19 +87,19 @@ export function OltPage({ onNavigate }: OltPageProps) {
   const [activeTab, setActiveTab] = useState<"olts" | "discovery" | "diagnostics">("olts");
   
   // ONU List Table State (matching screenshot)
-  // ONU List Table State (dynamically mapped from all 192+ real subscriber accounts)
+  // ONU List Table State (dynamically mapped from all 192+ real subscriber accounts across OLT1 and OLT2)
   const [onuList, setOnuList] = useState<OltOnuRecord[]>(() => {
     return customers.map((c, i) => {
       const isOnline = c.status === "active" || c.netStatus === "online";
-      const isOlt1 = (c.olt || "OLT1").toUpperCase().includes("1") || i % 6 !== 0;
+      const isOlt1 = (c.olt || "OLT1").toUpperCase().includes("1") || i % 2 === 0;
       const rxVal = c.onuSignal || (isOnline ? `-${(18.2 + (i % 8) * 0.9).toFixed(1)} dBm` : "—");
       const pppUser = c.pppUser || `Mbn@${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
       return {
         id: `onu-${c.id}`,
         mac: c.mac || `4c:46:d1:${(i % 89 + 10).toString(16).padStart(2, '0')}:${(i % 55 + 10).toString(16).padStart(2, '0')}:25`,
         ponPort: c.ponPort || `epon 0/${(i % 4) + 1}`,
-        status: isOlt1 && isOnline ? "online" : "offline",
-        rxPower: isOlt1 && isOnline ? rxVal : "—",
+        status: isOnline ? "online" : "offline",
+        rxPower: isOnline ? rxVal : "—",
         customer: pppUser,
         customerId: c.clientCode || c.id,
         oltServer: isOlt1 ? "OLT1" : "OLT2",
@@ -107,14 +107,39 @@ export function OltPage({ onNavigate }: OltPageProps) {
     });
   });
 
-  // Keep ONU List in sync if customer accounts or network status updates
+  // Keep OLTs in sync with live telemetry
+  useEffect(() => {
+    if (telemetry && telemetry.olt1 && telemetry.olt2) {
+      setOlts(prev => prev.map(o => {
+        if (o.id === "OLT-01" || o.name === "OLT1") {
+          return {
+            ...o,
+            activeOnu: telemetry.olt1.activeOnus || 53,
+            totalOnu: telemetry.olt1.totalOnus || 150,
+            status: telemetry.olt1.status as any || "online",
+          };
+        }
+        if (o.id === "OLT-02" || o.name === "OLT2") {
+          return {
+            ...o,
+            activeOnu: telemetry.olt2.activeOnus || 49,
+            totalOnu: telemetry.olt2.totalOnus || 145,
+            status: telemetry.olt2.status as any || "online",
+          };
+        }
+        return o;
+      }));
+    }
+  }, [telemetry]);
+
+  // Keep ONU List in sync if customer accounts update
   useEffect(() => {
     if (customers.length > 0) {
       setOnuList(prevList => {
         const existingMap = new Map(prevList.map(o => [o.id, o]));
         return customers.map((c, i) => {
           const isOnline = c.status === "active" || c.netStatus === "online";
-          const isOlt1 = (c.olt || "OLT1").toUpperCase().includes("1") || i % 6 !== 0;
+          const isOlt1 = (c.olt || "OLT1").toUpperCase().includes("1") || i % 2 === 0;
           const rxVal = c.onuSignal || (isOnline ? `-${(18.2 + (i % 8) * 0.9).toFixed(1)} dBm` : "—");
           const pppUser = c.pppUser || `Mbn@${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
           const existing = existingMap.get(`onu-${c.id}`);
@@ -122,9 +147,10 @@ export function OltPage({ onNavigate }: OltPageProps) {
           if (existing) {
             return {
               ...existing,
-              status: existing.adminDisabled ? "offline" : (isOlt1 && isOnline ? "online" : "offline"),
+              status: existing.adminDisabled ? "offline" : (isOnline ? "online" : "offline"),
               customer: pppUser,
               customerId: c.clientCode || c.id,
+              oltServer: isOlt1 ? "OLT1" : "OLT2",
             };
           }
 
@@ -132,8 +158,8 @@ export function OltPage({ onNavigate }: OltPageProps) {
             id: `onu-${c.id}`,
             mac: c.mac || `4c:46:d1:${(i % 89 + 10).toString(16).padStart(2, '0')}:${(i % 55 + 10).toString(16).padStart(2, '0')}:25`,
             ponPort: c.ponPort || `epon 0/${(i % 4) + 1}`,
-            status: isOlt1 && isOnline ? "online" : "offline",
-            rxPower: isOlt1 && isOnline ? rxVal : "—",
+            status: isOnline ? "online" : "offline",
+            rxPower: isOnline ? rxVal : "—",
             customer: pppUser,
             customerId: c.clientCode || c.id,
             oltServer: isOlt1 ? "OLT1" : "OLT2",
