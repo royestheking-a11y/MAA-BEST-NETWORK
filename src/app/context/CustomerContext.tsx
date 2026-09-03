@@ -15,10 +15,10 @@ export interface Invoice {
   month: string;
   amount: number;
   dueDate: string;
-  paidDate?: string;
+  paidDate?: string | null;
   status: "paid" | "due" | "overdue";
-  paymentMethod?: string;
-  trxId?: string;
+  paymentMethod?: string | null;
+  trxId?: string | null;
 }
 
 export interface PaymentTransaction {
@@ -55,7 +55,7 @@ export interface Customer {
   zone: string;
   subzone: string;
   box?: string;
-  connectionType?: "Optical Fiber" | "Cat6" | "Wireless" | "Coaxial";
+  connectionType?: "Optical Fiber" | "Cat6" | "Wireless" | "Coaxial" | "UTP";
   serverName?: string; // e.g. RETAIL_1, MikroTik-01
   profile?: string; // e.g. PIONEER_HOME_20Mbps
   service?: "pppoe" | "hotspot" | "static";
@@ -68,7 +68,7 @@ export interface Customer {
   status: CustomerStatus;
   netStatus: "online" | "offline";
   duration?: string; // e.g. "0d:1h:2m:51s"
-  logoutTime?: string; // e.g. "28/08/2026 10:30:06 PM"
+  logoutTime?: string | null; // e.g. "28/08/2026 10:30:06 PM"
   billingDate: number;
   startDate: string; // e.g. "10 Aug 2026"
   endDate: string; // e.g. "10 Sep 2026"
