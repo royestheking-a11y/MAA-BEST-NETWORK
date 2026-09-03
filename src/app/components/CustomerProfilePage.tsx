@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   User, Wifi, WifiOff, CreditCard, Package, MapPin, Phone, Mail,
   Shield, Server, Radio, Clock, CheckCircle2, AlertTriangle, XCircle,
@@ -207,6 +207,9 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       uptime: c.sessionUptime || "6d 14h 32m",
       package: c.profile || "20 Mbps Fiber Standard",
       packagePrice: c.packagePrice || 1200,
+      billingDate: 1,
+      dueDate: 10,
+      discount: 0,
       vat: 0,
       lateFee: 0,
       currentBalance: c.dueAmount || 0,
@@ -255,6 +258,9 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         uptime: realCustomer.sessionUptime || "6d 14h 32m",
         package: realCustomer.profile || "20 Mbps Fiber Standard",
         packagePrice: realCustomer.packagePrice || 1200,
+        billingDate: 1,
+        dueDate: 10,
+        discount: 0,
         vat: 0,
         lateFee: 0,
         currentBalance: realCustomer.dueAmount || 0,
