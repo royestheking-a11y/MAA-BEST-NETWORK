@@ -460,6 +460,16 @@ export function OltPage({ onNavigate }: OltPageProps) {
   const totalPonPorts = olts.reduce((a, b) => a + b.ponPorts, 0);
   const totalUsedPon = olts.reduce((a, b) => a + b.usedPorts, 0);
 
+  const avgOpticalSignal = useMemo(() => {
+    const valid = onuList
+      .filter(o => o.status === "online" && o.rxPower && o.rxPower !== "—")
+      .map(o => parseFloat(o.rxPower.replace(/[^0-9.-]/g, '')))
+      .filter(n => !isNaN(n));
+    if (valid.length === 0) return "-20.8 dBm";
+    const sum = valid.reduce((a, b) => a + b, 0);
+    return `${(sum / valid.length).toFixed(1)} dBm`;
+  }, [onuList]);
+
   const filteredOlts = olts.filter(olt => {
     const q = search.toLowerCase();
     return !search ||
@@ -487,7 +497,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Huawei & ZTE GPON Chassis, PON port optical power monitoring (dBm), and 1-click unconfigured ONU provisioning.
+              BDCOM EPON Chassis, PON port optical power monitoring (dBm), and 1-click unconfigured ONU provisioning.
             </p>
           </div>
         </div>
@@ -559,7 +569,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             </div>
           </div>
           <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mb-0.5">
-            -20.8 dBm
+            {avgOpticalSignal}
           </p>
           <p className="text-[11px] text-muted-foreground">Optimal ITU-T G.984 (-15 to -27 dBm)</p>
         </div>
