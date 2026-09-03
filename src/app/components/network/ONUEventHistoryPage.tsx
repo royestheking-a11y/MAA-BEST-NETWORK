@@ -99,7 +99,10 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
-  // Convert 295 authentic NetX ONUs into rich spatial devices
+  const [selectedOltFilter, setSelectedOltFilter] = useState<"all" | "OLT1" | "OLT2">("all");
+  const [selectedPonFilter, setSelectedPonFilter] = useState<string>("all");
+
+  // Convert 295 authentic NetX ONUs into structured spatial devices
   const onuDevices: OnuDevice[] = useMemo(() => {
     const custMap = new Map<string, Customer>();
     customers.forEach(c => {
@@ -124,7 +127,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
 
       if (!isOnline) {
         health = "issue";
-        lastEvent = `LOS Alarm / Offline on ${o.oltServer} (${o.ponPort})`;
+        lastEvent = `Terminal Standby / Deregistered on ${o.oltServer} (${o.ponPort})`;
         lastEventTime = `${(i % 55) + 5} mins ago`;
       } else if (rxNum < -27.0) {
         health = "warning";
@@ -132,14 +135,21 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
         lastEventTime = `${(i % 20) + 2} mins ago`;
       }
 
-      const zoneName = matchedCust?.zone || (i % 2 === 0 ? "Madaripur Sadar" : "Somitir Hat");
+      const zoneName = matchedCust?.zone || (o.oltServer === "OLT1" ? "Madaripur Central" : "Kalkini Station");
       const clientCode = matchedCust?.clientCode || matchedCust?.id || `ONU-${(i + 1).toString().padStart(4, '0')}`;
 
-      // Spatial distribution around Bangladesh / Madaripur NOC
-      const col = i % 15;
-      const row = Math.floor(i / 15);
-      const mapX = 80 + (col * 58) + ((i * 17) % 30);
-      const mapY = 70 + (row * 28) + ((i * 13) % 20);
+      // Spatial distribution separated cleanly by OLT1 (Left Hub) and OLT2 (Right Hub)
+      const isOlt1 = o.oltServer === "OLT1";
+      const ponNum = parseInt(o.ponPort.replace(/[^0-9]/g, '').slice(-1) || "1", 10);
+      
+      const baseX = isOlt1 ? 250 : 750;
+      const baseY = 120 + (ponNum - 1) * 125;
+      
+      const angle = ((i % 18) / 18) * Math.PI * 1.8 - 0.9;
+      const radius = 65 + ((i % 5) * 22);
+      
+      const mapX = baseX + Math.cos(angle) * (radius * (isOlt1 ? -1 : 1)) + ((i % 4) * 15 - 30);
+      const mapY = baseY + Math.sin(angle) * (radius * 0.75);
 
       return {
         id: `ONU-${o.mac}`,
@@ -162,36 +172,21 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
         temperature: 36 + (i % 8),
         lastEvent,
         lastEventTime,
-        mapX: Math.min(Math.max(mapX, 50), 950),
+        mapX: Math.min(Math.max(mapX, 40), 960),
         mapY: Math.min(Math.max(mapY, 40), 610),
       };
     });
   }, [customers]);
 
-  // Generate live optical events log from authentic NetX fleet
+  // Generate realistic optical event history
   const events: ONUEvent[] = useMemo(() => {
     const list: ONUEvent[] = [];
+    
     onuDevices.forEach((d, idx) => {
-      if (d.health === "issue") {
-        list.push({
-          id: `EVT-${1000 + idx}`,
-          onuId: d.id,
-          onuName: d.name,
-          olt: d.olt,
-          ponPort: d.ponPort,
-          mac: d.mac,
-          serial: d.serial,
-          customer: d.customer,
-          customerId: d.customerId,
-          zone: d.zone,
-          eventType: "los",
-          timestamp: d.lastEventTime,
-          rxPower: `${d.rxPower} dBm`,
-          txPower: "+2.4 dBm",
-          description: `Optical Loss of Signal (LOS) on ${d.olt} (${d.ponPort}). Attenuation > 38 dB.`,
-          duration: `${(idx % 45) + 5}m`,
-        });
-      } else if (d.health === "warning") {
+      const isOnline = d.health === "good" || (d.health as string) === "online";
+      const isWarning = d.health === "warning";
+      
+      if (isWarning) {
         list.push({
           id: `EVT-${2000 + idx}`,
           onuId: d.id,
@@ -204,31 +199,49 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           customerId: d.customerId,
           zone: d.zone,
           eventType: "signal_change",
-          timestamp: d.lastEventTime,
+          timestamp: `${(idx % 18) + 2}m ago`,
           rxPower: `${d.rxPower} dBm`,
           txPower: "+2.4 dBm",
-          description: `Optical power degraded to ${d.rxPower} dBm below -27 dBm threshold on ${d.olt} (${d.ponPort}).`,
+          description: `Optical Rx power attenuated to ${d.rxPower} dBm (below -27 dBm threshold) on ${d.olt} (${d.ponPort}). Optical drop inspection recommended.`,
+        });
+      } else if (isOnline) {
+        list.push({
+          id: `EVT-${3000 + idx}`,
+          onuId: d.id,
+          onuName: d.name,
+          olt: d.olt,
+          ponPort: d.ponPort,
+          mac: d.mac,
+          serial: d.serial,
+          customer: d.customer,
+          customerId: d.customerId,
+          zone: d.zone,
+          eventType: "online",
+          timestamp: `${(idx * 3) % 45 + 1}m ago`,
+          rxPower: `${d.rxPower} dBm`,
+          txPower: "+2.4 dBm",
+          description: `EPON ONU registered & authenticated on ${d.olt} (${d.ponPort}). Optical Rx: ${d.rxPower} dBm. Link healthy.`,
         });
       } else {
-        if (idx % 2 === 0) {
-          list.push({
-            id: `EVT-${3000 + idx}`,
-            onuId: d.id,
-            onuName: d.name,
-            olt: d.olt,
-            ponPort: d.ponPort,
-            mac: d.mac,
-            serial: d.serial,
-            customer: d.customer,
-            customerId: d.customerId,
-            zone: d.zone,
-            eventType: "online",
-            timestamp: `${(idx * 3) % 60 + 2}m ago`,
-            rxPower: `${d.rxPower} dBm`,
-            txPower: "+2.4 dBm",
-            description: `EPON O5 State Reached. Link active at ${d.rxPower} dBm on ${d.olt} (${d.ponPort}).`,
-          });
-        }
+        // Offline / Standby terminal
+        list.push({
+          id: `EVT-${1000 + idx}`,
+          onuId: d.id,
+          onuName: d.name,
+          olt: d.olt,
+          ponPort: d.ponPort,
+          mac: d.mac,
+          serial: d.serial,
+          customer: d.customer,
+          customerId: d.customerId,
+          zone: d.zone,
+          eventType: "offline",
+          timestamp: `${(idx % 50) + 10}m ago`,
+          rxPower: "—",
+          txPower: "—",
+          description: `Terminal in standby or customer CPE powered off on ${d.olt} (${d.ponPort}). Last known signal: ${d.rxPower} dBm.`,
+          duration: `${(idx % 30) + 15}m`,
+        });
       }
     });
     return list;
@@ -244,7 +257,10 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
 
     return onuDevices.filter(d => {
       const matchHealth = healthFilter === "all" || d.health === healthFilter;
-      if (!matchHealth) return false;
+      const matchOlt = selectedOltFilter === "all" || d.olt === selectedOltFilter;
+      const matchPon = selectedPonFilter === "all" || d.ponPort.toLowerCase().includes(selectedPonFilter.toLowerCase());
+
+      if (!matchHealth || !matchOlt || !matchPon) return false;
       if (!rawQ) return true;
 
       const cleanMac = d.mac.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -266,7 +282,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
         d.zone.toLowerCase().includes(rawQ)
       );
     });
-  }, [onuDevices, healthFilter, search]);
+  }, [onuDevices, healthFilter, selectedOltFilter, selectedPonFilter, search]);
 
   const filteredEvents = useMemo(() => {
     const rawQ = search.trim().toLowerCase();
@@ -275,7 +291,10 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
     return events.filter(e => {
       const matchEvent = eventFilter === "all" || e.eventType === eventFilter;
       const matchOnu = !selectedOnuId || e.onuId === selectedOnuId;
-      if (!matchEvent || !matchOnu) return false;
+      const matchOlt = selectedOltFilter === "all" || e.olt === selectedOltFilter;
+      const matchPon = selectedPonFilter === "all" || e.ponPort.toLowerCase().includes(selectedPonFilter.toLowerCase());
+
+      if (!matchEvent || !matchOnu || !matchOlt || !matchPon) return false;
       if (!rawQ) return true;
 
       const cleanMac = e.mac.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -296,7 +315,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
         e.serial.toLowerCase().includes(rawQ)
       );
     });
-  }, [events, search, eventFilter, selectedOnuId]);
+  }, [events, search, eventFilter, selectedOnuId, selectedOltFilter, selectedPonFilter]);
 
   const stats = useMemo(() => {
     const total = onuDevices.length;
@@ -306,161 +325,147 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
     return { total, good, issues, warnings };
   }, [onuDevices]);
 
-  const handleRegisterOnu = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustName || !newCustPhone) {
-      showToast("Please enter customer name and phone.");
-      return;
-    }
-
-    const newCustCode = `MBN${String(customers.length + 1).padStart(4, '0')}`;
-    const generatedSerial = newOnuSerial || `MBN-ONU-${newCustCode}`;
-    const generatedMac = newOnuMac || `44:D9:E7:${Math.floor(Math.random()*89+10)}:12:05`;
-
-    await addCustomer({
-      name: newCustName,
-      phone: newCustPhone,
-      address: `${newZone}, Madaripur`,
-      zone: newZone,
-      subzone: newZone,
-      package: "20 Mbps Fiber Standard",
-      price: 800,
-      billingStatus: "Monthly",
-      status: "active",
-      netStatus: "online",
-      deviceSerial: generatedSerial,
-      deviceVendor: newVendor,
-      deviceType: newModel,
-      mac: generatedMac,
-      olt: newOlt,
-      ponPort: newPonPort,
-      splitterBox: newSplitter,
-    });
-
-    setShowAddModal(false);
-    setNewCustName("");
-    setNewCustPhone("");
-    setNewOnuSerial("");
-    setNewOnuMac("");
-    showToast(`Successfully registered new ONU ${generatedSerial} for ${newCustName}!`);
-  };
-
   // Shared Map Component
   const renderMapCanvas = (isCompact = false) => (
-    <div className="w-full h-full relative rounded-3xl border border-border overflow-hidden bg-[#0E1626] shadow-lg flex">
-      {/* Top Map Floating HUD */}
-      <div className="absolute top-4 left-4 z-20 flex items-center gap-2 flex-wrap">
-        <div className="px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold flex items-center gap-1.5">
-          <Compass size={14} className="text-emerald-400" />
-          <span>Dhaka Metro GPON GIS Map</span>
+    <div className="w-full h-full relative rounded-3xl border border-border overflow-hidden bg-[#0A101D] shadow-xl flex flex-col">
+      {/* Top Map Floating Filter HUD */}
+      <div className="p-3 bg-[#0E1626]/90 backdrop-blur-md border-b border-white/10 z-20 flex items-center justify-between flex-wrap gap-2 text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="px-2.5 py-1 rounded-xl bg-primary/20 border border-primary/40 text-primary font-bold flex items-center gap-1.5">
+            <Compass size={13} />
+            <span>Optical Network Topology</span>
+          </div>
+
+          {/* OLT Filter */}
+          <select
+            value={selectedOltFilter}
+            onChange={e => setSelectedOltFilter(e.target.value as any)}
+            className="px-2.5 py-1 rounded-xl bg-card/80 border border-white/10 text-white text-xs font-semibold outline-none cursor-pointer">
+            <option value="all">Fleet: All OLTs (OLT1 + OLT2)</option>
+            <option value="OLT1">OLT1 (Madaripur Central)</option>
+            <option value="OLT2">OLT2 (Kalkini Station)</option>
+          </select>
+
+          {/* PON Port Filter */}
+          <select
+            value={selectedPonFilter}
+            onChange={e => setSelectedPonFilter(e.target.value)}
+            className="px-2.5 py-1 rounded-xl bg-card/80 border border-white/10 text-white text-xs font-semibold outline-none cursor-pointer">
+            <option value="all">All PON Ports (0/1 - 0/4)</option>
+            <option value="0/1">PON Port: epon 0/1</option>
+            <option value="0/2">PON Port: epon 0/2</option>
+            <option value="0/3">PON Port: epon 0/3</option>
+            <option value="0/4">PON Port: epon 0/4</option>
+          </select>
+
+          {selectedOnuId && (
+            <button
+              onClick={() => setSelectedOnuId(null)}
+              className="px-2.5 py-1 rounded-xl bg-rose-600 text-white text-xs font-bold flex items-center gap-1 shadow-md cursor-pointer hover:bg-rose-700">
+              <X size={12} /> Clear Focus
+            </button>
+          )}
         </div>
 
-        {selectedOnuId && (
-          <button
-            onClick={() => setSelectedOnuId(null)}
-            className="px-3 py-1.5 rounded-2xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold flex items-center gap-1 shadow-md cursor-pointer">
-            <X size={13} /> Clear Focus
-          </button>
-        )}
-      </div>
-
-      {/* Top Right Zoom Controls */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5">
-        <button
-          onClick={() => setZoom(z => Math.min(z + 0.2, 2.0))}
-          className="w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center cursor-pointer">
-          <ZoomIn size={16} />
-        </button>
-        <button
-          onClick={() => setZoom(z => Math.max(z - 0.2, 0.7))}
-          className="w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center cursor-pointer">
-          <ZoomOut size={16} />
-        </button>
-        <button
-          onClick={() => setZoom(1)}
-          className="w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center cursor-pointer">
-          <LocateFixed size={16} />
-        </button>
-      </div>
-
-      {/* Bottom Right Map Legend */}
-      {!isCompact && (
-        <div className="absolute bottom-4 right-4 z-20 rounded-2xl p-3 border border-white/10 bg-[#0A101D]/90 backdrop-blur-md hidden sm:block text-[11px] text-white/80 space-y-1.5">
-          <div className="text-[10px] font-bold text-white/50 uppercase tracking-wider mb-1 border-b border-white/10 pb-0.5">
-            ONU Node Status
+        {/* Legend Summary */}
+        <div className="flex items-center gap-3 text-[11px] text-white/80">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
+            <span>Online ({stats.good})</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
-            <span>Good & Normal Light (-15 to -22 dBm)</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+            <span>Degraded ({stats.warnings})</span>
           </div>
-          <div className="flex items-center gap-2 text-rose-400 font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
-            <span>Active Issue / LOS / Outage Alarm</span>
-          </div>
-          <div className="flex items-center gap-2 text-amber-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span>Warning / Optical Attenuation</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
+            <span>Offline/Standby ({stats.issues})</span>
           </div>
         </div>
-      )}
+      </div>
 
       {/* SVG Interactive Canvas */}
       <div
-        className="w-full h-full flex-1 cursor-crosshair overflow-hidden flex items-center justify-center"
+        className="w-full flex-1 relative cursor-crosshair overflow-hidden flex items-center justify-center"
         style={{
           transform: `scale(${zoom})`,
           transformOrigin: "center center",
           transition: "transform 0.25s ease-out",
           minHeight: isCompact ? 520 : 620
         }}>
-        <svg viewBox="0 0 1000 650" className="w-full h-full select-none" style={{ minHeight: isCompact ? 520 : 620 }}>
+        <svg viewBox="0 0 1000 650" className="w-full h-full select-none">
           <defs>
-            <pattern id="onuMapGridUnique" width="30" height="30" patternUnits="userSpaceOnUse">
-              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+            <pattern id="onuMapGridUnique" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.025)" strokeWidth="1" />
             </pattern>
           </defs>
           <rect width="1000" height="650" fill="url(#onuMapGridUnique)" />
 
-          {/* Major Zone Boxes */}
-          <g opacity="0.6">
-            <rect x="50" y="220" width="220" height="400" rx="16" fill="rgba(59,130,246,0.05)" stroke="rgba(59,130,246,0.2)" strokeDasharray="4,4" />
-            <text x="65" y="245" fill="#3B82F6" fontSize="11" fontWeight="bold">MIRPUR REGION</text>
+          {/* OLT1 Zone & Splitters (Left) */}
+          {(selectedOltFilter === "all" || selectedOltFilter === "OLT1") && (
+            <g>
+              <rect x="30" y="30" width="440" height="590" rx="24" fill="rgba(14, 165, 233, 0.03)" stroke="rgba(14, 165, 233, 0.2)" strokeDasharray="6,6" />
+              <text x="50" y="60" fill="#0EA5E9" fontSize="12" fontWeight="900" letterSpacing="1">
+                OLT 1 · MADARIPUR MAIN NOC (103.12.173.136:1895)
+              </text>
 
-            <rect x="250" y="40" width="500" height="150" rx="16" fill="rgba(139,92,246,0.05)" stroke="rgba(139,92,246,0.2)" strokeDasharray="4,4" />
-            <text x="265" y="65" fill="#8B5CF6" fontSize="11" fontWeight="bold">UTTARA SECTOR 4 & 7</text>
+              {/* Central OLT1 Node */}
+              <circle cx="250" cy="325" r="28" fill="#0369A1" stroke="#38BDF8" strokeWidth="2.5" />
+              <text x="250" y="329" textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="900">OLT 1</text>
 
-            <rect x="730" y="220" width="220" height="260" rx="16" fill="rgba(6,182,212,0.05)" stroke="rgba(6,182,212,0.2)" strokeDasharray="4,4" />
-            <text x="745" y="245" fill="#06B6D4" fontSize="11" fontWeight="bold">GULSHAN & BANANI</text>
+              {/* 4 PON Splitter Hubs */}
+              {[1, 2, 3, 4].map(p => {
+                const py = 120 + (p - 1) * 125;
+                const active = selectedPonFilter === "all" || selectedPonFilter === `0/${p}`;
+                return (
+                  <g key={`olt1-pon-${p}`} opacity={active ? 1 : 0.25}>
+                    <line x1="250" y1="325" x2="250" y2={py} stroke="#38BDF8" strokeWidth="2" strokeDasharray="4,4" />
+                    <rect x="210" y={py - 12} width="80" height="24" rx="8" fill="#082F49" stroke="#0284C7" strokeWidth="1.5" />
+                    <text x="250" y={py + 4} textAnchor="middle" fill="#BAE6FD" fontSize="9.5" fontWeight="bold">
+                      epon 0/{p}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
-            <rect x="360" y="480" width="280" height="140" rx="16" fill="rgba(249,115,22,0.05)" stroke="rgba(249,115,22,0.2)" strokeDasharray="4,4" />
-            <text x="375" y="505" fill="#F97316" fontSize="11" fontWeight="bold">DHANMONDI RESIDENTIAL</text>
-          </g>
+          {/* OLT2 Zone & Splitters (Right) */}
+          {(selectedOltFilter === "all" || selectedOltFilter === "OLT2") && (
+            <g>
+              <rect x="530" y="30" width="440" height="590" rx="24" fill="rgba(168, 85, 247, 0.03)" stroke="rgba(168, 85, 247, 0.2)" strokeDasharray="6,6" />
+              <text x="550" y="60" fill="#A855F7" fontSize="12" fontWeight="900" letterSpacing="1">
+                OLT 2 · KALKINI SUB-STATION (103.12.173.136:1894)
+              </text>
 
-          {/* Central NOC Hub */}
-          <g transform="translate(500, 325)">
-            <circle cx="0" cy="0" r="38" fill="none" stroke="rgba(225, 29, 72, 0.3)" strokeWidth="1.5">
-              <animate attributeName="r" values="30;46;30" dur="3s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="0" cy="0" r="24" fill="#1E293B" stroke="var(--primary)" strokeWidth="2" />
-            <text x="0" y="4" textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="900">NOC</text>
-          </g>
+              {/* Central OLT2 Node */}
+              <circle cx="750" cy="325" r="28" fill="#7E22CE" stroke="#C084FC" strokeWidth="2.5" />
+              <text x="750" y="329" textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="900">OLT 2</text>
 
-          {/* Fiber Trunks from NOC */}
-          <g stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.6">
-            <line x1="500" y1="325" x2="160" y2="420" />
-            <line x1="500" y1="325" x2="340" y2="105" />
-            <line x1="500" y1="325" x2="680" y2="110" />
-            <line x1="500" y1="325" x2="830" y2="270" />
-            <line x1="500" y1="325" x2="470" y2="560" />
-          </g>
+              {/* 4 PON Splitter Hubs */}
+              {[1, 2, 3, 4].map(p => {
+                const py = 120 + (p - 1) * 125;
+                const active = selectedPonFilter === "all" || selectedPonFilter === `0/${p}`;
+                return (
+                  <g key={`olt2-pon-${p}`} opacity={active ? 1 : 0.25}>
+                    <line x1="750" y1="325" x2="750" y2={py} stroke="#C084FC" strokeWidth="2" strokeDasharray="4,4" />
+                    <rect x="710" y={py - 12} width="80" height="24" rx="8" fill="#3B0764" stroke="#9333EA" strokeWidth="1.5" />
+                    <text x="750" y={py + 4} textAnchor="middle" fill="#F3E8FF" fontSize="9.5" fontWeight="bold">
+                      epon 0/{p}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
-          {/* ONU Device Pins */}
+          {/* ONU Terminals (Clean Dots with High-Visibility Tooltip on Hover) */}
           {filteredDevices.map(d => {
             const isSelected = selectedOnuId === d.id;
             const isHovered = hoveredOnuId === d.id;
             const isIssue = d.health === "issue";
             const isWarning = d.health === "warning";
-            const pinColor = isIssue ? "#DC2626" : isWarning ? "#F59E0B" : "#10B981";
+            const pinColor = isIssue ? "#64748B" : isWarning ? "#F59E0B" : "#10B981";
 
             return (
               <g
@@ -471,55 +476,37 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
                 onMouseEnter={() => setHoveredOnuId(d.id)}
                 onMouseLeave={() => setHoveredOnuId(null)}>
                 
-                {/* Pulse Ring for Issues */}
-                {isIssue && (
-                  <circle cx="0" cy="0" r="26" fill="none" stroke="#DC2626" strokeWidth="2" opacity="0.8">
-                    <animate attributeName="r" values="10;28;10" dur="1.8s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" values="0.9;0.1;0.9" dur="1.8s" repeatCount="indefinite" />
-                  </circle>
+                {/* Active Optical Pulse */}
+                {!isIssue && (
+                  <circle cx="0" cy="0" r="12" fill="none" stroke={pinColor} strokeWidth="1.2" opacity="0.4" />
                 )}
 
                 {/* Selected Halo */}
                 {(isSelected || isHovered) && (
-                  <circle cx="0" cy="0" r="20" fill="none" stroke={pinColor} strokeWidth="2.5" opacity="0.9" />
+                  <circle cx="0" cy="0" r="16" fill="none" stroke={pinColor} strokeWidth="2.5" opacity="0.95" />
                 )}
 
-                {/* Core Node Circle */}
+                {/* Core Pin Circle */}
                 <circle
                   cx="0"
                   cy="0"
-                  r={isSelected ? 11 : isIssue ? 9 : 8}
+                  r={isSelected ? 8.5 : isHovered ? 7.5 : 5.5}
                   fill={pinColor}
                   stroke="#FFFFFF"
-                  strokeWidth={isSelected ? 2.5 : 1.8}
+                  strokeWidth={isSelected ? 2 : 1.2}
                 />
 
-                {/* Exclamation for issues */}
-                {isIssue && (
-                  <text x="0" y="3.5" textAnchor="middle" fill="#FFFFFF" fontSize="9" fontWeight="900">!</text>
-                )}
-
-                {/* ONU ID Tag */}
-                <text
-                  x="0"
-                  y="18"
-                  textAnchor="middle"
-                  fill="#FFFFFF"
-                  fontSize="9.5"
-                  fontWeight="700"
-                  style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
-                  {d.id}
-                </text>
-
-                {/* Hover Tooltip */}
-                {isHovered && !isSelected && (
-                  <g transform="translate(-75, -52)">
-                    <rect x="0" y="0" width="150" height="44" rx="8" fill="rgba(10, 15, 25, 0.98)" stroke={pinColor} strokeWidth="1.2" />
-                    <text x="10" y="14" fill="#FFFFFF" fontSize="10.5" fontWeight="bold">{d.customer}</text>
-                    <text x="10" y="27" fill={pinColor} fontSize="9.5" fontWeight="semibold">
-                      {d.health.toUpperCase()} · Rx: {d.rxPower} dBm
+                {/* Hover Tooltip Card (Only shows when hovered/selected) */}
+                {(isHovered || isSelected) && (
+                  <g transform="translate(-85, -60)" className="z-50 pointer-events-none">
+                    <rect x="0" y="0" width="170" height="52" rx="10" fill="#0B132B" stroke={pinColor} strokeWidth="1.5" />
+                    <text x="10" y="16" fill="#FFFFFF" fontSize="10.5" fontWeight="900">{d.customer}</text>
+                    <text x="10" y="30" fill={pinColor} fontSize="9" fontWeight="bold">
+                      {d.olt} ({d.ponPort}) · {d.health === "good" ? "ONLINE" : d.health === "warning" ? "WARNING" : "STANDBY"}
                     </text>
-                    <text x="10" y="38" fill="rgba(255,255,255,0.6)" fontSize="8.5">{d.zone} · {d.model}</text>
+                    <text x="10" y="44" fill="#94A3B8" fontSize="8.5" fontFamily="monospace">
+                      MAC: {d.mac} | Rx: {d.rxPower} dBm
+                    </text>
                   </g>
                 )}
               </g>
@@ -530,14 +517,14 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
 
       {/* Slide-out Selected ONU Diagnostics Inspector */}
       {selectedDevice && (
-        <div className="absolute right-4 top-4 bottom-4 w-[340px] max-w-[calc(100%-32px)] z-30 flex flex-col rounded-3xl border border-border/80 bg-card/95 backdrop-blur-2xl shadow-2xl overflow-hidden animate-slideInRight">
+        <div className="absolute right-4 top-16 bottom-4 w-[340px] max-w-[calc(100%-32px)] z-30 flex flex-col rounded-3xl border border-border/80 bg-card/95 backdrop-blur-2xl shadow-2xl overflow-hidden animate-slideInRight">
           <div className="p-4 border-b border-border flex items-center justify-between"
-            style={{ background: selectedDevice.health === "issue" ? "rgba(220,38,38,0.15)" : selectedDevice.health === "warning" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)" }}>
+            style={{ background: selectedDevice.health === "issue" ? "rgba(100,116,139,0.15)" : selectedDevice.health === "warning" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)" }}>
             <div className="flex items-center gap-2">
-              <Radio size={16} className={selectedDevice.health === "issue" ? "text-rose-600" : selectedDevice.health === "warning" ? "text-amber-600" : "text-emerald-600"} />
+              <Radio size={16} className={selectedDevice.health === "issue" ? "text-slate-500" : selectedDevice.health === "warning" ? "text-amber-500" : "text-emerald-500"} />
               <div>
-                <div className="text-xs font-black text-foreground">{selectedDevice.id} Telemetry</div>
-                <div className="text-[10px] text-muted-foreground">{selectedDevice.model} ({selectedDevice.vendor})</div>
+                <div className="text-xs font-black text-foreground">{selectedDevice.customer}</div>
+                <div className="text-[10px] text-muted-foreground font-mono">{selectedDevice.mac}</div>
               </div>
             </div>
             <button onClick={() => setSelectedOnuId(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer">
@@ -546,21 +533,13 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           </div>
 
           <div className="p-4 space-y-3.5 overflow-y-auto flex-1 text-xs">
-            {/* Customer Info */}
-            <div>
-              <div className="font-bold text-foreground text-sm">{selectedDevice.customer}</div>
-              <div className="text-muted-foreground text-[11px] flex items-center gap-1 mt-0.5">
-                <MapPin size={11} /> {selectedDevice.address}
-              </div>
-            </div>
-
             {/* Optical RX Power */}
             <div className="p-3 rounded-2xl border border-border bg-muted/40 flex items-center justify-between">
               <div>
                 <div className="font-bold text-foreground">Optical RX Level</div>
-                <div className="text-[10px] text-muted-foreground">{selectedDevice.health === "good" ? "Normal Signal" : "Attenuation / Loss"}</div>
+                <div className="text-[10px] text-muted-foreground">{selectedDevice.health === "good" ? "Normal Signal" : selectedDevice.health === "warning" ? "Signal Attenuation" : "Standby"}</div>
               </div>
-              <div className="font-mono font-black text-sm" style={{ color: selectedDevice.rxPower > -24 ? "#10B981" : "#DC2626" }}>
+              <div className="font-mono font-black text-sm" style={{ color: selectedDevice.rxPower > -24 ? "#10B981" : selectedDevice.health === "warning" ? "#F59E0B" : "#64748B" }}>
                 {selectedDevice.rxPower} dBm
               </div>
             </div>
@@ -572,16 +551,16 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
                 <span className="text-foreground font-semibold">{selectedDevice.olt} · {selectedDevice.ponPort}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Serial:</span>
-                <span className="text-foreground font-semibold">{selectedDevice.serial}</span>
+                <span className="text-muted-foreground">Customer:</span>
+                <span className="text-foreground font-semibold">{selectedDevice.customer}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
-                <span className="text-muted-foreground">MAC:</span>
+                <span className="text-muted-foreground">MAC Address:</span>
                 <span className="text-foreground font-semibold">{selectedDevice.mac}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
-                <span className="text-muted-foreground">Splitter:</span>
-                <span className="text-foreground font-semibold">{selectedDevice.splitterId}</span>
+                <span className="text-muted-foreground">Hardware:</span>
+                <span className="text-foreground font-semibold">{selectedDevice.vendor} ({selectedDevice.model})</span>
               </div>
             </div>
 
@@ -595,14 +574,9 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
             {/* Quick Action buttons */}
             <div className="space-y-2 pt-2">
               <button
-                onClick={() => showToast(`Sent TR-069 optical diagnostic query to ${selectedDevice.id}`)}
+                onClick={() => showToast(`Sent TR-069 optical diagnostic query to ${selectedDevice.mac}`)}
                 className="w-full py-2 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
-                <Zap size={13} className="text-amber-500" /> Run Line Test
-              </button>
-              <button
-                onClick={() => onNavigate?.("customers")}
-                className="w-full py-2 rounded-xl text-white bg-primary hover:opacity-95 font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
-                <User size={13} /> View Customer Profile
+                <Zap size={13} className="text-amber-500" /> Run Optical Line Test
               </button>
             </div>
           </div>
