@@ -325,6 +325,45 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
     return { total, good, issues, warnings };
   }, [onuDevices]);
 
+  const handleRegisterOnu = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName || !newCustPhone) {
+      showToast("Please enter customer name and phone.");
+      return;
+    }
+
+    const newCustCode = `MBN${String(customers.length + 1).padStart(4, '0')}`;
+    const generatedSerial = newOnuSerial || `MBN-ONU-${newCustCode}`;
+    const generatedMac = newOnuMac || `4c:46:d1:${Math.floor(Math.random()*89+10)}:12:05`;
+
+    await addCustomer({
+      name: newCustName,
+      phone: newCustPhone,
+      address: `${newZone}, Madaripur`,
+      zone: newZone,
+      subzone: newZone,
+      package: "20 Mbps Fiber Standard",
+      price: 800,
+      billingStatus: "Monthly",
+      status: "active",
+      netStatus: "online",
+      deviceSerial: generatedSerial,
+      deviceVendor: newVendor,
+      deviceType: newModel,
+      mac: generatedMac,
+      olt: newOlt,
+      ponPort: newPonPort,
+      splitterBox: newSplitter,
+    });
+
+    setShowAddModal(false);
+    setNewCustName("");
+    setNewCustPhone("");
+    setNewOnuSerial("");
+    setNewOnuMac("");
+    showToast(`Successfully registered new ONU ${generatedSerial} for ${newCustName}!`);
+  };
+
   // Shared Map Component
   const renderMapCanvas = (isCompact = false) => (
     <div className="w-full h-full relative rounded-3xl border border-border overflow-hidden bg-[#0A101D] shadow-xl flex flex-col">
