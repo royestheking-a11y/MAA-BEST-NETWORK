@@ -5,7 +5,8 @@ import {
   ChevronLeft, Send, X, ShieldAlert, Check,
   HardDrive, Server, Layers, FileText, Sparkles, Image,
   Eye, EyeOff, Key, Copy, ArrowRight, ShieldCheck, Zap,
-  Radio, Laptop, Wifi, Hash, Tag, Award, CheckCircle
+  Radio, Laptop, Wifi, Hash, Tag, Award, CheckCircle,
+  Home, Building2, Globe2, Landmark
 } from "lucide-react";
 import { useCustomerContext, Customer } from "../context/CustomerContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -1152,25 +1153,29 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 <label className="text-xs font-bold text-foreground">Client Category Type</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
-                    { id: "Home" as const, label: "Home", icon: "🏠" },
-                    { id: "Commercial" as const, label: "Commercial", icon: "🏢" },
-                    { id: "Reseller" as const, label: "Reseller", icon: "🌐" },
-                    { id: "Corporate" as const, label: "Corporate", icon: "🏛️" }
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setClientType(t.id)}
-                      className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                        clientType === t.id
-                          ? "bg-primary text-white border-primary font-bold shadow-xs"
-                          : "bg-muted/30 border-border text-foreground hover:bg-muted/60"
-                      }`}
-                    >
-                      <span>{t.icon}</span>
-                      <span className="text-xs font-bold">{t.label}</span>
-                    </button>
-                  ))}
+                    { id: "Home" as const, label: "Home Fiber", icon: Home, color: "text-blue-500" },
+                    { id: "Commercial" as const, label: "Commercial", icon: Building2, color: "text-amber-500" },
+                    { id: "Reseller" as const, label: "Reseller POP", icon: Globe2, color: "text-purple-500" },
+                    { id: "Corporate" as const, label: "Corporate Link", icon: Landmark, color: "text-emerald-500" }
+                  ].map(t => {
+                    const Icon = t.icon;
+                    const isSelected = clientType === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setClientType(t.id)}
+                        className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          isSelected
+                            ? "bg-primary text-white border-primary font-bold shadow-xs"
+                            : "bg-muted/30 border-border text-foreground hover:bg-muted/60"
+                        }`}
+                      >
+                        <Icon size={15} className={isSelected ? "text-white" : t.color} />
+                        <span className="text-xs font-bold">{t.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
