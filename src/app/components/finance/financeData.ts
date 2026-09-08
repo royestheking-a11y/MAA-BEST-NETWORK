@@ -38,9 +38,44 @@ export const INITIAL_TRANSACTIONS: FinanceTransaction[] = [];
 
 export const INITIAL_EXPENSES: ExpenseItem[] = [];
 
-let sharedAccounts = [...INITIAL_ACCOUNTS];
-let sharedTrx = [...INITIAL_TRANSACTIONS];
-let sharedExpenses = [...INITIAL_EXPENSES];
+const STORAGE_KEYS = {
+  ACCOUNTS: "isp_finance_accounts_v3",
+  TRX: "isp_finance_trx_v3",
+  EXPENSES: "isp_finance_expenses_v3",
+};
+
+function loadStorage<T>(key: string, fallback: T): T {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(fallback)) {
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+        } else if (parsed && typeof parsed === "object") {
+          return { ...fallback, ...parsed } as unknown as T;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to load ${key} from storage:`, e);
+  }
+  return fallback;
+}
+
+function saveStorage<T>(key: string, data: T): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(`Failed to save ${key} to storage:`, e);
+  }
+}
+
+let sharedAccounts = loadStorage(STORAGE_KEYS.ACCOUNTS, [...INITIAL_ACCOUNTS]);
+let sharedTrx = loadStorage(STORAGE_KEYS.TRX, [...INITIAL_TRANSACTIONS]);
+let sharedExpenses = loadStorage(STORAGE_KEYS.EXPENSES, [...INITIAL_EXPENSES]);
 
 const listeners = new Set<() => void>();
 function notify() {
@@ -49,18 +84,23 @@ function notify() {
 
 export const financeStore = {
   getAccounts: () => sharedAccounts,
-  addAccount: (acc: FinanceAccount) => { sharedAccounts = [...sharedAccounts, acc]; notify(); },
+  addAccount: (acc: FinanceAccount) => {
+    sharedAccounts = [...sharedAccounts, acc];
+    saveStorage(STORAGE_KEYS.ACCOUNTS, sharedAccounts);
+    notify();
+  },
 
   getTransactions: () => sharedTrx,
   addTransaction: (trx: FinanceTransaction) => {
     sharedTrx = [trx, ...sharedTrx];
+    saveStorage(STORAGE_KEYS.TRX, sharedTrx);
     notify();
   },
 
   getExpenses: () => sharedExpenses,
   addExpense: (exp: ExpenseItem) => {
     sharedExpenses = [exp, ...sharedExpenses];
-    sharedTrx = [{
+    const newTrx: FinanceTransaction = {
       id: `TRX-${Date.now().toString().slice(-4)}`,
       date: exp.date,
       type: "expense",
@@ -70,7 +110,10 @@ export const financeStore = {
       amount: exp.amount,
       reference: exp.invoiceNo,
       status: "reconciled",
-    }, ...sharedTrx];
+    };
+    sharedTrx = [newTrx, ...sharedTrx];
+    saveStorage(STORAGE_KEYS.EXPENSES, sharedExpenses);
+    saveStorage(STORAGE_KEYS.TRX, sharedTrx);
     notify();
   },
 

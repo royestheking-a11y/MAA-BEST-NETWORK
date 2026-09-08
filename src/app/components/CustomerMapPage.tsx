@@ -244,7 +244,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
         fiberDistanceMeters: 380 + ((i * 29) % 950),
         pppoeUser: c.pppUser || c.clientCode || c.id,
         ipAddress: c.ipAddress || `103.12.173.${100 + (i % 120)}`,
-        oltNode: "OLT 1 (103.12.173.136:1893)",
+        oltNode: "OLT 1 (103.12.173.136:1895)",
         ponPort: c.ponPort || `EPON0/${(i % 4) + 1}:${(i % 32) + 1}`,
         splitterId: targetHub.id,
         splitterPort: `Port ${(i % 16) + 1}`,

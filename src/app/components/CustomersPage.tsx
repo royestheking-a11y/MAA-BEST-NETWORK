@@ -616,7 +616,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                         <span className="truncate max-w-[130px]">{c.package}</span>
                         <span className="opacity-0 group-hover:opacity-100 text-[10px] font-semibold text-primary bg-primary/10 px-1 py-0.5 rounded transition-all">Change</span>
                       </div>
-                      <p className="font-mono text-[10px] text-muted-foreground mt-0.5">৳{c.price.toLocaleString()}/mo · {c.speed} Mbps</p>
+                      <p className="font-mono text-[10px] text-muted-foreground mt-0.5">৳{(c.price ?? 0).toLocaleString()}/mo · {c.speed || 0} Mbps</p>
                     </div>
                   </td>
 
@@ -647,9 +647,9 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
                   {/* Due / Bill */}
                   <td className="px-4 py-3">
-                    {c.dueAmount > 0 ? (
+                    {(c.dueAmount ?? 0) > 0 ? (
                       <span className="font-mono text-xs font-black text-rose-600 dark:text-rose-400">
-                        ৳{c.dueAmount.toLocaleString()}
+                        ৳{(c.dueAmount ?? 0).toLocaleString()}
                       </span>
                     ) : (
                       <span className="text-xs font-bold text-emerald-600">Paid</span>
@@ -816,7 +816,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                       { label: "Zone", value: `${selectedCustomer.subzone}, ${selectedCustomer.zone}` },
                       { label: "Address", value: selectedCustomer.address },
                       { label: "Package", value: selectedCustomer.package },
-                      { label: "Monthly Fee", value: `৳${selectedCustomer.price.toLocaleString()}/mo` },
+                      { label: "Monthly Fee", value: `৳${(selectedCustomer.price ?? 0).toLocaleString()}/mo` },
                       { label: "PPPoE Username", value: selectedCustomer.pppUser, mono: true },
                       { label: "IP Address", value: selectedCustomer.ipAddress, mono: true },
                       { label: "Assigned OLT", value: selectedCustomer.olt },
@@ -1377,8 +1377,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                       <div className="text-[11px] text-muted-foreground">Billing Cycle: {selectedCustomer.billingDate}th of every month · ৳{selectedCustomer.price}/mo</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`font-mono text-sm font-black ${selectedCustomer.dueAmount > 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                        {selectedCustomer.dueAmount > 0 ? `৳${selectedCustomer.dueAmount.toLocaleString()} DUE` : "PAID"}
+                      <span className={`font-mono text-sm font-black ${(selectedCustomer.dueAmount ?? 0) > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                        {(selectedCustomer.dueAmount ?? 0) > 0 ? `৳${(selectedCustomer.dueAmount ?? 0).toLocaleString()} DUE` : "PAID"}
                       </span>
                       <button
                         onClick={() => openChangePackageModal(selectedCustomer)}
@@ -1388,13 +1388,13 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                     </div>
                   </div>
 
-                  {selectedCustomer.invoices.map(inv => (
+                  {(selectedCustomer.invoices || []).map(inv => (
                     <div key={inv.id} className="p-4 rounded-2xl border flex items-center justify-between" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
                       <div>
                         <div className="text-xs font-bold text-foreground">{inv.month} ({inv.id})</div>
                         <div className="text-[11px] text-muted-foreground">{inv.paidDate ? `Paid on ${inv.paidDate}` : `Due: ${inv.dueDate}`}</div>
                       </div>
-                      <span className="font-mono text-xs font-bold">৳{inv.amount.toLocaleString()}</span>
+                      <span className="font-mono text-xs font-bold">৳{(inv.amount ?? 0).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -1403,18 +1403,18 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               {drawerTab === "Payments" && (
                 <div className="space-y-3">
                   <button
-                    onClick={() => { setPaymentModal(true); setPayAmount(String(selectedCustomer.dueAmount || selectedCustomer.price)); }}
+                    onClick={() => { setPaymentModal(true); setPayAmount(String(selectedCustomer.dueAmount || selectedCustomer.price || 0)); }}
                     className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-primary shadow-md flex items-center justify-center gap-2">
                     <Plus size={14} /> Record Manual Payment
                   </button>
 
-                  {selectedCustomer.paymentHistory.map(p => (
+                  {(selectedCustomer.paymentHistory || []).map(p => (
                     <div key={p.id} className="p-4 rounded-2xl border flex items-center justify-between" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
                       <div>
                         <div className="text-xs font-bold font-mono text-primary">{p.trxId} ({p.method})</div>
                         <div className="text-[11px] text-muted-foreground">{p.date} · {p.collectedBy}</div>
                       </div>
-                      <span className="font-mono text-xs font-bold text-emerald-600">+৳{p.amount.toLocaleString()}</span>
+                      <span className="font-mono text-xs font-bold text-emerald-600">+৳{(p.amount ?? 0).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -2137,7 +2137,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                           <div>
                             <span className="text-muted-foreground text-[10px] uppercase font-bold block">Current Plan</span>
                             <span className="font-bold text-foreground">{req.currentPackage}</span>
-                            <span className="font-mono text-muted-foreground ml-1.5">(৳{req.currentPrice.toLocaleString()}/mo)</span>
+                            <span className="font-mono text-muted-foreground ml-1.5">(৳{(req.currentPrice ?? 0).toLocaleString()}/mo)</span>
                           </div>
 
                           <div className="text-primary font-black">
@@ -2147,13 +2147,13 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                           <div>
                             <span className="text-primary text-[10px] uppercase font-bold block">Requested Upgrade</span>
                             <span className="font-extrabold text-foreground">{req.requestedPackage}</span>
-                            <span className="font-mono font-bold text-primary ml-1.5">(৳{req.requestedPrice.toLocaleString()}/mo)</span>
+                            <span className="font-mono font-bold text-primary ml-1.5">(৳{(req.requestedPrice ?? 0).toLocaleString()}/mo)</span>
                           </div>
 
                           <div className="text-right">
                             <span className="text-emerald-600 dark:text-emerald-400 text-[10px] uppercase font-bold block">Monthly Diff</span>
                             <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
-                              +৳{req.priceDifference.toLocaleString()}/mo
+                              +৳{(req.priceDifference ?? 0).toLocaleString()}/mo
                             </span>
                           </div>
                         </div>

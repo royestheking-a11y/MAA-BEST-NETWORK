@@ -1,5 +1,5 @@
 import http from 'http';
-import { getCachedTelemetry, refreshLiveHardwareTelemetry, executeOltCommand } from './telemetry-service.js';
+import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
 
@@ -67,24 +67,73 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4. OLT CLI command execution
-  if (url.pathname === '/api/olt/command') {
-    const host = url.searchParams.get('host') || '103.12.173.136';
-    const port = Number(url.searchParams.get('port')) || 1895;
-    const cmd = url.searchParams.get('cmd') || 'show epon onu-information';
-    const user = url.searchParams.get('user') || 'mbn@netx.com';
-    const pass = url.searchParams.get('pass') || '';
+  // ─── NEW: Real Live Stats Proxy from NetX API ─────────────────────────────
 
-    const result = await executeOltCommand(host, port, user, pass, cmd);
+  // 4. Get real live customer stats (connection status, IP, MAC, uptime, ONU RX power)
+  if (url.pathname === '/api/netx/live-stats') {
+    const cached = getCachedLiveStats();
+    // If data is older than 60s, trigger a background refresh
+    if (!cached.data || cached.ageMs > 60000) {
+      fetchNetxLiveStats().catch(() => {});
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(result));
+    res.end(JSON.stringify({
+      success: true,
+      count: cached.data ? cached.data.length : 0,
+      lastFetch: cached.lastFetch ? new Date(cached.lastFetch).toISOString() : null,
+      ageSeconds: Math.round(cached.ageMs / 1000),
+      data: cached.data || []
+    }));
     return;
   }
 
-  // 5. Health check
-  if (url.pathname === '/health') {
+  // 5. Get real OLT server data (status, ONU counts)
+  if (url.pathname === '/api/netx/olt-servers') {
+    const cached = getCachedOltServers();
+    if (!cached.data || cached.ageMs > 60000) {
+      syncNetxOltData().catch(() => {});
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', service: 'mbn-telemetry-gateway', sseClients: sseClients.size }));
+    res.end(JSON.stringify({
+      success: true,
+      lastFetch: cached.lastFetch ? new Date(cached.lastFetch).toISOString() : null,
+      ageSeconds: Math.round(cached.ageMs / 1000),
+      data: cached.data || []
+    }));
+    return;
+  }
+
+  // 6. OLT Live Cloud Sync (force)
+  if (url.pathname === '/api/olt/sync') {
+    const data = await syncNetxOltData();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, servers: data }));
+    return;
+  }
+
+  // 7. OLT Live Test
+  if (url.pathname === '/api/olt/test') {
+    const serverId = url.searchParams.get('id') || '6f29a9a7-b5b9-4a38-93c6-efd59e200140';
+    const data = await testOltConnection(serverId);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  // 8. Health check
+  if (url.pathname === '/health') {
+    const liveStats = getCachedLiveStats();
+    const oltServers = getCachedOltServers();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      service: 'mbn-telemetry-gateway',
+      version: '2.0',
+      sseClients: sseClients.size,
+      liveStatsAge: Math.round(liveStats.ageMs / 1000) + 's',
+      liveStatsCount: liveStats.data ? liveStats.data.length : 0,
+      oltServersAge: Math.round(oltServers.ageMs / 1000) + 's'
+    }));
     return;
   }
 
@@ -93,11 +142,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[MBN Telemetry Gateway] Realtime SSE Stream on http://localhost:${PORT}/api/realtime/stream`);
-  console.log(`[MBN Telemetry Gateway] High-speed endpoint on http://localhost:${PORT}/api/realtime/live-status`);
-  console.log(`[MBN Telemetry Gateway] Connected to BDCOM OLT 1 (103.12.173.136:1895)`);
+  console.log(`[MBN Telemetry Gateway v2.0] Real-time data from NetX API`);
+  console.log(`  SSE Stream:   http://localhost:${PORT}/api/realtime/stream`);
+  console.log(`  Live Status:  http://localhost:${PORT}/api/realtime/live-status`);
+  console.log(`  Live Stats:   http://localhost:${PORT}/api/netx/live-stats`);
+  console.log(`  OLT Servers:  http://localhost:${PORT}/api/netx/olt-servers`);
 
-  // Autonomous Built-in Self-Ping Keep-Alive (every 8 minutes)
+  // Autonomous Self-Ping Keep-Alive (every 8 minutes)
   const SELF_URL = process.env.RENDER_EXTERNAL_URL || "https://maa-best-network.onrender.com";
   console.log(`[Self-Ping Engine] Initialized keep-alive loop for ${SELF_URL}/health`);
 
@@ -105,10 +156,10 @@ server.listen(PORT, () => {
     try {
       const res = await fetch(`${SELF_URL}/health`, { signal: AbortSignal.timeout(10000) });
       if (res.ok) {
-        console.log(`[Self-Ping Keep-Alive] Pinged ${SELF_URL}/health at ${new Date().toLocaleTimeString()} (HTTP ${res.status})`);
+        console.log(`[Self-Ping Keep-Alive] Pinged at ${new Date().toLocaleTimeString()} (HTTP ${res.status})`);
       }
     } catch (err) {
       console.log(`[Self-Ping Keep-Alive] Ping notice:`, err.message);
     }
-  }, 8 * 60 * 1000); // 8 minutes (Render sleeps at 15 minutes)
+  }, 8 * 60 * 1000);
 });

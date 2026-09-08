@@ -172,7 +172,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem("isp_customers_store_v11_authentic_netx_macs");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= INITIAL_CUSTOMERS.length) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
@@ -349,7 +349,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       paymentHistory: data.paymentHistory || [],
     };
 
-    setCustomers(prev => [newCustomer, ...prev]);
+    const updatedList = [newCustomer, ...customers];
+    setCustomers(updatedList);
+    try {
+      localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updatedList));
+    } catch (e) {
+      console.error(e);
+    }
     saveCustomerToFirestore(newCustomer);
     return newCustomer;
   };
@@ -359,12 +365,25 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       const updated = prev.map(c => (c.id === id ? { ...c, ...updates } : c));
       const target = updated.find(c => c.id === id);
       if (target) saveCustomerToFirestore(target);
+      try {
+        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
       return updated;
     });
   };
 
   const deleteCustomer = (id: string) => {
-    setCustomers(prev => prev.filter(c => c.id !== id));
+    setCustomers(prev => {
+      const updated = prev.filter(c => c.id !== id);
+      try {
+        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
     deleteCustomerFromFirestore(id);
   };
 
@@ -381,6 +400,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       );
       const target = updated.find(c => c.id === id);
       if (target) saveCustomerToFirestore(target);
+      try {
+        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
       return updated;
     });
   };
@@ -475,6 +499,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       });
       const target = updated.find(c => c.id === customerId);
       if (target) saveCustomerToFirestore(target);
+      try {
+        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
       return updated;
     });
   };

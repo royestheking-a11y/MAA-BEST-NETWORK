@@ -176,13 +176,13 @@ export const INITIAL_MAP_NODES: MapNode[] = [
     id: "OLT2",
     name: "BDCOM OLT 2 (Kalkini)",
     type: "olt",
-    ip: "103.12.173.136:1894",
+    ip: "103.12.173.136:1896",
     status: "online",
     x: 740,
     y: 350,
-    sessions: 145,
-    traffic: "49 ONUs Active",
-    latency: "51ms",
+    sessions: 156,
+    traffic: "59 ONUs Active",
+    latency: "33ms",
   },
   {
     id: "ZONE-SADAR",
@@ -272,9 +272,9 @@ export const INITIAL_OLTS: OltDevice[] = [
     location: "Somitir Hat Core POP",
     ponPorts: 8,
     usedPorts: 6,
-    activeOnu: 53,
-    offlineOnu: 97,
-    totalOnu: 150,
+    activeOnu: 93,
+    offlineOnu: 64,
+    totalOnu: 157,
     rxPower: -19.4,
     status: "online",
     lastSync: "Just now (Realtime)",
@@ -286,7 +286,7 @@ export const INITIAL_OLTS: OltDevice[] = [
     vendor: "BDCOM",
     model: "BDCOM P3616-2TE EPON OLT",
     ip: "103.12.173.136",
-    port: 1894,
+    port: 1896,
     connectionProtocol: "Telnet",
     username: "mbn@netx.com",
     password: "••••••••",
@@ -295,9 +295,9 @@ export const INITIAL_OLTS: OltDevice[] = [
     location: "Kalkini Distribution Hub",
     ponPorts: 8,
     usedPorts: 4,
-    activeOnu: 49,
-    offlineOnu: 96,
-    totalOnu: 145,
+    activeOnu: 59,
+    offlineOnu: 97,
+    totalOnu: 156,
     rxPower: -20.2,
     status: "online",
     lastSync: "Just now (Realtime)",
@@ -311,12 +311,44 @@ export const INITIAL_INCIDENTS: NetworkIncident[] = [];
 
 export const INITIAL_TELEMETRY: MetricPoint[] = [];
 
-// ─── Reactive Network Store ──────────────────────────────────────────────────
+// ─── Reactive Network Store with LocalStorage Persistence ─────────────────────
 
-let sharedMikrotik = [...INITIAL_MIKROTIK];
-let sharedOlts = [...INITIAL_OLTS];
-let sharedZones = [...INITIAL_ZONES];
-let sharedIncidents = [...INITIAL_INCIDENTS];
+const STORAGE_KEY_OLTS = "isp_network_olts_v2";
+const STORAGE_KEY_MIKROTIK = "isp_network_mikrotik_v2";
+const STORAGE_KEY_ZONES = "isp_network_zones_v2";
+const STORAGE_KEY_INCIDENTS = "isp_network_incidents_v2";
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const item = localStorage.getItem(key);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(fallback) ? Array.isArray(parsed) : parsed) {
+          return parsed;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return fallback;
+}
+
+function saveToStorage<T>(key: string, data: T): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+let sharedMikrotik = loadFromStorage(STORAGE_KEY_MIKROTIK, [...INITIAL_MIKROTIK]);
+let sharedOlts = loadFromStorage(STORAGE_KEY_OLTS, [...INITIAL_OLTS]);
+let sharedZones = loadFromStorage(STORAGE_KEY_ZONES, [...INITIAL_ZONES]);
+let sharedIncidents = loadFromStorage(STORAGE_KEY_INCIDENTS, [...INITIAL_INCIDENTS]);
 
 const listeners = new Set<() => void>();
 function notify() {
@@ -325,30 +357,65 @@ function notify() {
 
 export const networkStore = {
   getMikrotik: () => sharedMikrotik,
-  setMikrotik: (data: MikrotikServer[]) => { sharedMikrotik = data; notify(); },
-  addMikrotik: (srv: MikrotikServer) => { sharedMikrotik = [srv, ...sharedMikrotik]; notify(); },
+  setMikrotik: (data: MikrotikServer[]) => {
+    sharedMikrotik = data;
+    saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+    notify();
+  },
+  addMikrotik: (srv: MikrotikServer) => {
+    sharedMikrotik = [srv, ...sharedMikrotik];
+    saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+    notify();
+  },
 
   getOlts: () => sharedOlts,
-  setOlts: (data: OltDevice[]) => { sharedOlts = data; notify(); },
-  addOlt: (olt: OltDevice) => { sharedOlts = [olt, ...sharedOlts]; notify(); },
+  setOlts: (data: OltDevice[]) => {
+    sharedOlts = data;
+    saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+    notify();
+  },
+  addOlt: (olt: OltDevice) => {
+    sharedOlts = [olt, ...sharedOlts];
+    saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+    notify();
+  },
   updateOlt: (id: string, updates: Partial<OltDevice>) => {
     sharedOlts = sharedOlts.map(o => o.id === id ? { ...o, ...updates } : o);
+    saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
     notify();
   },
   deleteOlt: (id: string) => {
     sharedOlts = sharedOlts.filter(o => o.id !== id);
+    saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
     notify();
   },
 
   getZones: () => sharedZones,
-  setZones: (data: ServiceZone[]) => { sharedZones = data; notify(); },
-  addZone: (z: ServiceZone) => { sharedZones = [z, ...sharedZones]; notify(); },
+  setZones: (data: ServiceZone[]) => {
+    sharedZones = data;
+    saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+    notify();
+  },
+  addZone: (z: ServiceZone) => {
+    sharedZones = [z, ...sharedZones];
+    saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+    notify();
+  },
 
   getIncidents: () => sharedIncidents,
-  setIncidents: (data: NetworkIncident[]) => { sharedIncidents = data; notify(); },
-  addIncident: (inc: NetworkIncident) => { sharedIncidents = [inc, ...sharedIncidents]; notify(); },
+  setIncidents: (data: NetworkIncident[]) => {
+    sharedIncidents = data;
+    saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
+    notify();
+  },
+  addIncident: (inc: NetworkIncident) => {
+    sharedIncidents = [inc, ...sharedIncidents];
+    saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
+    notify();
+  },
   resolveIncident: (id: string) => {
     sharedIncidents = sharedIncidents.map(i => i.id === id ? { ...i, status: "resolved" } : i);
+    saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
     notify();
   },
 

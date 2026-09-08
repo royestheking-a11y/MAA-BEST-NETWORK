@@ -43,9 +43,44 @@ export const INITIAL_TIMELINE: TimelineEvent[] = [];
 
 export const INITIAL_MESSAGES: CustomerMessage[] = [];
 
-let sharedTickets = [...INITIAL_TICKETS];
-let sharedTimeline = [...INITIAL_TIMELINE];
-let sharedMessages = [...INITIAL_MESSAGES];
+const STORAGE_KEYS = {
+  TICKETS: "isp_crm_tickets_v3",
+  TIMELINE: "isp_crm_timeline_v3",
+  MESSAGES: "isp_crm_messages_v3",
+};
+
+function loadStorage<T>(key: string, fallback: T): T {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(fallback)) {
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+        } else if (parsed && typeof parsed === "object") {
+          return { ...fallback, ...parsed } as unknown as T;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to load ${key} from storage:`, e);
+  }
+  return fallback;
+}
+
+function saveStorage<T>(key: string, data: T): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(`Failed to save ${key} to storage:`, e);
+  }
+}
+
+let sharedTickets = loadStorage(STORAGE_KEYS.TICKETS, [...INITIAL_TICKETS]);
+let sharedTimeline = loadStorage(STORAGE_KEYS.TIMELINE, [...INITIAL_TIMELINE]);
+let sharedMessages = loadStorage(STORAGE_KEYS.MESSAGES, [...INITIAL_MESSAGES]);
 
 const listeners = new Set<() => void>();
 function notify() {
@@ -56,7 +91,7 @@ export const crmStore = {
   getTickets: () => sharedTickets,
   addTicket: (t: SupportTicket) => {
     sharedTickets = [t, ...sharedTickets];
-    sharedTimeline = [{
+    const newEvent: TimelineEvent = {
       id: `EV-${Date.now()}`,
       custId: t.custId,
       customerName: t.customerName,
@@ -65,11 +100,15 @@ export const crmStore = {
       details: t.subject,
       timestamp: t.createdAt,
       author: "Helpdesk System"
-    }, ...sharedTimeline];
+    };
+    sharedTimeline = [newEvent, ...sharedTimeline];
+    saveStorage(STORAGE_KEYS.TICKETS, sharedTickets);
+    saveStorage(STORAGE_KEYS.TIMELINE, sharedTimeline);
     notify();
   },
   resolveTicket: (id: string) => {
     sharedTickets = sharedTickets.map(t => t.id === id ? { ...t, status: "resolved" } : t);
+    saveStorage(STORAGE_KEYS.TICKETS, sharedTickets);
     notify();
   },
 
@@ -78,6 +117,7 @@ export const crmStore = {
   getMessages: () => sharedMessages,
   sendMessage: (m: CustomerMessage) => {
     sharedMessages = [m, ...sharedMessages];
+    saveStorage(STORAGE_KEYS.MESSAGES, sharedMessages);
     notify();
   },
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Circle, Search, RefreshCw, Clock, Wifi, WifiOff, Download, Activity, CheckCircle2, Radio, Server, Signal } from "lucide-react";
 import { useCustomerContext } from "../context/CustomerContext";
 import { AUTHENTIC_NETX_ONUS } from "../data/netxOnuData";
+import { useNetxLiveData, type NetxLiveCustomer } from "../services/netxApiService";
 
 interface Session {
   customer: string;
@@ -47,6 +48,7 @@ function exportCSV(sessions: Session[]) {
 
 export function LiveStatusPage() {
   const { customers } = useCustomerContext();
+  const { liveStats, isConnected: isNetxConnected, lastRefresh: netxLastRefresh, refresh: refreshNetx } = useNetxLiveData(30000);
 
   const baseSessions: Session[] = useMemo(() => {
     const custMap = new Map<string, any>();
@@ -58,12 +60,34 @@ export function LiveStatusPage() {
       if (c.mac) macMap.set(c.mac.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
     });
 
+    // Build a lookup map from real NetX live-stats data
+    const liveMap = new Map<string, NetxLiveCustomer>();
+    liveStats.forEach(c => {
+      if (c.pppoe_username) liveMap.set(c.pppoe_username.toLowerCase(), c);
+      if (c.full_name) liveMap.set(c.full_name.toLowerCase(), c);
+    });
+
     return AUTHENTIC_NETX_ONUS.map((o, idx) => {
       const cleanCust = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
       const cleanMac = o.mac.toLowerCase().replace(/[^a-z0-9]/g, '');
       const matched = macMap.get(cleanMac) || custMap.get(cleanCust);
 
-      const isOnline = o.status === "online";
+      // Try to find real live data from NetX API
+      const liveMatch = liveMap.get(o.customer.toLowerCase());
+
+      // Use real data if available, otherwise fall back to static
+      const isOnline = liveMatch
+        ? liveMatch.connection_status === 'online'
+        : o.status === 'online';
+
+      const realUptime = liveMatch?.live_uptime || '';
+      const realIp = liveMatch?.live_ip || '';
+      const realMac = liveMatch?.live_mac || o.mac;
+      const realRxPower = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
+        ? `${liveMatch.onu_rx_power} dBm`
+        : o.rxPower;
+      const realPackage = liveMatch?.package_name || matched?.package || '20 Mbps Fiber Standard';
+
       const cleanUser = o.customer !== "— Unassigned —" ? o.customer : `Unassigned-ONU-${idx + 1}`;
 
       return {
@@ -71,20 +95,20 @@ export function LiveStatusPage() {
         id: matched?.clientCode || matched?.id || `MBN-${(idx + 1).toString().padStart(4, '0')}`,
         user: cleanUser,
         status: isOnline ? ("online" as const) : ("offline" as const),
-        uptime: isOnline ? (matched?.sessionUptime || `${(idx % 14) + 1}d ${(idx % 20) + 1}h ${(idx % 50) + 5}m`) : "—",
-        ip: isOnline ? (matched?.ipAddress || `100.64.${Math.floor(idx / 250) + 10}.${(idx % 250) + 2}`) : "—",
-        mac: o.mac,
-        rxPower: o.rxPower,
-        rxPowerNum: parseFloat(o.rxPower) || -20,
+        uptime: isOnline ? (realUptime || matched?.sessionUptime || `${(idx % 14) + 1}d ${(idx % 20) + 1}h ${(idx % 50) + 5}m`) : "—",
+        ip: isOnline ? (realIp || matched?.ipAddress || `100.64.${Math.floor(idx / 250) + 10}.${(idx % 250) + 2}`) : "—",
+        mac: realMac || o.mac,
+        rxPower: realRxPower,
+        rxPowerNum: parseFloat(realRxPower) || -20,
         ponPort: o.ponPort,
         olt: o.oltServer,
         up: isOnline ? `${Math.round(((matched?.uploadSpeedMbps || 15) * 0.45) + (idx % 3))} Mbps` : "—",
         down: isOnline ? `${Math.round(((matched?.downloadSpeedMbps || 30) * 0.72) + (idx % 5))} Mbps` : "—",
-        mikrotik: matched?.mikrotik || "MikroTik-MBN-Core",
-        pkg: matched?.package || "20 Mbps Fiber Standard"
+        mikrotik: matched?.mikrotik || liveMatch?.server_name || "MikroTik-MBN-Core",
+        pkg: realPackage
       };
     });
-  }, [customers]);
+  }, [customers, liveStats]);
 
   const [sessions, setSessions] = useState<Session[]>(baseSessions);
 
@@ -103,17 +127,14 @@ export function LiveStatusPage() {
 
   const doRefresh = useCallback(() => {
     setRefreshing(true);
+    // Trigger real API refresh
+    refreshNetx();
     setTimeout(() => {
-      setSessions(prev => prev.map(s => ({
-        ...s,
-        up: randomizeSpeed(s.up),
-        down: randomizeSpeed(s.down),
-      })));
       setLastRefresh(new Date());
       setCountdown(30);
       setRefreshing(false);
-    }, 600);
-  }, []);
+    }, 800);
+  }, [refreshNetx]);
 
   useEffect(() => {
     if (!autoRefresh) return;

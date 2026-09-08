@@ -474,7 +474,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
             <g>
               <rect x="530" y="30" width="440" height="590" rx="24" fill="rgba(168, 85, 247, 0.03)" stroke="rgba(168, 85, 247, 0.2)" strokeDasharray="6,6" />
               <text x="550" y="60" fill="#A855F7" fontSize="12" fontWeight="900" letterSpacing="1">
-                OLT 2 · KALKINI SUB-STATION (103.12.173.136:1894)
+                OLT 2 · KALKINI SUB-STATION (103.12.173.136:1896)
               </text>
 
               {/* Central OLT2 Node */}

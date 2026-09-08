@@ -655,7 +655,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
 
                   <div className="text-left sm:text-right">
                     <div className="text-[11px] font-bold text-muted-foreground uppercase">Monthly Fee</div>
-                    <div className="text-2xl font-black text-foreground font-mono">৳{customer.price.toLocaleString()}</div>
+                    <div className="text-2xl font-black text-foreground font-mono">৳{(customer.price ?? 0).toLocaleString()}</div>
                   </div>
                 </div>
 
@@ -715,8 +715,8 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-extrabold text-foreground">
-                        {customer.dueAmount > 0
-                          ? `Bill Due: ৳${customer.dueAmount.toLocaleString()}`
+                        {(customer.dueAmount ?? 0) > 0
+                          ? `Bill Due: ৳${(customer.dueAmount ?? 0).toLocaleString()}`
                           : "Account Up-To-Date & Paid"}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
@@ -998,13 +998,13 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                   <div>
                     <div className="text-[11px] font-bold text-muted-foreground uppercase">Current Invoice Amount</div>
                     <div className="text-2xl font-black font-mono text-foreground mt-0.5">
-                      ৳{(customer.dueAmount > 0 ? customer.dueAmount : customer.price).toLocaleString()}.00
+                      ৳{(((customer.dueAmount ?? 0) > 0 ? customer.dueAmount : customer.price) || 0).toLocaleString()}.00
                     </div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-extrabold ${
-                    customer.dueAmount > 0 ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"
+                    (customer.dueAmount ?? 0) > 0 ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"
                   }`}>
-                    {customer.dueAmount > 0 ? `Due by ${customer.endDate}` : "Fully Paid"}
+                    {(customer.dueAmount ?? 0) > 0 ? `Due by ${customer.endDate}` : "Fully Paid"}
                   </span>
                 </div>
 
@@ -1094,7 +1094,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs font-black">৳{inv.amount.toLocaleString()}</span>
+                        <span className="font-mono text-xs font-black">৳{(inv.amount ?? 0).toLocaleString()}</span>
                         <button
                           onClick={() => setReceiptInvoice(inv)}
                           className="p-2 rounded-xl border bg-card hover:bg-muted"

@@ -728,7 +728,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { id: "OLT1" as const, name: "OLT1 (Madaripur Central)", sub: "103.12.173.136:1895" },
-                      { id: "OLT2" as const, name: "OLT2 (Kalkini Station)", sub: "103.12.173.136:1894" }
+                      { id: "OLT2" as const, name: "OLT2 (Kalkini Station)", sub: "103.12.173.136:1896" }
                     ].map(olt => (
                       <button
                         key={olt.id}

@@ -18,6 +18,28 @@ export const CUSTOMERS_COLLECTION = "customers";
 export const UPGRADE_REQUESTS_COLLECTION = "upgradeRequests";
 export const PAYMENTS_COLLECTION = "payments";
 
+/**
+ * Deep sanitization for Firestore: strips undefined properties so setDoc never throws.
+ */
+function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as any;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirestore(item)) as any;
+  }
+  if (typeof data === "object" && !(data instanceof Date)) {
+    const result: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        result[key] = sanitizeForFirestore(value);
+      }
+    }
+    return result;
+  }
+  return data;
+}
+
 // ── 1. CUSTOMERS REALTIME SYNC & CRUD ──────────────────────────────────────────
 
 /**
@@ -34,7 +56,19 @@ export function subscribeToCustomers(
       if (snapshot.empty) return;
       const docs: Customer[] = [];
       snapshot.forEach(docSnap => {
-        const data = docSnap.data() as Customer;
+        const raw = docSnap.data() as any;
+        const data: Customer = {
+          ...raw,
+          price: typeof raw.price === "number" ? raw.price : (Number(raw.price) || 0),
+          monthlyBill: typeof raw.monthlyBill === "number" ? raw.monthlyBill : (typeof raw.price === "number" ? raw.price : (Number(raw.monthlyBill) || 0)),
+          dueAmount: typeof raw.dueAmount === "number" ? raw.dueAmount : (Number(raw.dueAmount) || 0),
+          due: typeof raw.due === "number" ? raw.due : (typeof raw.dueAmount === "number" ? raw.dueAmount : 0),
+          speed: typeof raw.speed === "string" ? raw.speed : (typeof raw.speed === "number" ? `${raw.speed}/${Math.round(raw.speed / 2)}` : "20/10"),
+          downloadSpeedMbps: typeof raw.downloadSpeedMbps === "number" ? raw.downloadSpeedMbps : 20,
+          uploadSpeedMbps: typeof raw.uploadSpeedMbps === "number" ? raw.uploadSpeedMbps : 10,
+          invoices: Array.isArray(raw.invoices) ? raw.invoices : [],
+          paymentHistory: Array.isArray(raw.paymentHistory) ? raw.paymentHistory : (Array.isArray(raw.payments) ? raw.payments : []),
+        };
         // Guarantee mbn@ passcode standard
         if (data.passcode && data.passcode.startsWith("isp@")) {
           data.passcode = data.passcode.replace(/^isp@/i, "mbn@");
@@ -67,8 +101,9 @@ export async function saveCustomerToFirestore(customer: Customer): Promise<void>
       ...customer,
       passcode: (customer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(customer.clientCode || customer.id).replace(/\D/g, "")}`
     };
+    const sanitized = sanitizeForFirestore(fixedCust);
     const docRef = doc(db, CUSTOMERS_COLLECTION, fixedCust.id);
-    await setDoc(docRef, fixedCust, { merge: true });
+    await setDoc(docRef, sanitized, { merge: true });
   } catch (err) {
     console.error("Failed to save customer to Firestore:", err);
   }
@@ -101,7 +136,13 @@ export function subscribeToUpgradeRequests(
     snapshot => {
       const docs: PlanUpgradeRequest[] = [];
       snapshot.forEach(docSnap => {
-        docs.push(docSnap.data() as PlanUpgradeRequest);
+        const raw = docSnap.data() as any;
+        docs.push({
+          ...raw,
+          currentPrice: typeof raw.currentPrice === "number" ? raw.currentPrice : (Number(raw.currentPrice) || 0),
+          requestedPrice: typeof raw.requestedPrice === "number" ? raw.requestedPrice : (Number(raw.requestedPrice) || 0),
+          priceDifference: typeof raw.priceDifference === "number" ? raw.priceDifference : (Number(raw.priceDifference) || 0),
+        } as PlanUpgradeRequest);
       });
       onUpdate(docs);
     },
@@ -117,8 +158,9 @@ export function subscribeToUpgradeRequests(
  */
 export async function saveUpgradeRequestToFirestore(request: PlanUpgradeRequest): Promise<void> {
   try {
+    const sanitized = sanitizeForFirestore(request);
     const docRef = doc(db, UPGRADE_REQUESTS_COLLECTION, request.id);
-    await setDoc(docRef, request, { merge: true });
+    await setDoc(docRef, sanitized, { merge: true });
   } catch (err) {
     console.error("Failed to save upgrade request to Firestore:", err);
   }
@@ -138,13 +180,9 @@ export async function seedInitialFirestoreDataIfEmpty(
     const colRef = collection(db, CUSTOMERS_COLLECTION);
     const snapshot = await getDocs(colRef);
 
-    const needsPasscodeMigration = snapshot.docs.some(d => {
-      const p = d.data().passcode;
-      return typeof p === "string" && p.startsWith("isp@");
-    });
-
-    if (snapshot.size < seedCustomers.length || needsPasscodeMigration) {
-      console.log(`☁️ Syncing/Migrating ${seedCustomers.length} subscribers with mbn@ passcodes to Cloud Firestore...`);
+    // Only seed if the collection is completely empty
+    if (snapshot.empty || snapshot.size === 0) {
+      console.log(`☁️ Initializing Cloud Firestore with initial customer roster...`);
       const batch = writeBatch(db);
 
       // Seed Customers with mbn@ passcodes
@@ -154,17 +192,17 @@ export async function seedInitialFirestoreDataIfEmpty(
           ...cust,
           passcode: (cust.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(cust.clientCode || cust.id).replace(/\D/g, "")}`
         };
-        batch.set(cRef, fixedCust, { merge: true });
+        batch.set(cRef, sanitizeForFirestore(fixedCust), { merge: true });
       }
 
       // Seed Upgrade Requests
       for (const req of seedUpgradeRequests) {
         const uRef = doc(db, UPGRADE_REQUESTS_COLLECTION, req.id);
-        batch.set(uRef, req, { merge: true });
+        batch.set(uRef, sanitizeForFirestore(req), { merge: true });
       }
 
       await batch.commit();
-      console.log("✓ Cloud Firestore migration with mbn@ passcodes complete!");
+      console.log("✓ Cloud Firestore initial setup complete!");
       return true;
     }
     return false;

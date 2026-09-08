@@ -49,9 +49,44 @@ export const INITIAL_WORKFLOWS: AutomationWorkflow[] = [
 
 export const INITIAL_WEBHOOKS: WebhookNotification[] = [];
 
-let sharedSms = { ...INITIAL_SMS_CONFIG };
-let sharedWorkflows = [...INITIAL_WORKFLOWS];
-let sharedWebhooks = [...INITIAL_WEBHOOKS];
+const STORAGE_KEYS = {
+  SMS: "isp_automation_sms_v3",
+  WORKFLOWS: "isp_automation_workflows_v3",
+  WEBHOOKS: "isp_automation_webhooks_v3",
+};
+
+function loadStorage<T>(key: string, fallback: T): T {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(fallback)) {
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+        } else if (parsed && typeof parsed === "object") {
+          return { ...fallback, ...parsed } as unknown as T;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to load ${key} from storage:`, e);
+  }
+  return fallback;
+}
+
+function saveStorage<T>(key: string, data: T): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(`Failed to save ${key} to storage:`, e);
+  }
+}
+
+let sharedSms = loadStorage(STORAGE_KEYS.SMS, { ...INITIAL_SMS_CONFIG });
+let sharedWorkflows = loadStorage(STORAGE_KEYS.WORKFLOWS, [...INITIAL_WORKFLOWS]);
+let sharedWebhooks = loadStorage(STORAGE_KEYS.WEBHOOKS, [...INITIAL_WEBHOOKS]);
 
 const listeners = new Set<() => void>();
 function notify() {
@@ -60,21 +95,28 @@ function notify() {
 
 export const automationStore = {
   getSms: () => sharedSms,
-  updateSms: (cfg: Partial<SmsGatewayConfig>) => { sharedSms = { ...sharedSms, ...cfg }; notify(); },
+  updateSms: (cfg: Partial<SmsGatewayConfig>) => {
+    sharedSms = { ...sharedSms, ...cfg };
+    saveStorage(STORAGE_KEYS.SMS, sharedSms);
+    notify();
+  },
 
   getWorkflows: () => sharedWorkflows,
   toggleWorkflow: (id: string) => {
     sharedWorkflows = sharedWorkflows.map(w => w.id === id ? { ...w, enabled: !w.enabled } : w);
+    saveStorage(STORAGE_KEYS.WORKFLOWS, sharedWorkflows);
     notify();
   },
   addWorkflow: (wf: AutomationWorkflow) => {
     sharedWorkflows = [wf, ...sharedWorkflows];
+    saveStorage(STORAGE_KEYS.WORKFLOWS, sharedWorkflows);
     notify();
   },
 
   getWebhooks: () => sharedWebhooks,
   addWebhook: (wh: WebhookNotification) => {
     sharedWebhooks = [wh, ...sharedWebhooks];
+    saveStorage(STORAGE_KEYS.WEBHOOKS, sharedWebhooks);
     notify();
   },
 

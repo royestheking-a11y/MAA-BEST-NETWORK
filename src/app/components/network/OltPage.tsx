@@ -11,6 +11,7 @@ import {
 } from "./networkData";
 import { useCustomerContext } from "../../context/CustomerContext";
 import { useRealtimeHardwareTelemetry } from "../../services/realtimeTelemetryService";
+import { useNetxLiveData, type NetxLiveCustomer } from "../../services/netxApiService";
 
 interface OltPageProps {
   onNavigate?: (page: string) => void;
@@ -65,32 +66,55 @@ import { AUTHENTIC_NETX_ONUS } from "../../data/netxOnuData";
 export function OltPage({ onNavigate }: OltPageProps) {
   const { customers } = useCustomerContext();
   const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(2500);
+  const { liveStats, oltServers, isConnected: isNetxConnected, lastRefresh: netxLastRefresh, refresh: refreshNetx } = useNetxLiveData(30000);
 
   const [olts, setOlts] = useState<OltDevice[]>(networkStore.getOlts());
   const [discovered, setDiscovered] = useState<DiscoveredOnu[]>(INITIAL_DISCOVERED);
   const [onus, setOnus] = useState<OnuTelemetry[]>(SAMPLE_ONUS);
   const [activeTab, setActiveTab] = useState<"olts" | "discovery" | "diagnostics">("olts");
   
-  // Helper to build ONU List directly from 295 authentic NetX hardware records
-  const buildOnuList = (custList: typeof customers): OltOnuRecord[] => {
+  // Helper to build ONU List from REAL NetX live-stats data, fallback to static records
+  const buildOnuList = (custList: typeof customers, liveData: NetxLiveCustomer[]): OltOnuRecord[] => {
     const userToId = new Map<string, string>();
     custList.forEach(c => {
       if (c.name) userToId.set(c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c.clientCode || c.id);
       if (c.pppUser) userToId.set(c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, ''), c.clientCode || c.id);
     });
 
+    // If we have real live data from NetX, use the static AUTHENTIC_NETX_ONUS as base
+    // but overlay real statuses from the live-stats API
+    const liveMap = new Map<string, NetxLiveCustomer>();
+    liveData.forEach(c => {
+      if (c.pppoe_username) liveMap.set(c.pppoe_username.toLowerCase(), c);
+      if (c.full_name) liveMap.set(c.full_name.toLowerCase(), c);
+    });
+
     return AUTHENTIC_NETX_ONUS.map(o => {
       let custId: string | undefined = undefined;
+      const custNameClean = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (o.customer && o.customer !== "— Unassigned —") {
-        const clean = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
-        custId = userToId.get(clean);
+        custId = userToId.get(custNameClean);
       }
+
+      // Find matching live data by customer name or pppoe username
+      const liveMatch = liveMap.get(o.customer.toLowerCase()) || liveMap.get(o.customer.toLowerCase().replace('mbn@', 'mbn@'));
+
+      let realStatus: "online" | "offline" = o.status;
+      let realRxPower = o.rxPower;
+
+      if (liveMatch) {
+        realStatus = liveMatch.connection_status === 'online' ? 'online' : 'offline';
+        if (liveMatch.onu_rx_power !== null && liveMatch.onu_rx_power !== undefined) {
+          realRxPower = `${liveMatch.onu_rx_power} dBm`;
+        }
+      }
+
       return {
         id: o.id,
         mac: o.mac,
         ponPort: o.ponPort,
-        status: o.status,
-        rxPower: o.rxPower,
+        status: realStatus,
+        rxPower: realRxPower,
         customer: o.customer,
         customerId: custId,
         oltServer: o.oltServer,
@@ -98,40 +122,65 @@ export function OltPage({ onNavigate }: OltPageProps) {
     });
   };
 
-  // ONU List Table State (100% authentic NetX OLT hardware table)
-  const [onuList, setOnuList] = useState<OltOnuRecord[]>(() => buildOnuList(customers));
+  // ONU List Table State — starts with static data, overlays real live data when available
+  const [onuList, setOnuList] = useState<OltOnuRecord[]>(() => buildOnuList(customers, []));
 
-  // Keep OLTs in sync with live telemetry
+  // Keep OLTs in sync with REAL NetX API data (primary) or telemetry (fallback)
   useEffect(() => {
-    if (telemetry && telemetry.olt1 && telemetry.olt2) {
+    if (oltServers.length > 0) {
+      // Use real NetX OLT server data
+      setOlts(prev => prev.map(o => {
+        const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
+        const netxOlt2 = oltServers.find(s => s.name === 'OLT2');
+
+        if ((o.id === "OLT-01" || o.name === "OLT1") && netxOlt1) {
+          return {
+            ...o,
+            activeOnu: netxOlt1.online_onu_count,
+            totalOnu: netxOlt1.onu_count,
+            status: netxOlt1.last_status === 'online' ? 'online' as const : 'offline' as const,
+          };
+        }
+        if ((o.id === "OLT-02" || o.name === "OLT2") && netxOlt2) {
+          return {
+            ...o,
+            activeOnu: netxOlt2.online_onu_count,
+            totalOnu: netxOlt2.onu_count,
+            status: netxOlt2.last_status === 'online' ? 'online' as const : 'offline' as const,
+          };
+        }
+        return o;
+      }));
+    } else if (telemetry && telemetry.olt1 && telemetry.olt2) {
+      // Fallback to telemetry data from Render backend
       setOlts(prev => prev.map(o => {
         if (o.id === "OLT-01" || o.name === "OLT1") {
           return {
             ...o,
-            activeOnu: telemetry.olt1.activeOnus || 53,
-            totalOnu: telemetry.olt1.totalOnus || 150,
-            status: telemetry.olt1.status as any || "online",
+            activeOnu: telemetry.olt1.activeOnus || o.activeOnu,
+            totalOnu: telemetry.olt1.totalOnus || o.totalOnu,
+            status: (telemetry.olt1.status as any) || o.status,
           };
         }
         if (o.id === "OLT-02" || o.name === "OLT2") {
           return {
             ...o,
-            activeOnu: telemetry.olt2.activeOnus || 49,
-            totalOnu: telemetry.olt2.totalOnus || 145,
-            status: telemetry.olt2.status as any || "online",
+            activeOnu: telemetry.olt2.activeOnus || o.activeOnu,
+            totalOnu: telemetry.olt2.totalOnus || o.totalOnu,
+            status: (telemetry.olt2.status as any) || o.status,
           };
         }
         return o;
       }));
     }
-  }, [telemetry]);
+  }, [oltServers, telemetry]);
 
-  // Keep ONU List in sync if customer accounts update
+  // Keep ONU List in sync with real live data + customer accounts
   useEffect(() => {
-    if (customers.length > 0) {
-      setOnuList(buildOnuList(customers));
+    if (customers.length > 0 || liveStats.length > 0) {
+      setOnuList(buildOnuList(customers, liveStats));
     }
-  }, [customers]);
+  }, [customers, liveStats]);
 
   const [onuSearch, setOnuSearch] = useState("");
   const [showAddOnuModal, setShowAddOnuModal] = useState(false);
@@ -1708,8 +1757,8 @@ export function OltPage({ onNavigate }: OltPageProps) {
                     value={newOnuOlt}
                     onChange={e => setNewOnuOlt(e.target.value as "OLT1" | "OLT2")}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-semibold outline-none">
-                    <option value="OLT1">OLT1 (103.12.173.136:1893)</option>
-                    <option value="OLT2">OLT2 (103.12.173.136:1894)</option>
+                    <option value="OLT1">OLT1 (103.12.173.136:1895)</option>
+                    <option value="OLT2">OLT2 (103.12.173.136:1896)</option>
                   </select>
                 </div>
                 <div>

@@ -44,6 +44,47 @@ function realtimeTelemetryPlugin() {
           res.end(JSON.stringify({ error: e.message }));
         }
       });
+      server.middlewares.use('/api/netx/live-stats', async (_req: any, res: any) => {
+        try {
+          const { getCachedLiveStats, fetchNetxLiveStats } = await import('./server/telemetry-service.js');
+          const cached = getCachedLiveStats();
+          if (!cached.data || cached.ageMs > 60000) {
+            fetchNetxLiveStats().catch(() => {});
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({
+            success: true,
+            count: cached.data ? cached.data.length : 0,
+            lastFetch: cached.lastFetch ? new Date(cached.lastFetch).toISOString() : null,
+            ageSeconds: Math.round(cached.ageMs / 1000),
+            data: cached.data || []
+          }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+      server.middlewares.use('/api/netx/olt-servers', async (_req: any, res: any) => {
+        try {
+          const { getCachedOltServers, syncNetxOltData } = await import('./server/telemetry-service.js');
+          const cached = getCachedOltServers();
+          if (!cached.data || cached.ageMs > 60000) {
+            syncNetxOltData().catch(() => {});
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({
+            success: true,
+            lastFetch: cached.lastFetch ? new Date(cached.lastFetch).toISOString() : null,
+            ageSeconds: Math.round(cached.ageMs / 1000),
+            data: cached.data || []
+          }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
     }
   }
 }

@@ -17,7 +17,7 @@ export interface Invoice {
   status: "paid" | "pending" | "overdue" | "cancelled";
   method: string | null;
   paidAt?: string;
-  trxId?: string;
+  trxId?: string | null;
 }
 
 export interface Payment {
@@ -189,12 +189,50 @@ export const INITIAL_BILLING_SETTINGS: BillingSettingsConfig = {
 
 // ─── Simple In-Memory / LocalStorage Store ───────────────────────────────────
 
-let sharedInvoices = [...INITIAL_INVOICES];
-let sharedPayments = [...INITIAL_PAYMENTS];
-let sharedPackages = [...INITIAL_PACKAGES];
-let sharedDiscounts = [...INITIAL_DISCOUNT_RULES];
-let sharedAdjustments = [...INITIAL_ADJUSTMENTS];
-let sharedSettings = { ...INITIAL_BILLING_SETTINGS };
+const STORAGE_KEYS = {
+  INVOICES: "isp_billing_invoices_v3",
+  PAYMENTS: "isp_billing_payments_v3",
+  PACKAGES: "isp_billing_packages_v3",
+  DISCOUNTS: "isp_billing_discounts_v3",
+  ADJUSTMENTS: "isp_billing_adjustments_v3",
+  SETTINGS: "isp_billing_settings_v3",
+};
+
+function loadStorage<T>(key: string, fallback: T): T {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(fallback)) {
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+        } else if (parsed && typeof parsed === "object") {
+          return { ...fallback, ...parsed } as unknown as T;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to load ${key} from storage:`, e);
+  }
+  return fallback;
+}
+
+function saveStorage<T>(key: string, data: T): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.error(`Failed to save ${key} to storage:`, e);
+  }
+}
+
+let sharedInvoices = loadStorage(STORAGE_KEYS.INVOICES, [...INITIAL_INVOICES]);
+let sharedPayments = loadStorage(STORAGE_KEYS.PAYMENTS, [...INITIAL_PAYMENTS]);
+let sharedPackages = loadStorage(STORAGE_KEYS.PACKAGES, [...INITIAL_PACKAGES]);
+let sharedDiscounts = loadStorage(STORAGE_KEYS.DISCOUNTS, [...INITIAL_DISCOUNT_RULES]);
+let sharedAdjustments = loadStorage(STORAGE_KEYS.ADJUSTMENTS, [...INITIAL_ADJUSTMENTS]);
+let sharedSettings = loadStorage(STORAGE_KEYS.SETTINGS, { ...INITIAL_BILLING_SETTINGS });
 
 const listeners = new Set<() => void>();
 function notify() {
@@ -203,33 +241,79 @@ function notify() {
 
 export const billingStore = {
   getInvoices: () => sharedInvoices,
-  setInvoices: (invs: Invoice[]) => { sharedInvoices = invs; notify(); },
-  addInvoice: (inv: Invoice) => { sharedInvoices = [inv, ...sharedInvoices]; notify(); },
+  setInvoices: (invs: Invoice[]) => {
+    sharedInvoices = invs;
+    saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+    notify();
+  },
+  addInvoice: (inv: Invoice) => {
+    sharedInvoices = [inv, ...sharedInvoices];
+    saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+    notify();
+  },
 
   getPayments: () => sharedPayments,
-  setPayments: (pays: Payment[]) => { sharedPayments = pays; notify(); },
+  setPayments: (pays: Payment[]) => {
+    sharedPayments = pays;
+    saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
+    notify();
+  },
   addPayment: (pay: Payment) => {
     sharedPayments = [pay, ...sharedPayments];
     // Mark matching invoice as paid
     sharedInvoices = sharedInvoices.map(i => i.id === pay.invoice ? { ...i, status: "paid", method: pay.method, paidAt: pay.date, trxId: pay.txn } : i);
+    saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
+    saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
     notify();
   },
 
   getPackages: () => sharedPackages,
-  setPackages: (pkgs: IspPackage[]) => { sharedPackages = pkgs; notify(); },
-  addPackage: (pkg: IspPackage) => { sharedPackages = [...sharedPackages, pkg]; notify(); },
-  updatePackage: (pkg: IspPackage) => { sharedPackages = sharedPackages.map(p => p.id === pkg.id ? pkg : p); notify(); },
+  setPackages: (pkgs: IspPackage[]) => {
+    sharedPackages = pkgs;
+    saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    notify();
+  },
+  addPackage: (pkg: IspPackage) => {
+    sharedPackages = [...sharedPackages, pkg];
+    saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    notify();
+  },
+  updatePackage: (pkg: IspPackage) => {
+    sharedPackages = sharedPackages.map(p => p.id === pkg.id ? pkg : p);
+    saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    notify();
+  },
 
   getDiscounts: () => sharedDiscounts,
-  setDiscounts: (rules: DiscountRule[]) => { sharedDiscounts = rules; notify(); },
-  addDiscount: (rule: DiscountRule) => { sharedDiscounts = [rule, ...sharedDiscounts]; notify(); },
+  setDiscounts: (rules: DiscountRule[]) => {
+    sharedDiscounts = rules;
+    saveStorage(STORAGE_KEYS.DISCOUNTS, sharedDiscounts);
+    notify();
+  },
+  addDiscount: (rule: DiscountRule) => {
+    sharedDiscounts = [rule, ...sharedDiscounts];
+    saveStorage(STORAGE_KEYS.DISCOUNTS, sharedDiscounts);
+    notify();
+  },
 
   getAdjustments: () => sharedAdjustments,
-  setAdjustments: (adjs: CustomerAdjustment[]) => { sharedAdjustments = adjs; notify(); },
-  addAdjustment: (adj: CustomerAdjustment) => { sharedAdjustments = [adj, ...sharedAdjustments]; notify(); },
+  setAdjustments: (adjs: CustomerAdjustment[]) => {
+    sharedAdjustments = adjs;
+    saveStorage(STORAGE_KEYS.ADJUSTMENTS, sharedAdjustments);
+    notify();
+  },
+  addAdjustment: (adj: CustomerAdjustment) => {
+    sharedAdjustments = [adj, ...sharedAdjustments];
+    saveStorage(STORAGE_KEYS.ADJUSTMENTS, sharedAdjustments);
+    notify();
+  },
 
   getSettings: () => sharedSettings,
-  setSettings: (s: BillingSettingsConfig) => { sharedSettings = s; notify(); },
+  setSettings: (s: BillingSettingsConfig) => {
+    sharedSettings = s;
+    saveStorage(STORAGE_KEYS.SETTINGS, sharedSettings);
+    notify();
+  },
 
   subscribe: (cb: () => void) => {
     listeners.add(cb);

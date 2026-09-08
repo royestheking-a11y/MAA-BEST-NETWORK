@@ -14,6 +14,7 @@ import { useCustomerContext } from "../context/CustomerContext";
 import { billingStore } from "./billing/billingData";
 import { crmStore } from "./crm/crmData";
 import { useLanguage } from "../context/LanguageContext";
+import { useNetxLiveData } from "../services/netxApiService";
 
 function fmt(n: number) {
   if (n >= 100000) return `৳${(n / 100000).toFixed(1)}L`;
@@ -135,6 +136,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     setResolvedIssues(prev => [...prev, id]);
     showToast(`✓ ${msg}`);
   };
+
+  // Real-time NetX live stats & OLT servers data
+  const { oltServers, liveStats } = useNetxLiveData(30000);
 
   // ── REAL AGGREGATIONS CALCULATED DIRECTLY FROM LIVE DATABASE ──────────
   const totalCustomers = customers.length;
@@ -268,40 +272,46 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     ];
   }, [customers, now]);
 
-  const networkDevices = useMemo(() => [
-    {
-      name: "MikroTik CCR2004 (Somitir Hat Gateway)",
-      type: "mikrotik",
-      status: "online",
-      cpu: 18,
-      ram: 34,
-      sessions: onlineCustomersCount,
-    },
-    {
-      name: "OLT1 - 103.12.173.136:1893 (BDCOM EPON)",
-      type: "olt",
-      status: "online",
-      onu: 150,
-      active: 149,
-      pon: 8,
-    },
-    {
-      name: "MikroTik-02 (Kalkini Hub Router)",
-      type: "mikrotik",
-      status: "online",
-      cpu: 14,
-      ram: 28,
-      sessions: Math.max(1, Math.round(onlineCustomersCount * 0.42)),
-    },
-    {
-      name: "OLT2 - 103.12.173.136:1894 (BDCOM EPON)",
-      type: "olt",
-      status: "offline",
-      onu: 145,
-      active: 0,
-      pon: 8,
-    },
-  ], [totalCustomers, onlineCustomersCount]);
+  const networkDevices = useMemo(() => {
+    const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
+    const netxOlt2 = oltServers.find(s => s.name === 'OLT2');
+    const onlineNetxSessions = liveStats.length > 0 ? liveStats.filter(c => c.connection_status === 'online').length : onlineCustomersCount;
+
+    return [
+      {
+        name: "MikroTik CCR2004 (Somitir Hat Gateway)",
+        type: "mikrotik",
+        status: "online",
+        cpu: 18,
+        ram: 34,
+        sessions: onlineNetxSessions,
+      },
+      {
+        name: "OLT1 - 103.12.173.136:1895 (BDCOM EPON)",
+        type: "olt",
+        status: netxOlt1 ? (netxOlt1.last_status === 'online' ? 'online' : 'offline') : "online",
+        onu: netxOlt1?.onu_count || 157,
+        active: netxOlt1?.online_onu_count || 20,
+        pon: 8,
+      },
+      {
+        name: "MikroTik-02 (Kalkini Hub Router)",
+        type: "mikrotik",
+        status: "online",
+        cpu: 14,
+        ram: 28,
+        sessions: Math.max(1, Math.round(onlineNetxSessions * 0.42)),
+      },
+      {
+        name: "OLT2 - 103.12.173.136:1896 (BDCOM EPON)",
+        type: "olt",
+        status: netxOlt2 ? (netxOlt2.last_status === 'online' ? 'online' : 'offline') : "online",
+        onu: netxOlt2?.onu_count || 156,
+        active: netxOlt2?.online_onu_count || 16,
+        pon: 8,
+      },
+    ];
+  }, [totalCustomers, onlineCustomersCount, oltServers, liveStats]);
 
   const activeIssues = useMemo(() => {
     const list = [];
