@@ -23,6 +23,10 @@ export interface LiveMikrotikData {
   freeRamMb: number;
   usedRamMb: number;
   interfaces: LiveInterfaceMetric[];
+  latencyMs?: number;
+  version?: string;
+  activePppoe?: number;
+  lastSync?: string;
 }
 
 export interface LiveOltData {
@@ -64,14 +68,17 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     host: "103.12.173.136",
     status: "online",
     model: "RouterOS x86 (72-Core Xeon Core Server)",
-    sysName: "MikroTik-MBN-Core",
-    uptime: "284 days, 4h",
-    uptimeSeconds: 24552640,
+    sysName: "DC-CA",
+    uptime: "43w 5d 5h",
+    uptimeSeconds: 26370000,
     cpuCores: 72,
-    cpuUsagePercent: 12,
+    cpuUsagePercent: 8,
     totalRamMb: 32064,
-    freeRamMb: 24510,
-    usedRamMb: 7554,
+    freeRamMb: 28445,
+    usedRamMb: 3619,
+    latencyMs: 46,
+    version: "7.11 (stable)",
+    activePppoe: 843,
     interfaces: [
       { id: 18, name: "MediaOne-IIG", status: "up", rxMbps: 482.4, txMbps: 128.6, totalRxGb: 472.1, totalTxGb: 125.8 },
       { id: 21, name: "MediaOne-BDIX", status: "up", rxMbps: 890.1, txMbps: 412.3, totalRxGb: 885.3, totalTxGb: 395.2 },
