@@ -89,16 +89,54 @@ export function OltPage({ onNavigate }: OltPageProps) {
   // Helper to build ONU List from REAL NetX live-stats data, fallback to static records
   const buildOnuList = useCallback((custList: typeof customers, liveData: NetxLiveCustomer[]): OltOnuRecord[] => {
     const userToId = new Map<string, string>();
+    const userToCustomer = new Map<string, typeof custList[0]>();
+    const userByMac = new Map<string, typeof custList[0]>();
     custList.forEach(c => {
-      if (c.name) userToId.set(c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c.clientCode || c.id);
-      if (c.pppUser) userToId.set(c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, ''), c.clientCode || c.id);
+      if (c.name) {
+        const clean = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        userToId.set(clean, c.clientCode || c.id);
+        userToCustomer.set(clean, c);
+      }
+      if (c.pppUser) {
+        const clean = c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, '');
+        userToId.set(clean, c.clientCode || c.id);
+        userToCustomer.set(clean, c);
+      }
+      if (c.mac) {
+        userByMac.set(c.mac.toLowerCase().trim(), c);
+      }
     });
 
     const liveMap = new Map<string, NetxLiveCustomer>();
+    const liveMacMap = new Map<string, NetxLiveCustomer>();
     liveData.forEach(c => {
-      if (c.pppoe_username) liveMap.set(c.pppoe_username.toLowerCase(), c);
-      if (c.full_name) liveMap.set(c.full_name.toLowerCase(), c);
+      const candidates = [c.pppoe_username, c.full_name, c.user_id];
+      candidates.forEach(cand => {
+        if (cand) {
+          const clean = cand.toLowerCase().trim();
+          liveMap.set(clean, c);
+          liveMap.set(clean.replace(/@/g, ""), c);
+          liveMap.set(clean.replace(/[^a-z0-9]/g, ""), c);
+          if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+            liveMap.set("mbn@" + clean.slice(3), c);
+          }
+        }
+      });
+      if (c.live_mac) {
+        liveMacMap.set(c.live_mac.toLowerCase().trim(), c);
+      }
     });
+
+    const getMatch = (custName: string, macStr?: string) => {
+      if (macStr && liveMacMap.has(macStr.toLowerCase().trim())) {
+        return liveMacMap.get(macStr.toLowerCase().trim());
+      }
+      if (!custName || custName.includes("Unassigned")) return null;
+      const clean = custName.toLowerCase().trim();
+      return liveMap.get(clean) ||
+             liveMap.get(clean.replace(/@/g, "")) ||
+             liveMap.get(clean.replace(/[^a-z0-9]/g, ""));
+    };
 
     if (liveData.length > 0) {
       const usedLiveIds = new Set<string>();
@@ -106,7 +144,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
 
       for (const o of AUTHENTIC_NETX_ONUS) {
         const custNameClean = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const liveMatch = liveMap.get(o.customer.toLowerCase());
+        const liveMatch = getMatch(o.customer, o.mac);
 
         if (liveMatch && !usedLiveIds.has(liveMatch.id)) {
           usedLiveIds.add(liveMatch.id);
@@ -128,7 +166,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             id: o.id,
             mac: o.mac,
             ponPort: o.ponPort,
-            status: 'unassigned',
+            status: o.customer.includes("Unassigned") ? 'unassigned' : 'offline',
             rxPower: o.rxPower,
             customer: o.customer,
             customerId: custId,
@@ -140,16 +178,19 @@ export function OltPage({ onNavigate }: OltPageProps) {
       liveData.forEach((c, idx) => {
         if (!usedLiveIds.has(c.id)) {
           const custNameClean = (c.full_name || c.pppoe_username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const designatedCust = userToCustomer.get(custNameClean) || (c.live_mac ? userByMac.get(c.live_mac.toLowerCase().trim()) : null);
+          const effectiveOlt = (designatedCust?.olt === "OLT2" || c.server_name?.includes('OLT2')) ? "OLT2" : "OLT1";
+
           results.push({
             id: `onu-live-${idx}`,
             mac: c.live_mac || '—',
-            ponPort: 'epon 0/1',
+            ponPort: designatedCust?.ponPort || 'epon 0/1',
             status: c.connection_status === 'online' ? 'online' : 'offline',
             rxPower: (c.onu_rx_power !== null && c.onu_rx_power !== undefined)
               ? `${c.onu_rx_power} dBm` : '—',
             customer: c.full_name || c.pppoe_username || '— Unassigned —',
-            customerId: userToId.get(custNameClean),
-            oltServer: (c.server_name?.includes('OLT2') ? 'OLT2' : 'OLT1') as "OLT1" | "OLT2",
+            customerId: userToId.get(custNameClean) || designatedCust?.clientCode || designatedCust?.id,
+            oltServer: effectiveOlt as "OLT1" | "OLT2",
           });
         }
       });

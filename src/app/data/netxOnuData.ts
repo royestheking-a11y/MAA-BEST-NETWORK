@@ -20,11 +20,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-2",
-    "mac": "00:d3:9e:75:bd:1c",
-    "ponPort": "epon 0/1",
+    "mac": "a2:3d:09:22:3e:7c",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-13.9 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@rohima",
     "oltServer": "OLT2"
   },
   {
@@ -47,11 +47,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-5",
-    "mac": "68:89:c1:5c:63:ba",
-    "ponPort": "epon 0/1",
+    "mac": "b4:64:15:30:54:9e",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-12.7 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@shamim",
     "oltServer": "OLT2"
   },
   {
@@ -83,11 +83,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-9",
-    "mac": "a0:7d:12:15:db:20",
-    "ponPort": "epon 0/1",
+    "mac": "4c:46:d1:68:ac:26",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-23.0 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@omar",
     "oltServer": "OLT2"
   },
   {
@@ -137,20 +137,20 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-15",
-    "mac": "f8:e8:11:2c:c1:9c",
-    "ponPort": "epon 0/1",
+    "mac": "a0:7d:12:84:d8:6a",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-14.9 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@abserali",
     "oltServer": "OLT2"
   },
   {
     "id": "onu-netx-real-16",
-    "mac": "a2:3d:12:12:5c:d0",
-    "ponPort": "epon 0/1",
+    "mac": "00:d5:9e:a0:04:ae",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-13.4 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@rezaul",
     "oltServer": "OLT2"
   },
   {
@@ -164,11 +164,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-18",
-    "mac": "82:46:42:30:c5:48",
-    "ponPort": "epon 0/1",
+    "mac": "28:6c:07:bc:30:f2",
+    "ponPort": "epon 0/2",
     "status": "online",
     "rxPower": "-14.8 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@enamulhawlader",
     "oltServer": "OLT2"
   },
   {
@@ -191,11 +191,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-21",
-    "mac": "4c:46:d1:98:0e:c3",
-    "ponPort": "epon 0/1",
+    "mac": "00:d3:9e:ca:46:14",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-24.6 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@sohag",
     "oltServer": "OLT2"
   },
   {
@@ -218,20 +218,20 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-24",
-    "mac": "b4:64:15:bb:02:9f",
-    "ponPort": "epon 0/1",
+    "mac": "a2:3d:09:d8:5c:36",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-21.3 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@redaysarder",
     "oltServer": "OLT2"
   },
   {
     "id": "onu-netx-real-25",
-    "mac": "a2:3d:09:1b:a7:d0",
-    "ponPort": "epon 0/1",
+    "mac": "f8:e8:11:f4:88:7a",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-21.9 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@sagor",
     "oltServer": "OLT2"
   },
   {
@@ -245,20 +245,20 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-27",
-    "mac": "a0:8c:a1:5a:8b:e0",
-    "ponPort": "epon 0/1",
+    "mac": "e0:67:b3:02:9e:9c",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-14.5 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@mokforalom",
     "oltServer": "OLT2"
   },
   {
     "id": "onu-netx-real-28",
-    "mac": "00:d5:9e:9e:38:fc",
-    "ponPort": "epon 0/1",
+    "mac": "14:14:4b:10:b4:be",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-26.9 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@eliushossain",
     "oltServer": "OLT2"
   },
   {
@@ -272,11 +272,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-30",
-    "mac": "4c:d7:c8:a8:5d:7b",
-    "ponPort": "epon 0/1",
+    "mac": "4c:46:d1:1e:ca:e0",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-24.9 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@rased",
     "oltServer": "OLT2"
   },
   {
@@ -290,11 +290,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-32",
-    "mac": "68:8f:84:14:b4:7c",
-    "ponPort": "epon 0/1",
+    "mac": "82:46:42:2c:e0:02",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-20.7 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@mahabuba",
     "oltServer": "OLT2"
   },
   {
@@ -308,11 +308,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-34",
-    "mac": "4c:46:d1:f5:d6:96",
-    "ponPort": "epon 0/1",
+    "mac": "a0:7d:12:3a:f6:24",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-27.2 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@harunkhan",
     "oltServer": "OLT2"
   },
   {
@@ -326,11 +326,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-36",
-    "mac": "82:46:21:10:0e:98",
-    "ponPort": "epon 0/1",
+    "mac": "a2:3d:09:8e:7a:f0",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-25.8 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@mdabdussalamtalukder",
     "oltServer": "OLT2"
   },
   {
@@ -344,20 +344,20 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-38",
-    "mac": "a0:94:6a:04:53:59",
-    "ponPort": "epon 0/1",
+    "mac": "00:d5:9e:0c:40:22",
+    "ponPort": "epon 0/2",
     "status": "online",
     "rxPower": "-15.1 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@motiurrahman",
     "oltServer": "OLT2"
   },
   {
     "id": "onu-netx-real-39",
-    "mac": "48:ad:08:59:57:fe",
-    "ponPort": "epon 0/1",
+    "mac": "bc:20:ba:1a:56:44",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-25.8 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@chanmia",
     "oltServer": "OLT2"
   },
   {
@@ -380,20 +380,20 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-42",
-    "mac": "9c:7d:a3:7e:61:c5",
-    "ponPort": "epon 0/1",
+    "mac": "b4:64:15:52:ae:cc",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-23.6 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@molina",
     "oltServer": "OLT2"
   },
   {
     "id": "onu-netx-real-43",
-    "mac": "4c:f9:a7:24:fe:14",
-    "ponPort": "epon 0/1",
+    "mac": "a0:7d:12:5c:50:52",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-23.7 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@shadathossin",
     "oltServer": "OLT2"
   },
   {
@@ -407,11 +407,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-45",
-    "mac": "4c:f9:a3:52:0e:41",
-    "ponPort": "epon 0/1",
+    "mac": "00:d3:9e:a2:be:fc",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-13.7 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@yeasin",
     "oltServer": "OLT2"
   },
   {
@@ -425,11 +425,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-47",
-    "mac": "4c:46:d1:55:08:25",
-    "ponPort": "epon 0/1",
+    "mac": "e0:67:b3:da:16:84",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-26.1 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@sajal",
     "oltServer": "OLT2"
   },
   {
@@ -443,11 +443,11 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-49",
-    "mac": "00:d3:9e:e2:64:e4",
-    "ponPort": "epon 0/1",
+    "mac": "14:14:4b:e8:2c:a6",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-24.2 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@hasankhan",
     "oltServer": "OLT2"
   },
   {
@@ -470,20 +470,20 @@ export const AUTHENTIC_NETX_ONUS: NetxOnuRecord[] = [
   },
   {
     "id": "onu-netx-real-52",
-    "mac": "b4:64:15:bb:14:fb",
-    "ponPort": "epon 0/1",
+    "mac": "28:6c:07:4a:c6:94",
+    "ponPort": "epon 0/4",
     "status": "offline",
     "rxPower": "-23.9 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@nurmohammad",
     "oltServer": "OLT2"
   },
   {
     "id": "onu-netx-real-53",
-    "mac": "70:a5:6a:2e:f6:93",
-    "ponPort": "epon 0/1",
+    "mac": "00:d3:9e:58:dc:b6",
+    "ponPort": "epon 0/2",
     "status": "offline",
     "rxPower": "-27.2 dBm",
-    "customer": "Unassigned",
+    "customer": "Mbn@jalalsarder",
     "oltServer": "OLT2"
   },
   {
