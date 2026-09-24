@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Users, Receipt, Activity, Menu } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Activity, Menu, ShieldAlert, Eye } from "lucide-react";
 import { LoginPage } from "./components/LoginPage";
 import { CustomerLoginPage } from "./components/CustomerLoginPage";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { LanguageProvider } from "./context/LanguageContext";
 import { CustomerProvider } from "./context/CustomerContext";
+import { AuthProvider, useAuth, PagePermissionContext } from "./context/AuthContext";
 import { Dashboard } from "./components/Dashboard";
 import { CustomersPage } from "./components/CustomersPage";
 import { LiveStatusPage } from "./components/LiveStatusPage";
@@ -307,9 +308,9 @@ function renderPage(page: Page, onNavigate: (p: Page) => void) {
     case "customer-map":
       return <CustomerMapPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "due-customers":
-      return <DueCustomersPage />;
+      return <DueCustomersPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "disconnected":
-      return <DisconnectedPage />;
+      return <DisconnectedPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "import":
       return <ImportCustomersPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "live-status":
@@ -434,7 +435,7 @@ function renderPage(page: Page, onNavigate: (p: Page) => void) {
     case "customer-reports":
       return <CustomerReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "network-reports":
-      return <NetworkReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
+      return <RevenueReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "custom-reports":
       return <CustomReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
 
@@ -461,17 +462,8 @@ function renderPage(page: Page, onNavigate: (p: Page) => void) {
   }
 }
 
-export default function App() {
-  const [loggedIn, setLoggedIn] = useState<boolean>(() => {
-    try {
-      if (typeof window !== "undefined") {
-        return localStorage.getItem("mbn_admin_logged_in") === "true";
-      }
-    } catch {
-      // fallback
-    }
-    return false;
-  });
+function MainApp() {
+  const { isAuthenticated, logout, canAccessPage, getPageAccess, canEditPage, canDeletePage } = useAuth();
 
   const [portalAuthenticated, setPortalAuthenticated] = useState<boolean>(() => {
     try {
@@ -493,19 +485,6 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-
-  // Persist Admin session
-  useEffect(() => {
-    try {
-      if (loggedIn) {
-        localStorage.setItem("mbn_admin_logged_in", "true");
-      } else {
-        localStorage.removeItem("mbn_admin_logged_in");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, [loggedIn]);
 
   // Persist Subscriber session
   useEffect(() => {
@@ -546,139 +525,181 @@ export default function App() {
 
   // ── 1. NORMAL LINK (SUBSCRIBER PORTAL AT "/") ──
   if (currentPage === "customer-portal") {
-    return (
-      <LanguageProvider>
-        <CustomerProvider>
-          {portalAuthenticated ? (
-            <CustomerPortalPage
-              onNavigate={handleNavigate}
-              onLogout={() => {
-                setPortalAuthenticated(false);
-                handleNavigate("customer-portal");
-              }}
-            />
-          ) : (
-            <CustomerLoginPage
-              onSuccess={() => setPortalAuthenticated(true)}
-              onAdminSwitch={() => {
-                handleNavigate("dashboard");
-              }}
-            />
-          )}
-        </CustomerProvider>
-      </LanguageProvider>
+    return portalAuthenticated ? (
+      <CustomerPortalPage
+        onNavigate={handleNavigate}
+        onLogout={() => {
+          setPortalAuthenticated(false);
+          handleNavigate("customer-portal");
+        }}
+      />
+    ) : (
+      <CustomerLoginPage
+        onSuccess={() => setPortalAuthenticated(true)}
+        onAdminSwitch={() => {
+          handleNavigate("dashboard");
+        }}
+      />
     );
   }
 
-  // ── 2. ADMIN LINK (ADMIN GATEWAY AT "/admin") ──
-  if (!loggedIn) {
+  // ── 2. ADMIN / STAFF LINK (ADMIN GATEWAY AT "/admin") ──
+  if (!isAuthenticated) {
     return (
-      <LanguageProvider>
-        <CustomerProvider>
-          <LoginPage
-            onLogin={() => {
-              setLoggedIn(true);
-              handleNavigate("dashboard");
-            }}
-            onPortalSwitch={() => {
-              handleNavigate("customer-portal");
-            }}
-          />
-        </CustomerProvider>
-      </LanguageProvider>
+      <LoginPage
+        onLogin={() => {
+          handleNavigate("dashboard");
+        }}
+        onPortalSwitch={() => {
+          handleNavigate("customer-portal");
+        }}
+      />
     );
   }
 
   // ── 3. FULL ADMIN ISP OPERATING SYSTEM (WHEN LOGGED IN AT "/admin") ──
   return (
-    <LanguageProvider>
-      <CustomerProvider>
-        <div
-          className="flex h-screen overflow-hidden relative"
-          style={{ background: "var(--background)", animation: "appFadeIn 0.35s ease" }}
+    <div
+      className="flex h-screen overflow-hidden relative"
+      style={{ background: "var(--background)", animation: "appFadeIn 0.35s ease" }}
+    >
+      <style>{`@keyframes appFadeIn { from { opacity:0; transform:scale(0.997); } to { opacity:1; transform:scale(1); } }`}</style>
+      
+      {/* Responsive Sidebar (Desktop Fixed + Mobile Overlay Drawer) */}
+      <Sidebar
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(c => !c)}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+        onLogout={() => {
+          logout();
+          handleNavigate("dashboard");
+        }}
+      />
+
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <TopBar
+          currentPage={currentPage}
+          darkMode={darkMode}
+          onToggleDark={() => setDarkMode(d => !d)}
+          onLogout={() => {
+            logout();
+            handleNavigate("dashboard");
+          }}
+          onNavigate={handleNavigate}
+          onMenuToggle={() => setMobileMenuOpen(m => !m)}
+        />
+
+        <main
+          className="flex-1 overflow-y-auto pb-16 md:pb-0"
+          style={{ background: "var(--background)" }}
         >
-          <style>{`@keyframes appFadeIn { from { opacity:0; transform:scale(0.997); } to { opacity:1; transform:scale(1); } }`}</style>
-          
-          {/* Responsive Sidebar (Desktop Fixed + Mobile Overlay Drawer) */}
-          <Sidebar
-            currentPage={currentPage}
-            onNavigate={handleNavigate}
-            collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(c => !c)}
-            mobileOpen={mobileMenuOpen}
-            onCloseMobile={() => setMobileMenuOpen(false)}
-            onLogout={() => {
-              setLoggedIn(false);
-              handleNavigate("dashboard");
-            }}
-          />
+          {canAccessPage(currentPage) && !canEditPage(currentPage) && (
+            <div className="bg-sky-500/10 border-b border-sky-500/20 px-4 py-2 flex items-center justify-between text-xs text-sky-800 dark:text-sky-300 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-5 h-5 rounded-md bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                  <Eye size={13} />
+                </div>
+                <span>
+                  <strong>View Only Mode:</strong> You have read-only access to this section. Creating, modifying, and deleting are restricted.
+                </span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30 font-bold uppercase tracking-wide inline-flex items-center gap-1">
+                <Eye size={10} />
+                <span>Read Only</span>
+              </span>
+            </div>
+          )}
 
-          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            <TopBar
-              currentPage={currentPage}
-              darkMode={darkMode}
-              onToggleDark={() => setDarkMode(d => !d)}
-              onLogout={() => {
-                setLoggedIn(false);
-                handleNavigate("dashboard");
-              }}
-              onNavigate={handleNavigate}
-              onMenuToggle={() => setMobileMenuOpen(m => !m)}
-            />
-
-            <main
-              className="flex-1 overflow-y-auto pb-16 md:pb-0"
-              style={{ background: "var(--background)" }}
-            >
-              {renderPage(currentPage, handleNavigate)}
-            </main>
-
-            {/* Mobile Bottom Navigation Bar (Admin Quick Actions) */}
-            <div
-              className="md:hidden flex items-center justify-around fixed bottom-0 left-0 right-0 z-40 px-2 py-1.5 border-t backdrop-blur-md"
-              style={{
-                background: "var(--card)",
-                borderColor: "var(--border)",
-                boxShadow: "0 -2px 10px rgba(0,0,0,0.06)",
-                height: 56
-              }}
-            >
-              {[
-                { id: "dashboard" as Page, label: "Home", icon: LayoutDashboard },
-                { id: "customers" as Page, label: "Customers", icon: Users },
-                { id: "cash-desk" as Page, label: "Cash POS", icon: Receipt },
-                { id: "live-status" as Page, label: "Status", icon: Activity },
-              ].map(item => {
-                const Icon = item.icon;
-                const active = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavigate(item.id)}
-                    className="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors cursor-pointer"
-                    style={{
-                      color: active ? "var(--primary)" : "var(--muted-foreground)",
-                      fontWeight: active ? 700 : 500
-                    }}
-                  >
-                    <Icon size={18} className="mb-0.5" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+          {!canAccessPage(currentPage) ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center mb-4 shadow-sm border border-rose-500/20">
+                <ShieldAlert size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-foreground mb-1">Access Restricted</h2>
+              <p className="text-sm text-muted-foreground max-w-md mb-6">
+                Your account does not have permission to access the <strong>{currentPage}</strong> module. Please contact your system administrator to adjust your permissions.
+              </p>
               <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors cursor-pointer"
-                style={{
-                  color: mobileMenuOpen ? "var(--primary)" : "var(--muted-foreground)"
-                }}
+                onClick={() => handleNavigate("dashboard")}
+                className="px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-95 shadow-md cursor-pointer transition-all flex items-center gap-2"
               >
-                <Menu size={18} className="mb-0.5" />
-                <span>More</span>
+                <span>Return to Dashboard</span>
               </button>
             </div>
-          </div>
+          ) : (
+            <PagePermissionContext.Provider
+              value={{
+                pageId: currentPage,
+                access: getPageAccess(currentPage),
+                isReadOnly: !canEditPage(currentPage),
+                canEdit: canEditPage(currentPage),
+                canDelete: canDeletePage(currentPage),
+              }}
+            >
+              {renderPage(currentPage, handleNavigate)}
+            </PagePermissionContext.Provider>
+          )}
+        </main>
+
+        {/* Mobile Bottom Navigation Bar (Admin Quick Actions) */}
+        <div
+          className="flex md:!hidden items-center justify-around fixed bottom-0 left-0 right-0 z-40 px-2 py-1.5 border-t backdrop-blur-md"
+          style={{
+            background: "var(--card)",
+            borderColor: "var(--border)",
+            boxShadow: "0 -2px 10px rgba(0,0,0,0.06)",
+            height: 56
+          }}
+        >
+          {[
+            { id: "dashboard" as Page, label: "Home", icon: LayoutDashboard },
+            { id: "customers" as Page, label: "Customers", icon: Users },
+            { id: "cash-desk" as Page, label: "Cash POS", icon: Receipt },
+            { id: "live-status" as Page, label: "Status", icon: Activity },
+          ].map(item => {
+            const Icon = item.icon;
+            const active = currentPage === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavigate(item.id)}
+                className="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors cursor-pointer"
+                style={{
+                  color: active ? "var(--primary)" : "var(--muted-foreground)",
+                  fontWeight: active ? 700 : 500
+                }}
+              >
+                <Icon size={18} className="mb-0.5" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors cursor-pointer"
+            style={{
+              color: mobileMenuOpen ? "var(--primary)" : "var(--muted-foreground)"
+            }}
+          >
+            <Menu size={18} className="mb-0.5" />
+            <span>More</span>
+          </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <CustomerProvider>
+        <AuthProvider>
+          <MainApp />
+        </AuthProvider>
       </CustomerProvider>
     </LanguageProvider>
   );

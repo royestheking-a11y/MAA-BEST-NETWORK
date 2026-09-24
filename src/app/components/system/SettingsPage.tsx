@@ -1,18 +1,100 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Settings as SettingsIcon, CheckCircle2, Save, Building2,
   Phone, Globe, Shield, RefreshCw, X, Upload, Palette, Link,
   Mail, Bell, Key, CreditCard, Image, Eye, EyeOff, Lock,
   Smartphone, Server, Database, Clock, AlertTriangle,
   ChevronRight, Wifi, Zap, DollarSign, FileText, Users, Star,
-  Check, Copy, ExternalLink, Plus, Crown, MessageSquare, HardDrive, Sparkles
+  Check, Copy, ExternalLink, Plus, Crown, MessageSquare, HardDrive, Sparkles,
+  KeyRound, ShieldCheck, AlertCircle
 } from "lucide-react";
+import { activityLogger } from "../../services/activityLogger";
+import { useAuth, usePermission } from "../../context/AuthContext";
 
 interface SettingsPageProps {
   onNavigate?: (page: string) => void;
+  defaultTab?: SettingsTab;
 }
 
 type SettingsTab = "company" | "billing" | "invoice" | "notifications" | "security" | "subscription";
+
+interface CompanySettings {
+  legalName: string;
+  displayName: string;
+  tagline: string;
+  btrcLicense: string;
+  binNo: string;
+  hotline: string;
+  supportEmail: string;
+  website: string;
+  address: string;
+  currency: string;
+  timezone: string;
+  dateFormat: string;
+}
+
+interface BillingSettings {
+  billingDay: string;
+  dueAfterDays: string;
+  gracePeriodDays: string;
+  autoDisconnect: boolean;
+  autoReconnect: boolean;
+  lateFeeEnabled: boolean;
+  lateFeeType: "fixed" | "percent";
+  lateFeeAmount: string;
+  vatPercent: string;
+  sendInvoiceSms: boolean;
+  sendInvoiceEmail: boolean;
+  reminderDaysBefore: string;
+  finalReminderDaysBefore: string;
+  currency: string;
+  invoicePrefix: string;
+  receiptPrefix: string;
+}
+
+interface InvoiceSettings {
+  footerText: string;
+  showLogo: boolean;
+  showAddress: boolean;
+  showBtrcLicense: boolean;
+  showVat: boolean;
+  showTerms: boolean;
+  terms: string;
+  bankDetails: string;
+  stampText: string;
+}
+
+interface NotificationSettings {
+  smsGateway: string;
+  smsApiUrl: string;
+  smsApiKey: string;
+  smsSenderId: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPass: string;
+  alertCpuThreshold: string;
+  alertRamThreshold: string;
+  alertBandwidthThreshold: string;
+  alertOnDeviceDown: boolean;
+  alertOnPaymentReceived: boolean;
+  alertOnDisconnect: boolean;
+  alertOnBackupFail: boolean;
+}
+
+interface SecuritySettings {
+  require2FA: boolean;
+  sessionTimeout: string;
+  maxLoginAttempts: string;
+  lockoutDuration: string;
+  passwordMinLength: string;
+  requireSpecialChar: boolean;
+  requireNumber: boolean;
+  logAllActions: boolean;
+  logIpAddresses: boolean;
+  allowMultipleSessions: boolean;
+  showLoginHistory: boolean;
+}
 
 const inputStyle = {
   background: "var(--muted)",
@@ -26,12 +108,99 @@ const sectionCard = {
   border: "1px solid var(--border)",
 };
 
-export function SettingsPage({ onNavigate }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("company");
+const SETTINGS_STORAGE_KEY = "mbn_isp_system_settings_v1";
+
+export function SettingsPage({ onNavigate, defaultTab }: SettingsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("settings");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab || "company");
   const [toast, setToast] = useState("");
+  const { currentUser, changeAdminPassword, adminPasswords } = useAuth();
+
+  // ── Admin Change Password Form State ─────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [targetAdminAccount, setTargetAdminAccount] = useState<"all" | "admin" | "maabest" | "root">("all");
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [passSubmitting, setPassSubmitting] = useState(false);
+  const [passError, setPassError] = useState("");
+  const [passSuccess, setPassSuccess] = useState("");
+
+  const passwordStrength = useMemo(() => {
+    if (!newPassword) return { score: 0, label: "None", color: "#94a3b8" };
+    let s = 0;
+    if (newPassword.length >= 6) s++;
+    if (newPassword.length >= 10) s++;
+    if (/[0-9]/.test(newPassword)) s++;
+    if (/[^A-Za-z0-9]/.test(newPassword)) s++;
+    if (s <= 1) return { score: 1, label: "Weak", color: "#EF4444" };
+    if (s === 2) return { score: 2, label: "Fair", color: "#F59E0B" };
+    if (s === 3) return { score: 3, label: "Good", color: "#3B82F6" };
+    return { score: 4, label: "Strong & Secure", color: "#10B981" };
+  }, [newPassword]);
+
+  const passwordsMatch = useMemo(() => {
+    return newPassword.length > 0 && confirmPassword.length > 0 && newPassword === confirmPassword;
+  }, [newPassword, confirmPassword]);
+
+  const handleAdminPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassError("");
+    setPassSuccess("");
+
+    if (!currentPassword.trim()) {
+      setPassError("Please enter your current administrator password.");
+      return;
+    }
+    if (!newPassword.trim()) {
+      setPassError("Please enter a new password.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPassError("New password must be at least 6 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPassError("New password and confirm password do not match.");
+      return;
+    }
+
+    setPassSubmitting(true);
+    await new Promise(r => setTimeout(r, 450));
+
+    const result = changeAdminPassword(currentPassword, newPassword, targetAdminAccount);
+    setPassSubmitting(false);
+
+    if (!result.success) {
+      setPassError(result.error || "Failed to update password. Please check your current password.");
+      return;
+    }
+
+    setPassSuccess(
+      `✓ Administrator password updated successfully! Your new password is now active for ${
+        targetAdminAccount === "all" ? "all admin accounts (admin, maabest, root)" : targetAdminAccount
+      }.`
+    );
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    showToast("Admin password changed successfully!");
+  };
+
+  const savedSettings = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  }, []);
 
   // ── Company Profile ──────────────────────────────────────────────────────
-  const [company, setCompany] = useState({
+  const [company, setCompany] = useState<CompanySettings>(() => ({
     legalName: "MAA BEST NETWORK Ltd.",
     displayName: "MAA BEST NETWORK",
     tagline: "Ultra-Fast Gigabit Fiber & Enterprise Connectivity",
@@ -44,10 +213,11 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     currency: "BDT (৳)",
     timezone: "Asia/Dhaka (GMT+6)",
     dateFormat: "DD/MM/YYYY",
-  });
+    ...(savedSettings?.company || {}),
+  }));
 
   // ── Billing Rules ─────────────────────────────────────────────────────────
-  const [billing, setBilling] = useState({
+  const [billing, setBilling] = useState<BillingSettings>(() => ({
     billingDay: "1",
     dueAfterDays: "10",
     gracePeriodDays: "2",
@@ -64,10 +234,11 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     currency: "BDT",
     invoicePrefix: "MBN",
     receiptPrefix: "RCP",
-  });
+    ...(savedSettings?.billing || {}),
+  }));
 
   // ── Invoice ────────────────────────────────────────────────────────────────
-  const [invoice, setInvoice] = useState({
+  const [invoice, setInvoice] = useState<InvoiceSettings>(() => ({
     footerText: "Thank you for choosing MAA BEST NETWORK. For support: 09611-223344",
     showLogo: true,
     showAddress: true,
@@ -77,10 +248,11 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     terms: "Payment is due by the specified due date. Late payments may result in service interruption.",
     bankDetails: "",
     stampText: "PAID",
-  });
+    ...(savedSettings?.invoice || {}),
+  }));
 
   // ── Notifications ──────────────────────────────────────────────────────────
-  const [notifications, setNotifications] = useState({
+  const [notifications, setNotifications] = useState<NotificationSettings>(() => ({
     smsGateway: "ssl_commerz",
     smsApiUrl: "",
     smsApiKey: "mbn_live_sec_991823a4b",
@@ -96,10 +268,11 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     alertOnPaymentReceived: true,
     alertOnDisconnect: true,
     alertOnBackupFail: true,
-  });
+    ...(savedSettings?.notifications || {}),
+  }));
 
   // ── Security ───────────────────────────────────────────────────────────────
-  const [security, setSecurity] = useState({
+  const [security, setSecurity] = useState<SecuritySettings>(() => ({
     require2FA: false,
     sessionTimeout: "8",
     maxLoginAttempts: "5",
@@ -111,16 +284,39 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
     logIpAddresses: true,
     allowMultipleSessions: false,
     showLoginHistory: true,
-  });
+    ...(savedSettings?.security || {}),
+  }));
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
+
+  const handleSaveAllSettings = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to System Settings.");
+      return;
+    }
+    try {
+      const payload = { company, billing, invoice, notifications, security };
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(payload));
+      showToast("All system settings saved & propagated successfully!");
+      activityLogger.log({
+        type: "system",
+        severity: "success",
+        action: "Platform Configuration Updated",
+        detail: `Saved changes to ${company.displayName} configuration (Billing day: ${billing.billingDay}, Grace: ${billing.gracePeriodDays}d, Currency: ${company.currency}).`,
+        metadata: { legalName: company.legalName, hotline: company.hotline, invoicePrefix: billing.invoicePrefix }
+      });
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to save settings to local storage.");
+    }
+  };
 
   const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
     { id: "company", label: "Company Profile", icon: Building2 },
     { id: "billing", label: "Billing Rules", icon: CreditCard },
     { id: "invoice", label: "Invoice & Receipt", icon: FileText },
     { id: "notifications", label: "Notifications & SMS", icon: Bell },
-    { id: "security", label: "Security", icon: Shield },
+    { id: "security", label: "Security & Passwords", icon: Shield },
     { id: "subscription", label: "Subscription Plan", icon: Star },
   ];
 
@@ -177,13 +373,26 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
             Complete platform configuration, white-label branding, billing rules, security and subscription management
           </p>
         </div>
-        <button
-          onClick={() => showToast("All settings saved successfully!")}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold shadow-sm transition-all cursor-pointer"
-          style={{ background: "var(--primary)", fontSize: 13 }}
-        >
-          <Save size={15} /> Save Changes
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("security")}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-border text-foreground hover:bg-muted font-semibold text-xs shadow-xs transition-all cursor-pointer"
+          >
+            <KeyRound size={14} className="text-rose-600" />
+            <span>Change Admin Password</span>
+          </button>
+          <button
+            onClick={handleSaveAllSettings}
+            disabled={isReadOnly || !canEdit}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold shadow-sm transition-all ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+            }`}
+            style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
+          >
+            <Save size={15} /> {isReadOnly || !canEdit ? "Read-Only: Locked" : "Save Changes"}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 sm:gap-6">
@@ -552,6 +761,248 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
           {/* ── Security ─────────────────────────────────────────────────── */}
           {activeTab === "security" && (
             <>
+              {/* ── System Administrator Password Change Card ─────────────────── */}
+              <div className="rounded-2xl p-6 border shadow-sm relative overflow-hidden space-y-5" style={sectionCard}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                  <div className="flex items-start gap-3.5">
+                    <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/20 flex-shrink-0">
+                      <KeyRound size={22} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--foreground)" }}>
+                          Change System Administrator Password
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                          Root Access Control
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 2 }}>
+                        You can update your admin login password anytime. The new password applies immediately to web login and NOC operations.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/60 border border-border text-xs text-muted-foreground self-start sm:self-auto">
+                    <ShieldCheck size={14} className="text-emerald-500 flex-shrink-0" />
+                    <span>
+                      Active: <strong className="text-foreground">{currentUser?.name || "Super Admin"}</strong> ({currentUser?.email || "admin@maabestnetwork.com"})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Target Account Scope */}
+                <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-2">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Lock size={13} className="text-rose-600" />
+                    <span>Select Admin Account to Update:</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1">
+                    {[
+                      { id: "all", label: "All Admin Accounts", desc: "admin, maabest, root (Recommended)" },
+                      { id: "admin", label: "admin User", desc: "Default Primary Admin" },
+                      { id: "maabest", label: "maabest User", desc: "NOC Lead Admin" },
+                      { id: "root", label: "root User", desc: "Core System Root" },
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setTargetAdminAccount(opt.id as any)}
+                        className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                          targetAdminAccount === opt.id
+                            ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                            : "bg-card border-border text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold">{opt.label}</span>
+                          {targetAdminAccount === opt.id && (
+                            <CheckCircle2 size={13} className="text-primary flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Password Form */}
+                <form onSubmit={handleAdminPasswordSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Current Password */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Current Admin Password <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showCurrentPass ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={e => setCurrentPassword(e.target.value)}
+                          placeholder="e.g. admin123"
+                          className="w-full px-3 py-2.5 rounded-xl outline-none pr-10 text-xs"
+                          style={inputStyle}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPass(!showCurrentPass)}
+                          className="absolute right-2.5 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showCurrentPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Default: <code className="px-1 py-0.2 rounded bg-muted font-mono text-[10px]">admin123</code> or active password
+                      </p>
+                    </div>
+
+                    {/* New Password */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        New Admin Password <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showNewPass ? "text" : "password"}
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder="Enter new strong password"
+                          className="w-full px-3 py-2.5 rounded-xl outline-none pr-10 text-xs"
+                          style={inputStyle}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPass(!showNewPass)}
+                          className="absolute right-2.5 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showNewPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+
+                      {/* Password strength meter */}
+                      {newPassword.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-muted-foreground">Strength:</span>
+                            <span style={{ color: passwordStrength.color, fontWeight: 700 }}>
+                              {passwordStrength.label}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-1 h-1.5">
+                            {[1, 2, 3, 4].map(idx => (
+                              <div
+                                key={idx}
+                                className="rounded-full transition-all"
+                                style={{
+                                  background: idx <= passwordStrength.score ? passwordStrength.color : "var(--border)",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Confirm New Password */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Confirm New Password <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showConfirmPass ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                          placeholder="Re-enter new password"
+                          className="w-full px-3 py-2.5 rounded-xl outline-none pr-10 text-xs"
+                          style={inputStyle}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPass(!showConfirmPass)}
+                          className="absolute right-2.5 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showConfirmPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+
+                      {confirmPassword.length > 0 && (
+                        <div className="flex items-center gap-1 text-[11px] mt-1.5">
+                          {passwordsMatch ? (
+                            <span className="text-emerald-500 flex items-center gap-1 font-semibold">
+                              <CheckCircle2 size={12} /> Passwords match
+                            </span>
+                          ) : (
+                            <span className="text-amber-500 flex items-center gap-1 font-semibold">
+                              <AlertTriangle size={12} /> Passwords do not match
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Feedback Messages */}
+                  {passError && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs font-semibold">
+                      <AlertCircle size={16} className="flex-shrink-0" />
+                      <span>{passError}</span>
+                    </div>
+                  )}
+
+                  {passSuccess && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-xs font-semibold">
+                      <CheckCircle2 size={16} className="flex-shrink-0" />
+                      <span>{passSuccess}</span>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                      <Shield size={12} className="text-rose-600 flex-shrink-0" />
+                      <span>Password is encrypted, stored locally & synced across all administrator sessions.</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {(currentPassword || newPassword || confirmPassword) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentPassword("");
+                            setNewPassword("");
+                            setConfirmPassword("");
+                            setPassError("");
+                            setPassSuccess("");
+                          }}
+                          className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={passSubmitting || !currentPassword || !newPassword || !confirmPassword}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95"
+                        style={{ background: "var(--primary)", fontSize: 13 }}
+                      >
+                        {passSubmitting ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>Updating Admin Password...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save size={14} />
+                            <span>Update Administrator Password</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
               <div className="rounded-2xl p-6 space-y-5" style={sectionCard}>
                 <SectionTitle>Authentication</SectionTitle>
                 <FormRow label="Require 2FA for Admins" hint="Strongly recommended for ISP owners">
@@ -628,15 +1079,15 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
                       </span>
                     </div>
                     <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, color: "#fff" }}>
-                      Starter Plan (Up to 200 Users)
+                      Enterprise Ultra (Unlimited 900+ Users & Full NOC Suite)
                     </div>
-                    <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginTop: 4 }}>
-                      Dedicated ISP software license & cloud server • All billing, MikroTik & optical OLT modules enabled
+                    <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, marginTop: 4 }}>
+                      Dedicated High-Capacity ISP license & Cloud Server • Multi-OLT, TR-069 ACS Wi-Fi, AI Risk Detector & 24/7 SLA enabled
                     </div>
                   </div>
                   <div className="text-right">
                     <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 34, color: "#fff" }}>
-                      ৳800
+                      ৳1,600
                     </div>
                     <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 600 }}>per month</div>
                   </div>
@@ -644,10 +1095,10 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
                   {[
-                    { label: "Subscribers Allocated", value: "168 / 200 Users (84%)" },
-                    { label: "SMS Gateway Integration", value: "BTCL / SSL Gateway API" },
-                    { label: "Cloud Database Backup", value: "Encrypted Daily Backups" },
-                    { label: "Next Renewal Billing", value: "01 Sep 2026" },
+                    { label: "Subscribers License", value: "900+ Users (Enterprise Tier)" },
+                    { label: "SMS Gateway Integration", value: "High-Throughput BTCL / SSL API" },
+                    { label: "Cloud Database Backup", value: "Encrypted Real-Time Backups" },
+                    { label: "Next Renewal Billing", value: "01 Oct 2026" },
                   ].map(s => (
                     <div key={s.label}>
                       <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 600 }}>{s.label}</div>
@@ -664,8 +1115,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
                     name: "Starter Plan",
                     price: "৳800",
                     users: "Up to 200 Users",
-                    tag: "CURRENT PLAN",
-                    current: true,
+                    tag: "STARTER TIER",
+                    current: false,
                     desc: "Perfect for local ISP operators managing up to 200 subscribers with core billing & network tools.",
                     features: [
                       "Up to 200 Active Subscribers",
@@ -682,7 +1133,7 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
                     name: "Growth Pro",
                     price: "৳1,200",
                     users: "Up to 600 Users",
-                    tag: "POPULAR UPGRADE",
+                    tag: "MID-TIER",
                     current: false,
                     desc: "Expanded subscriber capacity and automation for growing ISP networks up to 600 subscribers.",
                     features: [
@@ -700,8 +1151,8 @@ export function SettingsPage({ onNavigate }: SettingsPageProps) {
                     name: "Enterprise Ultra",
                     price: "৳1,600",
                     users: "Up to 900+ Users",
-                    tag: "ULTRA FEATURES",
-                    current: false,
+                    tag: "CURRENT ACTIVE PLAN",
+                    current: true,
                     desc: "High-capacity tier with ultra network intelligence for large metropolitan operators.",
                     features: [
                       "Up to 900+ Active Subscribers",

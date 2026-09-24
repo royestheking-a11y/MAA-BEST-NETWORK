@@ -8,7 +8,7 @@ import {
   BrainCircuit, Bot, PieChart, Users2, Network, Globe, ClipboardList,
   UserCog, ScrollText, HardDrive, Link, ChevronLeft, ChevronRight,
   ChevronDown, Palette, Wrench, Box, History, User, MapPin, Headset,
-  Receipt, Wifi, LogOut, Video, X, Send, ShoppingBag, Share2
+  Receipt, Wifi, LogOut, Video, X, Send, ShoppingBag, Share2, Eye
 } from "lucide-react";
 
 export type Page =
@@ -45,27 +45,33 @@ const navSections: NavSection[] = [
     items: [
       { id: "customers", label: "All Clients", icon: Users },
       { id: "add-client", label: "Add New Client", icon: User, badge: "+" },
-      { id: "online-clients", label: "Online Clients", icon: Activity, badge: "150" },
-      { id: "due-customers", label: "Due Clients", icon: AlertTriangle, badge: "847" },
+      { id: "online-clients", label: "Online Clients", icon: Activity },
+      { id: "due-customers", label: "Due Clients", icon: AlertTriangle },
       { id: "disconnected", label: "Disconnected", icon: WifiOff },
       { id: "customer-map", label: "Customer Map", icon: MapPin },
       { id: "import", label: "Import", icon: Upload },
     ],
   },
   {
-    title: "Monitoring",
+    title: "Live Monitoring & NOC",
     items: [
+      { id: "noc-wallboard", label: "NOC OLT Center", icon: Radio, badge: "LIVE" },
       { id: "live-status", label: "Live Status", icon: Activity },
-      { id: "noc-wallboard", label: "NOC Wallboard", icon: Radio },
       { id: "network-map", label: "Network Map", icon: Map },
-      { id: "mikrotik", label: "MikroTik Client", icon: Server },
-      { id: "olt", label: "OLT / ONT", icon: Network },
       { id: "onu-events", label: "ONU Event History", icon: History },
-      { id: "tr069", label: "TR-069 ACS Wi-Fi", icon: Wifi, badge: "ACS" },
+      { id: "incidents", label: "Network Problems", icon: Zap },
+      { id: "monitoring", label: "Monitoring Hub", icon: Monitor },
+    ],
+  },
+  {
+    title: "Network Infrastructure",
+    items: [
+      { id: "mikrotik", label: "MikroTik", icon: Server },
+      { id: "olt", label: "OLT / ONT", icon: Network },
+      { id: "splitters", label: "Splitter & ODN", icon: Share2, badge: "ODN" },
       { id: "ip-pools", label: "IP Pools & VLANs", icon: Layers },
+      { id: "tr069", label: "User WiFi", icon: Wifi, badge: "WiFi" },
       { id: "zones", label: "Zones", icon: Box },
-      { id: "incidents", label: "Incidents", icon: Zap },
-      { id: "monitoring", label: "Monitoring Hub", icon: Activity },
     ],
   },
   {
@@ -78,22 +84,6 @@ const navSections: NavSection[] = [
       { id: "packages", label: "Packages", icon: Package },
       { id: "discounts", label: "Discounts", icon: Tag },
       { id: "billing-settings", label: "Billing Settings", icon: Settings },
-    ],
-  },
-  {
-    title: "Network",
-    items: [
-      { id: "network-map", label: "Network Map", icon: Map },
-      { id: "noc-wallboard", label: "NOC Wall Screen", icon: Monitor, badge: "LIVE" },
-      { id: "mikrotik", label: "MikroTik", icon: Server },
-      { id: "olt", label: "OLT / ONT", icon: Radio },
-      { id: "splitters", label: "Splitter & PON Ledger", icon: Share2, badge: "ODN" },
-      { id: "onu-events", label: "ONU Event History", icon: History },
-      { id: "ip-pools", label: "IP Pools & VLANs", icon: Network },
-      { id: "tr069", label: "TR-069 ACS Wi-Fi", icon: Wifi, badge: "ACS" },
-      { id: "zones", label: "Zones", icon: Layers },
-      { id: "incidents", label: "Incidents", icon: Zap },
-      { id: "monitoring", label: "Monitoring", icon: Activity },
     ],
   },
   {
@@ -159,7 +149,6 @@ const navSections: NavSection[] = [
       { id: "payment-processing-fee-report", label: "P.Processing Fee", icon: CreditCard },
       { id: "revenue-reports", label: "Revenue", icon: PieChart },
       { id: "customer-reports", label: "Customer", icon: Users2 },
-      { id: "network-reports", label: "Network", icon: Network },
       { id: "custom-reports", label: "Custom Reports", icon: FileText },
     ],
   },
@@ -179,6 +168,7 @@ const navSections: NavSection[] = [
 
 import { useLanguage } from "../context/LanguageContext";
 import { useCustomerContext } from "../context/CustomerContext";
+import { useAuth } from "../context/AuthContext";
 
 interface SidebarProps {
   currentPage: Page;
@@ -193,10 +183,12 @@ interface SidebarProps {
 export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOpen, onCloseMobile, onLogout }: SidebarProps) {
   const { t, bnNum } = useLanguage();
   const { customers } = useCustomerContext();
+  const { currentUser, logout, canAccessPage, getPageAccess } = useAuth();
   const [menuSearch, setMenuSearch] = useState("");
 
-  const onlineCount = customers.filter(c => c.netStatus === "online").length;
+  const onlineCount = customers.filter(c => c.netStatus === "online" || c.status === "active").length;
   const dueCount = customers.filter(c => (c.dueAmount || 0) > 0 || c.status === "due").length;
+  const disconnectedCount = customers.filter(c => c.status === "disconnected" || c.status === "offline").length;
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(
     Object.fromEntries(navSections.filter(s => s.title).map(s => [s.title!, true]))
@@ -285,9 +277,10 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOp
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin">
         {navSections.map((section, si) => {
+          const permittedItems = section.items.filter(item => canAccessPage(item.id));
           const visibleItems = menuSearch.trim()
-            ? section.items.filter(item => item.label.toLowerCase().includes(menuSearch.toLowerCase()))
-            : section.items;
+            ? permittedItems.filter(item => item.label.toLowerCase().includes(menuSearch.toLowerCase()))
+            : permittedItems;
 
           if (visibleItems.length === 0) return null;
 
@@ -332,6 +325,7 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOp
                   const badgeVal =
                     item.id === "online-clients" ? onlineCount :
                     item.id === "due-customers" ? dueCount :
+                    item.id === "disconnected" ? disconnectedCount :
                     item.badge;
                   return (
                     <button
@@ -417,17 +411,21 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOp
                 className="flex items-center justify-center rounded-xl font-black text-white text-xs flex-shrink-0 shadow-sm"
                 style={{ width: 34, height: 34, background: "linear-gradient(135deg, #8B2020 0%, #C43535 100%)" }}
               >
-                MBN
+                {currentUser?.avatar || "MBN"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">Super Admin</p>
-                <p className="text-[10px] text-white/70 truncate font-mono">admin@maabestnetwork.com</p>
+                <p className="text-xs font-bold text-white truncate">{currentUser?.name || "Super Admin"}</p>
+                <p className="text-[10px] text-white/70 truncate font-mono">{currentUser?.email || "admin@maabestnetwork.com"}</p>
+                <span className="inline-block text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-white/90 font-bold mt-0.5">
+                  {currentUser?.role || "ISP Admin"}
+                </span>
               </div>
             </div>
 
             <button
               onClick={() => {
                 if (onCloseMobile) onCloseMobile();
+                logout();
                 if (onLogout) onLogout();
               }}
               className="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer text-white bg-rose-950/60 hover:bg-rose-900 border border-rose-700/50 shadow-xs"
@@ -438,7 +436,10 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOp
           </div>
         ) : (
           <button
-            onClick={() => onLogout?.()}
+            onClick={() => {
+              logout();
+              onLogout?.();
+            }}
             className="w-full flex items-center justify-center p-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-950/60 transition-colors cursor-pointer"
             title={t("Sign Out / Logout")}
           >

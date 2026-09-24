@@ -6,12 +6,14 @@ import {
 import {
   financeStore, type FinanceAccount
 } from "./financeData";
+import { usePermission } from "../../context/AuthContext";
 
 interface AccountsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function AccountsPage({ onNavigate }: AccountsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("accounts");
   const [accounts, setAccounts] = useState<FinanceAccount[]>(financeStore.getAccounts());
   const [showAddModal, setShowAddModal] = useState(false);
   const [toast, setToast] = useState("");
@@ -30,6 +32,10 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleAdd = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Accounts.");
+      return;
+    }
     if (!newAcc.name || !newAcc.accountNumber) return;
     const acc: FinanceAccount = {
       id: `ACC-${(accounts.length + 1).toString().padStart(2, "0")}`,
@@ -91,8 +97,11 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-            style={{ background: "var(--primary)", fontSize: 13 }}
+            disabled={isReadOnly || !canEdit}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+            }`}
+            style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
           >
             <Plus size={14} /> Add Bank / MFS Account
           </button>
@@ -242,10 +251,10 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
               </button>
               <button
                 onClick={handleAdd}
-                disabled={!newAcc.name || !newAcc.accountNumber}
+                disabled={!newAcc.name || !newAcc.accountNumber || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary disabled:opacity-50"
               >
-                Save Account
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Save Account"}
               </button>
             </div>
           </div>

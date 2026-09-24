@@ -1,11 +1,12 @@
 import { useState } from "react";
 import {
   Search, Bell, ChevronDown, Sun, Moon, User, LogOut, Settings,
-  AlertTriangle, CheckCircle2, Info, X, Zap, Wifi, WifiOff, Menu
+  AlertTriangle, CheckCircle2, Info, X, Zap, Wifi, WifiOff, Menu, KeyRound
 } from "lucide-react";
 import type { Page } from "./Sidebar";
 import { useLanguage } from "../context/LanguageContext";
 import { LanguageToggle } from "./ui/LanguageToggle";
+import { useAuth } from "../context/AuthContext";
 
 const PAGE_TITLES: Partial<Record<Page, string>> = {
   dashboard: "Dashboard",
@@ -24,15 +25,15 @@ const PAGE_TITLES: Partial<Record<Page, string>> = {
   discounts: "Discounts & Penalties",
   "billing-settings": "Billing Settings",
   "network-map": "Network Map",
-  "noc-wallboard": "NOC Live Operations Center",
+  "noc-wallboard": "NOC OLT Center",
   mikrotik: "MikroTik Management",
-  olt: "OLT & ONT Management",
+  olt: "OLT Chassis & Optical Infrastructure",
   splitters: "Optical Splitter & PON Capacity Ledger",
   "onu-events": "ONU Event History",
   "ip-pools": "IPAM & Subnet Pools",
-  tr069: "TR-069 ACS Wi-Fi Management",
+  tr069: "User WiFi & CPE Router Management",
   zones: "Zones & Sub-Zones",
-  incidents: "Network Incidents",
+  incidents: "Network Problems & Outages",
   monitoring: "Network Monitoring",
   "mac-resellers": "MAC Resellers",
   "bandwidth-resellers": "Bandwidth Resellers",
@@ -101,6 +102,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ currentPage, darkMode, onToggleDark, onLogout, onNavigate, onMenuToggle }: TopBarProps) {
+  const { currentUser, logout } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [searchVal, setSearchVal] = useState("");
@@ -382,17 +384,22 @@ export function TopBar({ currentPage, darkMode, onToggleDark, onLogout, onNaviga
             className="flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-muted"
           >
             <div
-              className="flex items-center justify-center rounded-lg bg-white dark:bg-white/10 border border-border flex-shrink-0 p-0.5 overflow-hidden shadow-xs"
-              style={{ width: 28, height: 28 }}
+              className="flex items-center justify-center rounded-lg bg-primary/10 text-primary font-bold border border-primary/20 flex-shrink-0 p-0.5 overflow-hidden shadow-xs text-xs"
+              style={{ width: 30, height: 30 }}
             >
-              <img src="/maabestnetwork.png" alt="MBN" className="w-full h-full object-contain" />
+              {currentUser?.avatar || "MBN"}
             </div>
             <div className="flex flex-col items-start text-left">
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2 }}>
-                Super Admin
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--foreground)", lineHeight: 1.2 }}>
+                  {currentUser?.name || "Super Admin"}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-muted text-muted-foreground border border-border">
+                  {currentUser?.role || "ISP Admin"}
+                </span>
+              </div>
               <span style={{ fontSize: 10, color: "var(--muted-foreground)", lineHeight: 1.2 }}>
-                admin@maabestnetwork.com
+                {currentUser?.email || "admin@maabestnetwork.com"}
               </span>
             </div>
             <ChevronDown size={12} style={{ color: "var(--muted-foreground)" }} />
@@ -402,30 +409,42 @@ export function TopBar({ currentPage, darkMode, onToggleDark, onLogout, onNaviga
             <div
               className="absolute right-0 mt-1 rounded-xl shadow-xl overflow-hidden"
               style={{
-                width: 200,
+                width: 220,
                 background: "var(--card)",
                 border: "1px solid var(--border)",
                 zIndex: 50,
                 top: "100%",
               }}
             >
+              <div className="p-3 border-b border-border bg-muted/30">
+                <p className="text-xs font-bold text-foreground">{currentUser?.name || "Super Admin"}</p>
+                <p className="text-[10px] text-muted-foreground font-mono">{currentUser?.email || "admin@maabestnetwork.com"}</p>
+                <span className="inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  {currentUser?.role || "ISP Admin"} · {currentUser?.zone || "All Zones"}
+                </span>
+              </div>
               {[
-                { icon: User, label: "My Profile", page: "employees" as Page },
+                { icon: User, label: "Staff Directory", page: "employees" as Page },
                 { icon: Settings, label: "Account Settings", page: "settings" as Page },
+                { icon: KeyRound, label: "Change Admin Password", page: "settings" as Page },
                 { icon: LogOut, label: "Sign Out", danger: true },
               ].map((item, i) => {
                 const Icon = item.icon;
                 return (
                   <button
                     key={i}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 transition-colors"
-                    style={{ borderBottom: i < 2 ? "1px solid var(--border)" : "none" }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 transition-colors cursor-pointer"
+                    style={{ borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "var(--muted)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                     onClick={() => {
                       setUserOpen(false);
-                      if (item.danger && onLogout) onLogout();
-                      else if (item.page && onNavigate) onNavigate(item.page);
+                      if (item.danger) {
+                        logout();
+                        if (onLogout) onLogout();
+                      } else if (item.page && onNavigate) {
+                        onNavigate(item.page);
+                      }
                     }}
                   >
                     <Icon

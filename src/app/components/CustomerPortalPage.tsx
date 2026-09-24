@@ -15,6 +15,7 @@ import { useCustomerContext, Customer, Invoice } from "../context/CustomerContex
 import { useLanguage } from "../context/LanguageContext";
 import { LanguageToggle } from "./ui/LanguageToggle";
 import { storeService, StoreProduct, StoreOrder } from "../data/storeData";
+import { billingStore, type IspPackage } from "./billing/billingData";
 
 interface CustomerPortalPageProps {
   onNavigate?: (page: string) => void;
@@ -29,6 +30,13 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
 
   const [activeSection, setActiveSection] = useState<PortalSection>("overview");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [livePackages, setLivePackages] = useState<IspPackage[]>(() => billingStore.getPackages());
+
+  useEffect(() => {
+    return billingStore.subscribe(pkgs => {
+      if (pkgs && pkgs.length > 0) setLivePackages(pkgs);
+    });
+  }, []);
 
   // Speed test state
   const [speedTestActive, setSpeedTestActive] = useState(false);
@@ -148,7 +156,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
     setSelectedProductForOrder(null);
     setOrderQuantity(1);
     setOrderCustomerNote("");
-    showToast(`✓ Order #${newOrder.orderNumber} placed successfully! MAA BEST NETWORK is processing your hardware.`);
+    showToast(`Order #${newOrder.orderNumber} placed successfully! MAA BEST NETWORK is processing your hardware.`);
   };
 
   const showToast = (msg: string) => {
@@ -176,7 +184,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
     await new Promise(r => setTimeout(r, 500));
     setDiagnosing(false);
     setDiagDone(true);
-    showToast("✓ Line self-diagnosis completed: Optical link healthy (-18.4 dBm), DNS flushed & 2ms BDIX latency!");
+    showToast("Line self-diagnosis completed: Optical link healthy (-18.4 dBm), DNS flushed & 2ms BDIX latency!");
   };
 
   const toggleBlockDevice = (devId: string) => {
@@ -192,12 +200,12 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
       showToast("Security Alert: Wi-Fi password must be at least 8 characters.");
       return;
     }
-    showToast(`✓ Wi-Fi credentials updated! SSID: "${wifiSsid}" synchronized to router.`);
+    showToast(`Wi-Fi credentials updated! SSID: "${wifiSsid}" synchronized to router.`);
   };
 
   const handleRequestGrace = () => {
     setGraceActive(true);
-    showToast("✓ 72-Hour Emergency Grace Period activated! Full internet speed extended until 29 Aug 2026.");
+    showToast("72-Hour Emergency Grace Period activated! Full internet speed extended until 29 Aug 2026.");
   };
 
   // Speed test simulation
@@ -323,20 +331,12 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
 
     setIsSubmittingUpgrade(false);
     setUpgradeModalPlan(null);
-    showToast(`✓ Upgrade request (#${req.id}) submitted to MAA BEST NETWORK Admin! You will receive an SMS upon approval.`);
+    showToast(`Upgrade request (#${req.id}) submitted to MAA BEST NETWORK Admin! You will receive an SMS upon approval.`);
   };
 
-  // Usage graph mockup
-  const weeklyUsage = [
-    { day: "Mon", down: 18.4, up: 3.2 },
-    { day: "Tue", down: 22.1, up: 4.1 },
-    { day: "Wed", down: 15.8, up: 2.8 },
-    { day: "Thu", down: 28.5, up: 5.4 },
-    { day: "Fri", down: 36.2, up: 6.9 },
-    { day: "Sat", down: 42.8, up: 8.5 },
-    { day: "Sun", down: 31.4, up: 5.9 },
-  ];
-  const maxWeekly = Math.max(...weeklyUsage.map(w => w.down));
+  // Usage graph mockup (Removed for production)
+  const weeklyUsage: Array<{ day: string; down: number; up: number }> = [];
+  const maxWeekly = 0;
 
   const navMenuItems = [
     { id: "overview" as const, label: t("Dashboard"), icon: Home, badge: undefined },
@@ -943,7 +943,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                         : "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20"
                     }`}>
                     <CheckCircle size={14} />
-                    <span>{graceActive ? "✓ 72-Hour Grace Period Active" : "Request 3-Day Grace Extension"}</span>
+                    <span>{graceActive ? "72-Hour Grace Period Active" : "Request 3-Day Grace Extension"}</span>
                   </button>
                 </div>
 
@@ -1201,11 +1201,24 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
               })()}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {[
-                  { name: "30 Mbps Home Fiber", speed: "30/15", price: 1000, features: ["Buffer-Free 4K Streaming", "Unlimited High Speed", "15 Mbps Upload"] },
-                  { name: "50 Mbps Ultra Fiber Pro", speed: "50/25", price: 1200, popular: true, features: ["Ideal for 6+ Heavy Devices", "Low Ping Gaming Route", "Priority BDIX Peering"] },
-                  { name: "100 Mbps Gigabit Beast", speed: "100/50", price: 2200, features: ["Gigabit Fiber Direct Route", "Real IP Included", "VIP Dedicated Core Queue"] },
-                ].map(pkg => {
+                {(livePackages.length > 0
+                  ? livePackages.map(p => ({
+                      name: p.name,
+                      speed: `${p.down}/${p.up}`,
+                      price: p.price,
+                      popular: p.price >= 1000 && p.price <= 1500,
+                      features: [
+                        p.description || `${p.down} Mbps Download / ${p.up} Mbps Upload`,
+                        "Buffer-Free 4K Streaming & Ultra-Low Ping",
+                        "Priority BDIX & Local Cache Peering"
+                      ]
+                    }))
+                  : [
+                      { name: "30 Mbps Home Fiber", speed: "30/15", price: 1000, features: ["Buffer-Free 4K Streaming", "Unlimited High Speed", "15 Mbps Upload"] },
+                      { name: "50 Mbps Ultra Fiber Pro", speed: "50/25", price: 1200, popular: true, features: ["Ideal for 6+ Heavy Devices", "Low Ping Gaming Route", "Priority BDIX Peering"] },
+                      { name: "100 Mbps Gigabit Beast", speed: "100/50", price: 2200, features: ["Gigabit Fiber Direct Route", "Real IP Included", "VIP Dedicated Core Queue"] },
+                    ]
+                ).map(pkg => {
                   const isCurrent = customer.package.toLowerCase().includes(pkg.name.split(" ")[0].toLowerCase());
                   const isPending = upgradeRequests.some(
                     r => r.customerId === customer.id && r.status === "pending" && r.requestedPackage === pkg.name
@@ -1253,7 +1266,10 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                               : "bg-primary text-white shadow-md hover:opacity-95"
                           }`}>
                           {isCurrent ? (
-                            <span>✓ Current Active Plan</span>
+                            <>
+                              <CheckCircle2 size={13} />
+                              <span>Current Active Plan</span>
+                            </>
                           ) : isPending ? (
                             <>
                               <Clock size={13} />
@@ -1319,14 +1335,15 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                               <td className="py-2.5 text-muted-foreground">{req.requestDate}</td>
                               <td className="py-2.5">
                                 <span
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
+                                  className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase flex items-center gap-1.5 w-fit ${
                                     req.status === "approved"
                                       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                       : req.status === "rejected"
                                       ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
                                       : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                                   }`}>
-                                  {req.status === "approved" ? "✓ Approved" : req.status === "rejected" ? "✗ Declined" : "⏳ Under Review"}
+                                  {req.status === "approved" ? <CheckCircle2 size={11} /> : req.status === "rejected" ? <X size={11} /> : <Clock size={11} />}
+                                  {req.status === "approved" ? "Approved" : req.status === "rejected" ? "Declined" : "Under Review"}
                                 </span>
                               </td>
                             </tr>
@@ -1864,7 +1881,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
               <div>
                 <span className="text-muted-foreground">Amount: </span>
                 <strong className="font-mono text-lg font-black text-[#E2136E]">
-                  ৳{(customer.dueAmount > 0 ? customer.dueAmount : customer.price).toLocaleString()}
+                  ৳{(((customer.dueAmount ?? 0) > 0 ? customer.dueAmount : customer.price) || 0).toLocaleString()}
                 </strong>
               </div>
             </div>

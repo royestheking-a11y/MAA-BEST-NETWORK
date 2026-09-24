@@ -1,3 +1,4 @@
+import { useNetxLiveData } from "../../services/netxApiService";
 import { useState, useEffect } from "react";
 import {
   Zap, Search, Plus, AlertTriangle, CheckCircle2, Clock, XCircle,
@@ -7,11 +8,15 @@ import {
   networkStore, type NetworkIncident
 } from "./networkData";
 
+import { usePermission } from "../../context/AuthContext";
+
 interface IncidentsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("incidents");
+  const { isLoading: isNetxLoading } = useNetxLiveData(30000);
   const [incidents, setIncidents] = useState<NetworkIncident[]>(networkStore.getIncidents());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -43,6 +48,10 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
   });
 
   const handleAddIncident = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role only has Read (View Only) permission for Incidents.");
+      return;
+    }
     if (!newInc.title) return;
     const inc: NetworkIncident = {
       id: `INC-${(incidents.length + 882).toString()}`,
@@ -63,6 +72,10 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
   };
 
   const handleResolve = (id: string) => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role only has Read (View Only) permission for Incidents.");
+      return;
+    }
     networkStore.resolveIncident(id);
     showToast(`Incident #${id} resolved! Customer SMS status updated.`);
   };
@@ -78,6 +91,15 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
     color: "var(--foreground)",
   };
 
+  if (isNetxLoading) {
+    return (
+      <div className="p-6 h-screen flex flex-col items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-muted-foreground font-medium">Synchronizing Network Incidents...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-3 sm:p-6">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
@@ -85,15 +107,15 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
         <div>
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, color: "var(--foreground)" }}>
-              Network Incidents & Outages
+              Network Problems & Outages
             </h1>
             {openCount > 0 ? (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-600 text-white animate-pulse">
-                {openCount} Active Outages
+                {openCount} Active Problems
               </span>
             ) : (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white">
-                No Critical Outages
+                No Network Problems
               </span>
             )}
           </div>
@@ -104,10 +126,13 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
 
         <button
           onClick={() => setShowAddIncident(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-          style={{ background: "#DC2626", fontSize: 13 }}
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer bg-red-600 hover:bg-red-700"
+          }`}
+          style={{ fontSize: 13 }}
         >
-          <Plus size={14} /> Declare Outage / Incident
+          <Plus size={14} /> Report Network Problem
         </button>
       </div>
 
@@ -252,9 +277,14 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
                   {inc.status !== "resolved" && (
                     <button
                       onClick={() => handleResolve(inc.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm mt-1"
+                      disabled={isReadOnly || !canEdit}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm mt-1 ${
+                        isReadOnly || !canEdit
+                          ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                          : "bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+                      }`}
                     >
-                      <Check size={12} /> Mark Resolved
+                      <Check size={12} /> {isReadOnly || !canEdit ? "Read-Only" : "Mark Resolved"}
                     </button>
                   )}
                 </div>
@@ -378,10 +408,10 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
               </button>
               <button
                 onClick={handleAddIncident}
-                disabled={!newInc.title}
+                disabled={!newInc.title || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 disabled:opacity-50"
               >
-                Publish Outage Ticket
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Publish Outage Ticket"}
               </button>
             </div>
           </div>

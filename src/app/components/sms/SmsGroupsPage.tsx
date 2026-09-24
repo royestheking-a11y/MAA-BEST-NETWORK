@@ -13,8 +13,14 @@ interface SmsGroupsPageProps {
 export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
   const { customers } = useCustomerContext();
   const [groups, setGroups] = useState<SmsGroup[]>(() => {
-    const saved = localStorage.getItem("mbn_sms_groups");
-    return saved ? JSON.parse(saved) : INITIAL_SMS_GROUPS;
+    try {
+      const saved = localStorage.getItem("mbn_sms_groups");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return INITIAL_SMS_GROUPS;
   });
 
   const [memberStatusFilter, setMemberStatusFilter] = useState("all");

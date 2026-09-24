@@ -6,12 +6,14 @@ import {
 import {
   billingStore, type IspPackage
 } from "./billingData";
+import { usePermission } from "../../context/AuthContext";
 
 interface PackagesPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function PackagesPage({ onNavigate }: PackagesPageProps) {
+  const { canEdit, canDelete, isReadOnly } = usePermission("packages");
   const [packagesList, setPackagesList] = useState<IspPackage[]>(billingStore.getPackages());
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -41,9 +43,14 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
   });
 
   const handleCreatePackage = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: View Only Mode. Creating packages is restricted.");
+      return;
+    }
     if (!newPkg.name || !newPkg.price) return;
+    const uniqueId = `PKG-${Date.now().toString().slice(-4)}`;
     const pkg: IspPackage = {
-      id: `PKG-${(packagesList.length + 1).toString().padStart(2, "0")}`,
+      id: uniqueId,
       name: newPkg.name,
       down: Number(newPkg.down),
       up: Number(newPkg.up),
@@ -58,15 +65,30 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
     };
     billingStore.addPackage(pkg);
     setShowNewPackage(false);
-    showToast(`Package "${pkg.name}" created and synced with MikroTik profile!`);
+    showToast(`✓ Package "${pkg.name}" created and synced with MikroTik profile!`);
     setNewPkg({ name: "", down: "20", up: "10", price: "1200", type: "PPPoE", mikrotikProfile: "", burstLimit: "30M/15M 20s", fupLimit: "Unlimited" });
   };
 
   const handleUpdatePackage = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: View Only Mode. Modifying packages is restricted.");
+      return;
+    }
     if (!editingPkg) return;
     billingStore.updatePackage(editingPkg);
     setEditingPkg(null);
-    showToast(`Package "${editingPkg.name}" updated successfully!`);
+    showToast(`✓ Package "${editingPkg.name}" updated successfully!`);
+  };
+
+  const handleDeletePackage = (pkg: IspPackage) => {
+    if (isReadOnly || !canDelete) {
+      showToast("Permission denied: You cannot delete packages in read-only mode.");
+      return;
+    }
+    if (window.confirm(`Are you sure you want to permanently delete package "${pkg.name}" (${pkg.down}M/${pkg.up}M)?`)) {
+      billingStore.deletePackage(pkg.id);
+      showToast(`✓ Package "${pkg.name}" deleted and removed from Cloud Firestore.`);
+    }
   };
 
   const packageStats = {
@@ -110,9 +132,16 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
             <RefreshCw size={14} /> Sync MikroTik
           </button>
           <button
-            onClick={() => setShowNewPackage(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all"
-            style={{ background: "var(--primary)", fontSize: 13 }}
+            disabled={isReadOnly || !canEdit}
+            onClick={() => {
+              if (isReadOnly || !canEdit) return;
+              setShowNewPackage(true);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted-foreground" : "hover:opacity-95 cursor-pointer"
+            }`}
+            style={{ background: isReadOnly || !canEdit ? undefined : "var(--primary)", fontSize: 13 }}
+            title={isReadOnly || !canEdit ? "View Only: Creating packages is restricted" : "Create Package"}
           >
             <Plus size={14} /> Create Package
           </button>
@@ -289,17 +318,26 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
 
               <div className="flex items-center gap-2 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
                 <button
-                  onClick={() => setEditingPkg(pkg)}
-                  className="flex-1 py-1.5 rounded text-xs font-medium hover:bg-muted transition-colors flex items-center justify-center gap-1"
+                  onClick={() => !isReadOnly && canEdit && setEditingPkg(pkg)}
+                  disabled={isReadOnly || !canEdit}
+                  title={isReadOnly || !canEdit ? "Read-only mode: Editing packages is restricted" : undefined}
+                  className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                    isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted/40" : "hover:bg-muted"
+                  }`}
                   style={{ border: "1px solid var(--border)" }}
                 >
                   <Edit2 size={12} /> Edit
                 </button>
                 <button
-                  onClick={() => showToast(`Subscribers list for ${pkg.name} opened in CRM module.`)}
-                  className="flex-1 py-1.5 rounded text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  onClick={() => handleDeletePackage(pkg)}
+                  disabled={isReadOnly || !canDelete}
+                  title={isReadOnly || !canDelete ? "Read-only mode: Deleting packages is restricted" : "Delete Package"}
+                  className={`p-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center text-red-500 ${
+                    isReadOnly || !canDelete ? "opacity-30 cursor-not-allowed" : "hover:bg-red-500/10"
+                  }`}
+                  style={{ border: "1px solid var(--border)" }}
                 >
-                  Subscribers
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>
@@ -341,14 +379,22 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setEditingPkg(pkg)}
-                        className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => !isReadOnly && canEdit && setEditingPkg(pkg)}
+                        disabled={isReadOnly || !canEdit}
+                        title={isReadOnly || !canEdit ? "Read-only mode: Editing packages is restricted" : undefined}
+                        className={`p-1.5 rounded text-muted-foreground ${
+                          isReadOnly || !canEdit ? "opacity-30 cursor-not-allowed" : "hover:bg-muted hover:text-foreground"
+                        }`}
                       >
                         <Edit2 size={13} />
                       </button>
                       <button
-                        onClick={() => showToast(`Archived package ${pkg.name}`)}
-                        className="p-1.5 rounded hover:bg-muted text-red-500"
+                        onClick={() => handleDeletePackage(pkg)}
+                        disabled={isReadOnly || !canDelete}
+                        title={isReadOnly || !canDelete ? "Read-only mode: Deleting packages is restricted" : "Delete Package"}
+                        className={`p-1.5 rounded text-red-500 ${
+                          isReadOnly || !canDelete ? "opacity-30 cursor-not-allowed" : "hover:bg-red-500/10"
+                        }`}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -488,7 +534,10 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
               </button>
               <button
                 onClick={editingPkg ? handleUpdatePackage : handleCreatePackage}
-                className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary"
+                disabled={isReadOnly || (editingPkg ? !canEdit : !canEdit)}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold text-white ${
+                  isReadOnly || (editingPkg ? !canEdit : !canEdit) ? "opacity-50 cursor-not-allowed bg-muted-foreground" : "bg-primary"
+                }`}
               >
                 {editingPkg ? "Save Changes" : "Create Package"}
               </button>

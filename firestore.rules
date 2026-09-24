@@ -1,23 +1,68 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Customers Collection: Allow read and write for ISP application
+    // Customers Collection: Subscriber directories & profiles
     match /customers/{customerId} {
       allow read, write: if true;
     }
 
-    // Plan Upgrade Requests: Allow subscribers and admin to read and write
+    // Plan Upgrade Requests
     match /upgradeRequests/{requestId} {
       allow read, write: if true;
     }
 
-    // Payments & Receipts: Allow collection records
+    // Invoices & Billing Ledgers
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+
+    // Payments & Receipts
     match /payments/{paymentId} {
       allow read, write: if true;
     }
 
-    // Invoices
-    match /invoices/{invoiceId} {
+    // Employees Collection & Staff Credentials
+    match /employees/{employeeId} {
+      allow read, write: if true;
+    }
+
+    // Roles & Granular Permissions
+    match /roles/{roleId} {
+      allow read, write: if true;
+    }
+
+    // System Auth & Admin Passcodes
+    match /system_auth/{authDocId} {
+      allow read, write: if true;
+    }
+
+    // MikroTik Router Fleet & PPPoE Gateways
+    match /mikrotik/{serverId} {
+      allow read, write: if true;
+    }
+
+    // OLT Chassis & Optical Equipment
+    match /olts/{oltId} {
+      allow read, write: if true;
+    }
+
+    // Service Zones & Sub-Zones
+    match /zones/{zoneId} {
+      allow read, write: if true;
+    }
+
+    // Network Incidents & Outage Tickets
+    match /network_incidents/{incidentId} {
+      allow read, write: if true;
+    }
+
+    // ISP Packages Collection
+    match /packages/{packageId} {
+      allow read, write: if true;
+    }
+
+    // Global Catch-all: Ensure all ISP modules read and write reliably
+    match /{document=**} {
       allow read, write: if true;
     }
   }

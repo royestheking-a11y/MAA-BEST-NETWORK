@@ -8,19 +8,19 @@ import {
   ArrowUpRight, ArrowDownRight, Zap, Eye, Download, TrendingUp,
   Cpu, MemoryStick, Globe, Lock, Unlock, Plus, X, CheckCircle,
   Circle, Signal, Network, UserCheck, Wrench, ClipboardList,
-  Star, Award, Copy, Check, ExternalLink, Sliders
+  Star, Award, Copy, Check, ExternalLink, Sliders, ShieldCheck, Sparkles, Users
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { useCustomerContext } from "../context/CustomerContext";
+import { useCustomerContext, Customer } from "../context/CustomerContext";
+import { usePermission } from "../context/AuthContext";
+import { billingStore, type IspPackage } from "./billing/billingData";
 
-const AVAILABLE_PACKAGES = [
-  { id: "PKG-01", name: "5 Mbps Basic", down: 5, up: 2, price: 500, desc: "Economy home browsing & light streaming" },
-  { id: "PKG-02", name: "10 Mbps Home", down: 10, up: 5, price: 800, desc: "Standard family browsing, HD video & social" },
-  { id: "PKG-03", name: "15 Mbps Standard", down: 15, up: 8, price: 1000, desc: "HD streaming & smooth work-from-home" },
-  { id: "PKG-04", name: "20 Mbps Fiber Standard", down: 20, up: 10, price: 1200, desc: "4K streaming, low latency & gaming" },
-  { id: "PKG-05", name: "30 Mbps Home Fiber", down: 30, up: 15, price: 1500, desc: "Multi-device heavy home broadband" },
-  { id: "PKG-06", name: "50 Mbps Ultra Fiber Pro", down: 50, up: 25, price: 2500, desc: "High-speed SME, office & studio line" },
-  { id: "PKG-07", name: "100 Mbps Gigabit Fiber", down: 100, up: 50, price: 5000, desc: "Dedicated high priority fiber bandwidth" },
+const FALLBACK_PACKAGES: IspPackage[] = [
+  { id: "PKG-01", name: "5 Mbps Basic", down: 5, up: 2, price: 500, type: "PPPoE", customers: 0, margin: 40, mikrotikProfile: "profile-5M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "Economy home browsing & light streaming" },
+  { id: "PKG-02", name: "10 Mbps Home", down: 10, up: 5, price: 800, type: "PPPoE", customers: 0, margin: 45, mikrotikProfile: "profile-10M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "Standard family browsing, HD video & social" },
+  { id: "PKG-03", name: "15 Mbps Standard", down: 15, up: 8, price: 1000, type: "PPPoE", customers: 0, margin: 50, mikrotikProfile: "profile-15M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "HD streaming & smooth work-from-home" },
+  { id: "PKG-04", name: "20 Mbps Fiber Standard", down: 20, up: 10, price: 1200, type: "PPPoE", customers: 0, margin: 55, mikrotikProfile: "profile-20M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "4K streaming, low latency & gaming" },
+  { id: "PKG-05", name: "30 Mbps Home Fiber", down: 30, up: 15, price: 1500, type: "PPPoE", customers: 0, margin: 60, mikrotikProfile: "profile-30M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "Multi-device heavy home broadband" },
 ];
 
 interface CustomerProfilePageProps {
@@ -30,7 +30,56 @@ interface CustomerProfilePageProps {
 
 type Tab = "overview" | "network" | "billing" | "payments" | "messages" | "usage" | "activity" | "tickets";
 
-const initialCustomer = {
+export interface CustomerProfileData {
+  id: string;
+  name: string;
+  phone: string;
+  altPhone: string;
+  email: string;
+  nid: string;
+  address: string;
+  zone: string;
+  subZone: string;
+  area: string;
+  lat: string;
+  lng: string;
+  status: any;
+  notes: string;
+  createdAt: string;
+  pppoeUsername: string;
+  pppoePassword: string;
+  staticIP: string;
+  connectionType: string;
+  macAddress: string;
+  mikrotik: string;
+  olt: string;
+  onu: string;
+  onuMac: string;
+  ponPort: string;
+  onuModel: string;
+  onuSerial: string;
+  vlan: string;
+  serviceProfile: string;
+  rxPower: string;
+  txPower: string;
+  distance: string;
+  currentStatus: any;
+  uptimeSeconds: number;
+  uptime: string;
+  package: string;
+  packagePrice: number;
+  billingDate: number;
+  dueDate: number;
+  discount: number;
+  vat: number;
+  lateFee: number;
+  currentBalance: number;
+  previousDue: number;
+  lastPaidDate: string;
+  lastPaidAmount: number;
+}
+
+const initialCustomer: CustomerProfileData = {
   id: "CUST-10293",
   name: "Rahim Uddin",
   phone: "01711-223344",
@@ -65,6 +114,7 @@ const initialCustomer = {
   txPower: "2.1 dBm",
   distance: "1.24 km",
   currentStatus: "online" as const,
+  uptimeSeconds: 570752,
   uptime: "6d 14h 32m",
   // Billing
   package: "20 Mbps Fiber Standard",
@@ -155,8 +205,51 @@ const inputStyle = {
   color: "var(--foreground)",
 };
 
+function parseUptimeToSeconds(uptimeStr?: string): number {
+  if (!uptimeStr || uptimeStr === "—" || uptimeStr.includes("Off") || uptimeStr.includes("Standby")) return 0;
+  let total = 0;
+  const d = uptimeStr.match(/(\d+)\s*d/i);
+  const h = uptimeStr.match(/(\d+)\s*h/i);
+  const m = uptimeStr.match(/(\d+)\s*m/i);
+  const s = uptimeStr.match(/(\d+)\s*s/i);
+
+  if (d) total += parseInt(d[1], 10) * 86400;
+  if (h) total += parseInt(h[1], 10) * 3600;
+  if (m) total += parseInt(m[1], 10) * 60;
+  if (s) total += parseInt(s[1], 10);
+
+  if (total === 0) total = 570752; // default ~6d 14h 32m 32s
+  return total;
+}
+
+function formatTickingUptime(totalSec: number): string {
+  if (totalSec <= 0) return "—";
+  const days = Math.floor(totalSec / 86400);
+  const rem1 = totalSec % 86400;
+  const hours = Math.floor(rem1 / 3600);
+  const rem2 = rem1 % 3600;
+  const mins = Math.floor(rem2 / 60);
+  const secs = rem2 % 60;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (days > 0) return `${days}d ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+  if (hours > 0) return `${hours}h ${pad(mins)}m ${pad(secs)}s`;
+  return `${mins}m ${pad(secs)}s`;
+}
+
 export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfilePageProps) {
-  const { customers, activeCustomer } = useCustomerContext();
+  const {
+    customers,
+    activeCustomer,
+    updateCustomer,
+    toggleNetStatus,
+    grantExtraDays,
+    changePackage,
+    deleteCustomer,
+    processPayment,
+  } = useCustomerContext();
+
+  const { canEdit, canDelete, isReadOnly } = usePermission("customer-profile");
 
   const realCustomer = useMemo(() => {
     if (customerId) {
@@ -167,7 +260,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
     return customers[0] || null;
   }, [customerId, activeCustomer, customers]);
 
-  const [customer, setCustomer] = useState(() => {
+  const [customer, setCustomer] = useState<CustomerProfileData>(() => {
     const c = realCustomer || customers[0];
     if (!c) return initialCustomer;
     return {
@@ -204,7 +297,8 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       txPower: "2.1 dBm",
       distance: "1.24 km",
       currentStatus: (c.netStatus === "online" || c.status === "active" ? "online" : "offline") as any,
-      uptime: c.sessionUptime || "6d 14h 32m",
+      uptimeSeconds: parseUptimeToSeconds(c.sessionUptime),
+      uptime: formatTickingUptime(parseUptimeToSeconds(c.sessionUptime)),
       package: c.profile || "20 Mbps Fiber Standard",
       packagePrice: c.price || c.monthlyBill || 1200,
       billingDate: 1,
@@ -219,8 +313,25 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
     };
   });
 
+  // Real-time ticking session uptime loop for customer profile
+  useEffect(() => {
+    if (customer.currentStatus !== "online") return;
+    const timer = setInterval(() => {
+      setCustomer(prev => {
+        const nextSec = (prev.uptimeSeconds || parseUptimeToSeconds(prev.uptime)) + 1;
+        return {
+          ...prev,
+          uptimeSeconds: nextSec,
+          uptime: formatTickingUptime(nextSec),
+        };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [customer.currentStatus]);
+
   useEffect(() => {
     if (realCustomer) {
+      const upSec = parseUptimeToSeconds(realCustomer.sessionUptime);
       setCustomer({
         id: realCustomer.clientCode || realCustomer.id,
         name: realCustomer.name,
@@ -255,7 +366,8 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         txPower: "2.1 dBm",
         distance: "1.24 km",
         currentStatus: (realCustomer.netStatus === "online" || realCustomer.status === "active" ? "online" : "offline") as any,
-        uptime: realCustomer.sessionUptime || "6d 14h 32m",
+        uptimeSeconds: upSec,
+        uptime: formatTickingUptime(upSec),
         package: realCustomer.profile || "20 Mbps Fiber Standard",
         packagePrice: realCustomer.price || realCustomer.monthlyBill || 1200,
         billingDate: 1,
@@ -271,6 +383,34 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
     }
   }, [realCustomer]);
 
+  const displayInvoices = useMemo(() => {
+    if (realCustomer?.invoices && realCustomer.invoices.length > 0) {
+      return realCustomer.invoices.map(inv => ({
+        id: inv.id,
+        period: inv.month,
+        amount: inv.amount,
+        status: inv.status,
+        issued: inv.dueDate,
+        paid: inv.paidDate || "—",
+      }));
+    }
+    return invoices;
+  }, [realCustomer]);
+
+  const displayPayments = useMemo(() => {
+    if (realCustomer?.paymentHistory && realCustomer.paymentHistory.length > 0) {
+      return realCustomer.paymentHistory.map(p => ({
+        date: p.date,
+        amount: p.amount,
+        method: p.method,
+        txn: p.trxId,
+        by: p.collectedBy,
+        status: p.status,
+      }));
+    }
+    return paymentHistory;
+  }, [realCustomer]);
+
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [toast, setToast] = useState("");
   const [showActionModal, setShowActionModal] = useState<string | null>(null);
@@ -281,16 +421,119 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
   const [showGraceModal, setShowGraceModal] = useState(false);
   const [gracePeriod, setGracePeriod] = useState({ days: "3", reason: "" });
 
+  // ── Edit Subscriber ID & Profile Modal State ──
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    id: "",
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    userType: "normal" as "normal" | "free" | "unlimited",
+    zone: "",
+    subZone: "",
+    pppoeUsername: "",
+    pppoePassword: "",
+    passcode: "",
+  });
+
+  const openEditModal = () => {
+    setEditForm({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email,
+      address: customer.address,
+      userType: realCustomer?.userType || "normal",
+      zone: customer.zone,
+      subZone: customer.subZone,
+      pppoeUsername: customer.pppoeUsername,
+      pppoePassword: customer.pppoePassword,
+      passcode: (realCustomer?.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${customer.id.replace(/\D/g, "")}`,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly) {
+      showToast("Access Restricted: Your role only has Read (View Only) permission for Customer Profile.");
+      return;
+    }
+    const oldId = realCustomer ? realCustomer.id : customer.id;
+    const newId = (editForm.id || oldId).trim().toUpperCase();
+    if (!newId) {
+      showToast("Subscriber ID cannot be empty.");
+      return;
+    }
+
+    const updates: Partial<Customer> = {
+      id: newId,
+      clientCode: newId,
+      name: editForm.name.trim(),
+      phone: editForm.phone.trim(),
+      email: editForm.email.trim(),
+      address: editForm.address.trim(),
+      userType: editForm.userType,
+      zone: editForm.zone.trim(),
+      subzone: editForm.subZone.trim(),
+      pppUser: editForm.pppoeUsername.trim(),
+      pppPass: editForm.pppoePassword.trim(),
+      passcode: editForm.passcode.trim(),
+    };
+
+    updateCustomer(oldId, updates);
+    setCustomer(prev => ({
+      ...prev,
+      id: newId,
+      name: editForm.name,
+      phone: editForm.phone,
+      email: editForm.email,
+      address: editForm.address,
+      zone: editForm.zone,
+      subZone: editForm.subZone,
+      pppoeUsername: editForm.pppoeUsername,
+      pppoePassword: editForm.pppoePassword,
+    }));
+    setShowEditModal(false);
+    showToast(`✓ Subscriber ID & profile updated successfully to ${newId}!`);
+  };
+
   // ── Package Change Modal State ──
   const [showChangePackageModal, setShowChangePackageModal] = useState(false);
-  const [profileSelectedPkg, setProfileSelectedPkg] = useState(AVAILABLE_PACKAGES[3]);
+  const [profilePackages, setProfilePackages] = useState<IspPackage[]>(() => {
+    const pkgs = billingStore.getPackages();
+    return pkgs.length > 0 ? pkgs : FALLBACK_PACKAGES;
+  });
+
+  useEffect(() => {
+    return billingStore.subscribe(pkgs => {
+      if (pkgs && pkgs.length > 0) setProfilePackages(pkgs);
+    });
+  }, []);
+
+  const [profileSelectedPkg, setProfileSelectedPkg] = useState<IspPackage>(() => {
+    const pkgs = billingStore.getPackages();
+    return pkgs.length > 0 ? pkgs[0] : FALLBACK_PACKAGES[0];
+  });
   const [profileCustomPrice, setProfileCustomPrice] = useState("1200");
   const [profileApplyLive, setProfileApplyLive] = useState(true);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleApplyProfilePackageChange = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role only has Read (View Only) permission for Customer Profile.");
+      return;
+    }
     const finalPrice = Number(profileCustomPrice) || profileSelectedPkg.price;
+    const targetId = realCustomer ? realCustomer.id : customer.id;
+    changePackage(
+      targetId,
+      profileSelectedPkg.name,
+      `${profileSelectedPkg.down}/${profileSelectedPkg.up}`,
+      finalPrice
+    );
     setCustomer(prev => ({
       ...prev,
       package: profileSelectedPkg.name,
@@ -332,11 +575,63 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
   ];
 
   const handleAction = (id: string) => {
+    if ((isReadOnly || !canEdit) && (id === "suspend" || id === "unsuspend" || id === "enable" || id === "disable" || id === "add-payment" || id === "delete" || id === "schedule-package" || id === "grace-period" || id === "change-package" || id === "add-discount" || id === "add-penalty" || id === "change-ip" || id === "mac-bind" || id === "send-sms")) {
+      showToast("Access Restricted: Your role only has Read (View Only) permission for Customer Profile.");
+      return;
+    }
+    if (id === "delete" && !canDelete) {
+      showToast("Access Restricted: Full delete permission is required to delete subscribers.");
+      return;
+    }
+    const targetId = realCustomer ? realCustomer.id : customer.id;
     if (id === "change-package") {
-      const match = AVAILABLE_PACKAGES.find(p => p.name === customer.package) || AVAILABLE_PACKAGES[3];
+      const match = profilePackages.find(p => p.name === customer.package || customer.package.includes(p.name)) || profilePackages[0];
       setProfileSelectedPkg(match);
       setProfileCustomPrice(String(customer.packagePrice || match.price));
       setShowChangePackageModal(true);
+      setShowActionModal(null);
+      return;
+    }
+    if (id === "enable") {
+      toggleNetStatus(targetId, true);
+      setCustomer(prev => ({ ...prev, currentStatus: "online", status: "active" }));
+      showToast(`✓ Internet enabled and line active for ${customer.name}`);
+      setShowActionModal(null);
+      return;
+    }
+    if (id === "disable") {
+      toggleNetStatus(targetId, false);
+      setCustomer(prev => ({ ...prev, currentStatus: "offline", status: "suspended" }));
+      showToast(`✓ Internet disabled for ${customer.name}`);
+      setShowActionModal(null);
+      return;
+    }
+    if (id === "suspend") {
+      updateCustomer(targetId, { status: "suspended", netStatus: "offline" });
+      setCustomer(prev => ({ ...prev, currentStatus: "offline", status: "suspended" }));
+      showToast(`✓ Account suspended for ${customer.name}`);
+      setShowActionModal(null);
+      return;
+    }
+    if (id === "unsuspend") {
+      updateCustomer(targetId, { status: "active", netStatus: "online" });
+      setCustomer(prev => ({ ...prev, currentStatus: "online", status: "active" }));
+      showToast(`✓ Account restored & active for ${customer.name}`);
+      setShowActionModal(null);
+      return;
+    }
+    if (id === "add-payment") {
+      const res = processPayment(targetId, customer.packagePrice || 1200, "Cash");
+      showToast(`✓ Payment of ৳${(customer.packagePrice || 1200).toLocaleString()} recorded! (Trx: ${res.trxId})`);
+      setShowActionModal(null);
+      return;
+    }
+    if (id === "delete") {
+      if (confirm(`Are you sure you want to delete subscriber ${customer.name} (${customer.id})? This will permanently remove their records.`)) {
+        deleteCustomer(targetId);
+        showToast(`✓ Subscriber ${customer.name} deleted.`);
+        onNavigate?.("customers");
+      }
       setShowActionModal(null);
       return;
     }
@@ -365,7 +660,17 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
           <ChevronLeft size={16} /> All Customers
         </button>
         <span style={{ color: "var(--border)", fontSize: 16 }}>/</span>
-        <span style={{ fontSize: 13, color: "var(--foreground)", fontWeight: 500 }}>{customer.id}</span>
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 13, color: "var(--foreground)", fontWeight: 600 }} className="font-mono">{customer.id}</span>
+          {canEdit && !isReadOnly && (
+            <button
+              onClick={openEditModal}
+              title="Edit Subscriber ID & Profile"
+              className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer">
+              <Edit3 size={12} /> Edit ID / Profile
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Customer Header Card ───────────────────────────────────────────── */}
@@ -387,6 +692,19 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                 <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, color: "var(--foreground)" }}>
                   {customer.name}
                 </h1>
+                {realCustomer?.userType === "free" ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs">
+                    <ShieldCheck size={14} /> FREE USER (NEVER CUTOFF)
+                  </span>
+                ) : realCustomer?.userType === "unlimited" ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-xs">
+                    <Sparkles size={14} /> VIP UNLIMITED (PERMANENT)
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
+                    <User size={13} /> Normal Subscriber
+                  </span>
+                )}
                 <span
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
                   style={{ background: sc2.bg, color: sc2.text }}
@@ -414,26 +732,45 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
           {/* Quick stats */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="text-center px-4 py-2 rounded-xl border" style={{ borderColor: "var(--border)", background: "var(--muted)", minWidth: 80 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-display)" }}>৳1,200</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+                ৳{(customer.packagePrice ?? 1200).toLocaleString()}
+              </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 500 }}>MONTHLY BILL</div>
             </div>
             <div className="text-center px-4 py-2 rounded-xl border" style={{ borderColor: "var(--border)", background: "var(--muted)", minWidth: 80 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#16A34A", fontFamily: "var(--font-display)" }}>৳0</div>
-              <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 500 }}>OUTSTANDING</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: (customer.currentBalance ?? 0) > 0 ? "#DC2626" : "#16A34A", fontFamily: "var(--font-display)" }}>
+                {(customer.currentBalance ?? 0) > 0 ? `৳${(customer.currentBalance ?? 0).toLocaleString()}` : "৳0"}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 500 }}>
+                {(customer.currentBalance ?? 0) > 0 ? "PAYMENT DUE" : "PAID CLEAR"}
+              </div>
             </div>
             <div className="text-center px-4 py-2 rounded-xl border" style={{ borderColor: "var(--border)", background: "var(--muted)", minWidth: 80 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#2563EB", fontFamily: "var(--font-display)" }}>20M</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#2563EB", fontFamily: "var(--font-display)" }}>
+                {(customer.package || "20 Mbps").split(" ")[0]}
+              </div>
               <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 500 }}>PACKAGE</div>
             </div>
             <div className="text-center px-4 py-2 rounded-xl border" style={{ borderColor: "var(--border)", background: "var(--muted)", minWidth: 80 }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#16A34A", fontFamily: "var(--font-display)" }}>36</div>
-              <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 500 }}>MONTHS</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#16A34A", fontFamily: "var(--font-display)" }}>
+                {customer.currentStatus === "online" ? "Active" : "Offline"}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted-foreground)", fontWeight: 500 }}>NETWORK</div>
             </div>
           </div>
         </div>
 
         {/* Quick Actions Row */}
         <div className="flex flex-wrap gap-2 mt-5 pt-5" style={{ borderTop: "1px solid var(--border)" }}>
+          <button
+            onClick={openEditModal}
+            disabled={isReadOnly || !canEdit}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold border transition-all ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed border-border bg-muted text-muted-foreground" : "cursor-pointer text-white"
+            }`}
+            style={isReadOnly || !canEdit ? {} : { borderColor: "var(--primary)", background: "var(--primary)" }}>
+            <Edit3 size={13} /> Edit ID & Profile
+          </button>
           {[
             { id: "enable", label: "Enable Internet", icon: Wifi, color: "#16A34A" },
             { id: "disable", label: "Disable", icon: WifiOff, color: "#DC2626" },
@@ -448,7 +785,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <button
                 key={a.id}
                 onClick={() => handleAction(a.id)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer"
                 style={{ borderColor: "var(--border)", color: a.color, background: "var(--muted)" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = a.color; e.currentTarget.style.background = `${a.color}15`; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--muted)"; }}
@@ -459,7 +796,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
           })}
           <button
             onClick={() => setShowActionModal("all")}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer"
             style={{ borderColor: "var(--border)", color: "var(--muted-foreground)", background: "var(--muted)" }}
           >
             <MoreHorizontal size={13} /> More Actions
@@ -481,6 +818,9 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
                 <span>User ID: <strong className="font-mono text-foreground">{customer.id}</strong></span>
+                <button onClick={openEditModal} className="text-[10px] text-primary hover:underline font-bold flex items-center gap-0.5">
+                  <Edit3 size={10} /> Edit ID
+                </button>
                 <span>•</span>
                 <span>Default Passcode: <strong className="font-mono text-foreground">{(customer as any).passcode || `mbn@${customer.id.replace(/\D/g, '') || "0001"}`}</strong></span>
                 <span>•</span>
@@ -495,7 +835,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                 navigator.clipboard.writeText(`MAA BEST NETWORK Subscriber Login:\nPortal: portal.maabestnetwork.com\nUser ID: ${customer.id}\nPasscode: ${(customer as any).passcode || `mbn@${customer.id.replace(/\D/g, '') || "0001"}`}\nPackage: ${(customer as any).package || "20 Mbps"}`);
                 showToast("Copied Subscriber Login Bundle to clipboard!");
               }}
-              className="px-3 py-1.5 rounded-lg border text-xs font-semibold bg-card hover:bg-muted text-foreground flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg border text-xs font-semibold bg-card hover:bg-muted text-foreground flex items-center gap-1.5 cursor-pointer"
               style={{ borderColor: "var(--border)" }}>
               <Copy size={13} /> Copy Login Bundle
             </button>
@@ -503,7 +843,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               onClick={() => {
                 onNavigate?.("customer-portal");
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-primary hover:opacity-95 shadow-sm flex items-center gap-1.5">
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-primary hover:opacity-95 shadow-sm flex items-center gap-1.5 cursor-pointer">
               <ExternalLink size={13} /> Open User Panel
             </button>
           </div>
@@ -576,7 +916,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                 </h3>
                 <button
                   onClick={() => {
-                    const match = AVAILABLE_PACKAGES.find(p => p.name === customer.package) || AVAILABLE_PACKAGES[3];
+                    const match = profilePackages.find(p => p.name === customer.package || customer.package.includes(p.name)) || profilePackages[0];
                     setProfileSelectedPkg(match);
                     setProfileCustomPrice(String(customer.packagePrice || match.price));
                     setShowChangePackageModal(true);
@@ -727,7 +1067,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                 </h3>
                 <button
                   onClick={() => {
-                    const match = AVAILABLE_PACKAGES.find(p => p.name === customer.package) || AVAILABLE_PACKAGES[3];
+                    const match = profilePackages.find(p => p.name === customer.package || customer.package.includes(p.name)) || profilePackages[0];
                     setProfileSelectedPkg(match);
                     setProfileCustomPrice(String(customer.packagePrice || match.price));
                     setShowChangePackageModal(true);
@@ -753,7 +1093,9 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                 ))}
                 <div className="pt-3 mt-1 flex items-center justify-between font-bold" style={{ borderTop: "1px solid var(--border)" }}>
                   <span style={{ fontSize: 14, color: "var(--foreground)" }}>Net Total</span>
-                  <span style={{ fontSize: 18, color: "#16A34A", fontFamily: "var(--font-display)" }}>৳1,100</span>
+                  <span style={{ fontSize: 18, color: "#16A34A", fontFamily: "var(--font-display)" }}>
+                    ৳{(customer.packagePrice - customer.discount).toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
@@ -763,7 +1105,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                 <FileText size={15} style={{ color: "var(--primary)" }} /> Invoice History
               </h3>
               <div className="space-y-2">
-                {invoices.map(inv => {
+                {displayInvoices.map(inv => {
                   const sc = STATUS_COLORS[inv.status] || STATUS_COLORS.active;
                   return (
                     <div key={inv.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: "var(--muted)" }}>
@@ -792,9 +1134,9 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <CreditCard size={15} style={{ color: "var(--primary)" }} /> Payment Ledger
             </h3>
             <button
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer hover:opacity-95"
               style={{ background: "var(--primary)" }}
-              onClick={() => showToast("Manual payment recorded!")}
+              onClick={() => handleAction("add-payment")}
             >
               <Plus size={13} /> Add Payment
             </button>
@@ -811,7 +1153,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               </tr>
             </thead>
             <tbody>
-              {paymentHistory.map((p, i) => {
+              {displayPayments.map((p, i) => {
                 const sc = STATUS_COLORS[p.status] || STATUS_COLORS.active;
                 return (
                   <tr key={i} style={{ borderTop: "1px solid var(--border)", fontSize: 13 }}>
@@ -1138,8 +1480,14 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <div className="flex gap-3">
                 <button onClick={() => setShowGraceModal(false)} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border" style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>Cancel</button>
                 <button
-                  onClick={() => { setShowGraceModal(false); showToast(`Grace period of ${gracePeriod.days} days granted to ${customer.name}`); }}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
+                  onClick={() => {
+                    const days = parseInt(gracePeriod.days) || 3;
+                    const targetId = realCustomer ? realCustomer.id : customer.id;
+                    grantExtraDays(targetId, days);
+                    setShowGraceModal(false);
+                    showToast(`✓ Grace period of ${days} days granted to ${customer.name}!`);
+                  }}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 cursor-pointer hover:opacity-95"
                   style={{ background: "#0891B2" }}
                 >
                   <Gift size={14} /> Grant Grace
@@ -1189,7 +1537,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <div>
                 <label className="block text-xs font-bold mb-2 uppercase tracking-wider text-muted-foreground">Select New Package Plan</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {AVAILABLE_PACKAGES.map(pkg => {
+                  {profilePackages.map(pkg => {
                     const isSelected = profileSelectedPkg.id === pkg.id;
                     return (
                       <button
@@ -1253,11 +1601,219 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <button
                 type="button"
                 onClick={handleApplyProfilePackageChange}
-                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white bg-primary hover:opacity-95 shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
+                disabled={isReadOnly || !canEdit}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5 ${
+                  isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white bg-primary hover:opacity-95 cursor-pointer"
+                }`}>
                 <Check size={14} />
-                <span>Confirm & Apply Plan</span>
+                <span>{isReadOnly || !canEdit ? "Read-Only: Locked" : "Confirm & Apply Plan"}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Subscriber ID & Profile Modal ──────────────────────────── */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn" onClick={() => setShowEditModal(false)}>
+          <div
+            className="w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border flex flex-col max-h-[90vh] bg-card"
+            style={{ borderColor: "var(--border)" }}
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                  <Edit3 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-foreground">Edit Subscriber ID & Identity</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Modifying records for <strong className="text-foreground">{customer.name}</strong> ({customer.id})
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Primary Subscriber ID */}
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Tag size={13} className="text-primary" />
+                    <span>Subscriber ID / Client Code <span className="text-rose-500">*</span></span>
+                  </label>
+                  <span className="text-[10px] font-mono text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">
+                    Primary Unique Key
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={editForm.id}
+                  onChange={e => {
+                    const val = e.target.value.toUpperCase().replace(/\s/g, "");
+                    const numMatch = val.replace(/\D/g, "");
+                    setEditForm(p => ({
+                      ...p,
+                      id: val,
+                      passcode: numMatch ? `mbn@${numMatch}` : p.passcode
+                    }));
+                  }}
+                  placeholder="e.g. MBN0001 or CUST-1002"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-card border border-border text-foreground font-mono font-bold outline-none focus:border-primary transition-all tracking-wider uppercase"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Admin Note: Editing Subscriber ID safely migrates Firestore cloud records, payment logs, and customer self-service portal passcodes.
+                </p>
+              </div>
+
+              {/* Name & Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-foreground uppercase mb-1">
+                    Subscriber Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.name}
+                    onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-foreground uppercase mb-1">
+                    Mobile Phone <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.phone}
+                    onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary font-mono font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Email & Address */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-foreground uppercase mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-foreground uppercase mb-1">Physical Address</label>
+                  <input
+                    type="text"
+                    value={editForm.address}
+                    onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Zone & SubZone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-foreground uppercase mb-1">Zone / Area</label>
+                  <input
+                    type="text"
+                    value={editForm.zone}
+                    onChange={e => setEditForm(p => ({ ...p, zone: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-foreground uppercase mb-1">Sub-Zone / Pop</label>
+                  <input
+                    type="text"
+                    value={editForm.subZone}
+                    onChange={e => setEditForm(p => ({ ...p, subZone: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* PPPoE Credentials */}
+              <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-2 text-xs">
+                <div className="text-[11px] font-bold text-foreground uppercase tracking-wider">Network & PPPoE Credentials</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">PPPoE Username</label>
+                    <input
+                      type="text"
+                      value={editForm.pppoeUsername}
+                      onChange={e => setEditForm(p => ({ ...p, pppoeUsername: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">PPPoE Password</label>
+                    <input
+                      type="text"
+                      value={editForm.pppoePassword}
+                      onChange={e => setEditForm(p => ({ ...p, pppoePassword: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Portal Passcode */}
+              <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Lock size={12} className="text-amber-500" />
+                    <span>Customer Portal Passcode</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const num = (editForm.id || customer.id).replace(/\D/g, "");
+                      setEditForm(p => ({ ...p, passcode: `mbn@${num || "1234"}` }));
+                    }}
+                    className="text-[10px] text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer">
+                    Reset (mbn@...)
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={editForm.passcode}
+                  onChange={e => setEditForm(p => ({ ...p, passcode: e.target.value }))}
+                  placeholder="e.g. mbn@0001"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground outline-none focus:border-amber-500 font-mono font-bold"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs border border-border bg-card text-foreground hover:bg-muted cursor-pointer">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isReadOnly || !canEdit}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5 ${
+                    isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white bg-primary hover:opacity-95 cursor-pointer"
+                  }`}>
+                  <Check size={14} />
+                  <span>{isReadOnly || !canEdit ? "Read-Only: Locked" : "Save ID & Profile"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

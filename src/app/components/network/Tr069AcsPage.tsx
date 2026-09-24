@@ -1,3 +1,4 @@
+import { useNetxLiveData } from "../../services/netxApiService";
 import { useState, useMemo } from "react";
 import {
   Wifi, Radio, RefreshCw, Search, CheckCircle2, AlertTriangle,
@@ -6,6 +7,7 @@ import {
 } from "lucide-react";
 import { useCustomerContext } from "../../context/CustomerContext";
 import { AUTHENTIC_NETX_ONUS } from "../../data/netxOnuData";
+import { usePermission } from "../../context/AuthContext";
 
 interface Tr069AcsPageProps {
   onNavigate?: (page: string) => void;
@@ -35,6 +37,8 @@ interface CpeDevice {
 }
 
 export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("tr069");
+  const { isLoading: isNetxLoading } = useNetxLiveData(30000);
   const { customers } = useCustomerContext();
 
   const cpeDevices: CpeDevice[] = useMemo(() => {
@@ -113,6 +117,10 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
 
   const handleSaveWifi = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to TR-069.");
+      return;
+    }
     if (!selectedCpe) return;
 
     const updated = cpes.map(c => c.id === selectedCpe.id ? {
@@ -130,10 +138,18 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
   };
 
   const handleRemoteReboot = (cpe: CpeDevice) => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to TR-069.");
+      return;
+    }
     showToast(`✓ TR-069 RPC Reboot command sent to ${cpe.manufacturer} router (${cpe.serial}). Device restarting...`);
   };
 
   const handleChannelOptimize = (cpe: CpeDevice) => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to TR-069.");
+      return;
+    }
     showToast(`✓ Auto-switched ${cpe.customerName}'s Wi-Fi to optimal low-interference channel (Channel 6 for 2.4G, Channel 149 for 5G)!`);
   };
 
@@ -147,6 +163,15 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
       c.ipAddress.includes(q);
   });
 
+  if (isNetxLoading) {
+    return (
+      <div className="p-6 h-screen flex flex-col items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-muted-foreground font-medium">Synchronizing TR-069 ACS Server...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
@@ -158,10 +183,10 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg md:text-xl font-black text-foreground">
-                TR-069 ACS Wi-Fi & CPE Remote Management
+                User WiFi & CPE Router Management
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                ACS Server: acs.maabestnetwork.com:7547 (CWMP Active)
+                TR-069 ACS (CWMP Active)
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -279,19 +304,28 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
                   <td className="p-3.5 text-right space-x-1.5">
                     <button
                       onClick={() => handleRemoteReboot(cpe)}
-                      className="p-1.5 rounded-xl border border-border hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+                      disabled={isReadOnly || !canEdit}
+                      className={`p-1.5 rounded-xl border border-border ${
+                        isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+                      }`}
                       title="Remote Reboot Router">
                       <Power size={13} />
                     </button>
                     <button
                       onClick={() => handleChannelOptimize(cpe)}
-                      className="p-1.5 rounded-xl border border-border hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+                      disabled={isReadOnly || !canEdit}
+                      className={`p-1.5 rounded-xl border border-border ${
+                        isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+                      }`}
                       title="Optimize Radio Channels">
                       <Sparkles size={13} className="text-amber-500" />
                     </button>
                     <button
                       onClick={() => handleOpenWifiModal(cpe)}
-                      className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-all cursor-pointer">
+                      disabled={isReadOnly || !canEdit}
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                        isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary/10 hover:bg-primary/20 text-primary cursor-pointer"
+                      }`}>
                       Change Wi-Fi
                     </button>
                   </td>
@@ -388,8 +422,11 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-2xl bg-primary hover:opacity-95 text-white font-bold cursor-pointer">
-                  Push to Router
+                  disabled={isReadOnly || !canEdit}
+                  className={`flex-1 py-2.5 rounded-2xl font-bold ${
+                    isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary hover:opacity-95 text-white cursor-pointer"
+                  }`}>
+                  {isReadOnly || !canEdit ? "Read-Only: Locked" : "Push to Router"}
                 </button>
               </div>
             </form>

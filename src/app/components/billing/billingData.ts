@@ -49,6 +49,8 @@ export interface IspPackage {
   burstLimit: string;
   fupLimit: string;
   status: "active" | "archived";
+  desc?: string;
+  description?: string;
 }
 
 export interface DiscountRule {
@@ -202,10 +204,10 @@ function loadStorage<T>(key: string, fallback: T): T {
   try {
     if (typeof window !== "undefined" && window.localStorage) {
       const saved = localStorage.getItem(key);
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(fallback)) {
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+          if (Array.isArray(parsed)) return parsed as unknown as T;
         } else if (parsed && typeof parsed === "object") {
           return { ...fallback, ...parsed } as unknown as T;
         }
@@ -227,6 +229,17 @@ function saveStorage<T>(key: string, data: T): void {
   }
 }
 
+import {
+  subscribeToInvoices,
+  saveInvoiceToFirestore,
+  saveInvoicesBatchToFirestore,
+  subscribeToPayments,
+  savePaymentToFirestore,
+  subscribeToPackages,
+  savePackageToFirestore,
+  deletePackageFromFirestore,
+} from "../../../lib/firestoreService";
+
 let sharedInvoices = loadStorage(STORAGE_KEYS.INVOICES, [...INITIAL_INVOICES]);
 let sharedPayments = loadStorage(STORAGE_KEYS.PAYMENTS, [...INITIAL_PAYMENTS]);
 let sharedPackages = loadStorage(STORAGE_KEYS.PACKAGES, [...INITIAL_PACKAGES]);
@@ -234,9 +247,66 @@ let sharedDiscounts = loadStorage(STORAGE_KEYS.DISCOUNTS, [...INITIAL_DISCOUNT_R
 let sharedAdjustments = loadStorage(STORAGE_KEYS.ADJUSTMENTS, [...INITIAL_ADJUSTMENTS]);
 let sharedSettings = loadStorage(STORAGE_KEYS.SETTINGS, { ...INITIAL_BILLING_SETTINGS });
 
-const listeners = new Set<() => void>();
+const listeners = new Set<(pkgs?: IspPackage[]) => void>();
 function notify() {
-  listeners.forEach(cb => cb());
+  listeners.forEach(cb => cb(sharedPackages));
+}
+
+let isBillingSyncInitialized = false;
+let hasPackagesSynced = false;
+export function initBillingFirestoreSync() {
+  if (isBillingSyncInitialized || typeof window === "undefined") return;
+  isBillingSyncInitialized = true;
+
+  subscribeToInvoices(cloudInvoices => {
+    if (cloudInvoices && cloudInvoices.length > 0) {
+      sharedInvoices = cloudInvoices as Invoice[];
+      saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+      notify();
+    } else if (sharedInvoices && sharedInvoices.length > 0) {
+      saveInvoicesBatchToFirestore(sharedInvoices);
+    }
+  });
+
+  subscribeToPayments(cloudPayments => {
+    if (cloudPayments && cloudPayments.length > 0) {
+      sharedPayments = cloudPayments as Payment[];
+      saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
+      notify();
+    } else if (sharedPayments && sharedPayments.length > 0) {
+      sharedPayments.forEach(p => savePaymentToFirestore(p));
+    }
+  });
+
+  subscribeToPackages(cloudPackages => {
+    if (cloudPackages && cloudPackages.length > 0) {
+      sharedPackages = cloudPackages as IspPackage[];
+      saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+      notify();
+    } else if (!hasPackagesSynced && (!cloudPackages || cloudPackages.length === 0)) {
+      const wasInit = localStorage.getItem("isp_packages_initialized");
+      if (!wasInit && INITIAL_PACKAGES.length > 0) {
+        localStorage.setItem("isp_packages_initialized", "true");
+        sharedPackages = [...INITIAL_PACKAGES];
+        saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+        sharedPackages.forEach(p => savePackageToFirestore(p));
+        notify();
+      } else {
+        sharedPackages = [];
+        saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+        notify();
+      }
+    } else {
+      sharedPackages = (cloudPackages || []) as IspPackage[];
+      saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+      notify();
+    }
+    hasPackagesSynced = true;
+  });
+}
+
+if (typeof window !== "undefined") {
+  setTimeout(() => initBillingFirestoreSync(), 50);
 }
 
 export const billingStore = {
@@ -244,11 +314,13 @@ export const billingStore = {
   setInvoices: (invs: Invoice[]) => {
     sharedInvoices = invs;
     saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+    saveInvoicesBatchToFirestore(invs);
     notify();
   },
   addInvoice: (inv: Invoice) => {
     sharedInvoices = [inv, ...sharedInvoices];
     saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+    saveInvoiceToFirestore(inv);
     notify();
   },
 
@@ -256,6 +328,7 @@ export const billingStore = {
   setPayments: (pays: Payment[]) => {
     sharedPayments = pays;
     saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
+    pays.forEach(p => savePaymentToFirestore(p));
     notify();
   },
   addPayment: (pay: Payment) => {
@@ -264,6 +337,9 @@ export const billingStore = {
     sharedInvoices = sharedInvoices.map(i => i.id === pay.invoice ? { ...i, status: "paid", method: pay.method, paidAt: pay.date, trxId: pay.txn } : i);
     saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
     saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+    savePaymentToFirestore(pay);
+    const matched = sharedInvoices.find(i => i.id === pay.invoice);
+    if (matched) saveInvoiceToFirestore(matched);
     notify();
   },
 
@@ -271,16 +347,25 @@ export const billingStore = {
   setPackages: (pkgs: IspPackage[]) => {
     sharedPackages = pkgs;
     saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    pkgs.forEach(p => savePackageToFirestore(p));
     notify();
   },
   addPackage: (pkg: IspPackage) => {
     sharedPackages = [...sharedPackages, pkg];
     saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    savePackageToFirestore(pkg);
     notify();
   },
   updatePackage: (pkg: IspPackage) => {
     sharedPackages = sharedPackages.map(p => p.id === pkg.id ? pkg : p);
     saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    savePackageToFirestore(pkg);
+    notify();
+  },
+  deletePackage: (id: string) => {
+    sharedPackages = sharedPackages.filter(p => p.id !== id);
+    saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+    deletePackageFromFirestore(id);
     notify();
   },
 
@@ -315,10 +400,11 @@ export const billingStore = {
     notify();
   },
 
-  subscribe: (cb: () => void) => {
+  subscribe: (cb: (pkgs?: IspPackage[]) => void) => {
     listeners.add(cb);
     return () => {
       listeners.delete(cb);
     };
   }
 };
+

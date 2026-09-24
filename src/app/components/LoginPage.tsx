@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Eye, EyeOff, Network, Shield, Wifi, Zap, ArrowRight, CheckCircle2,
-  Lock, Sparkles, Server, Terminal, Activity, ArrowUpRight
+  Lock, Sparkles, Server, Terminal, Activity, ArrowUpRight, Mail, UserCheck, KeyRound
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { LanguageToggle } from "./ui/LanguageToggle";
+import { useAuth } from "../context/AuthContext";
 
 // ── Animated network canvas ──────────────────────────────────────────────────
 interface Node {
@@ -203,9 +204,11 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin, onPortalSwitch }: LoginPageProps) {
+  const { login, employees } = useAuth();
+
   // Admin Form State
-  const [adminUser, setAdminUser] = useState("admin");
-  const [adminPass, setAdminPass] = useState("admin123");
+  const [adminUser, setAdminUser] = useState("");
+  const [adminPass, setAdminPass] = useState("");
   const [remember, setRemember] = useState(true);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -221,14 +224,6 @@ export function LoginPage({ onLogin, onPortalSwitch }: LoginPageProps) {
     }
   }, [lockoutSeconds]);
 
-  const ALLOWED_ADMINS: Record<string, string> = {
-    "admin": "admin123",
-    "maabest": "mbn@2026",
-    "noc": "noc123",
-    "billing": "billing123",
-    "engineer": "eng123",
-  };
-
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -238,27 +233,28 @@ export function LoginPage({ onLogin, onPortalSwitch }: LoginPageProps) {
       return;
     }
 
-    const u = adminUser.trim().toLowerCase();
+    const u = adminUser.trim();
     const p = adminPass.trim();
 
     if (!u || !p) {
-      setError("Please enter your admin username and password.");
+      setError("Please enter your staff email/username and password.");
       return;
     }
 
     setLoading(true);
-    await new Promise(r => setTimeout(r, 650));
+    await new Promise(r => setTimeout(r, 500));
+
+    const res = login(u, p);
     setLoading(false);
 
-    const validPass = ALLOWED_ADMINS[u];
-    if (!validPass || (validPass !== p && p !== "admin123")) {
+    if (!res.success) {
       const newFails = failedAttempts + 1;
       setFailedAttempts(newFails);
       if (newFails >= 5) {
         setLockoutSeconds(30);
         setError("Security Lockout: 5 failed attempts detected. Login blocked for 30 seconds.");
       } else {
-        setError(`Access Denied: Invalid administrator credentials (${5 - newFails} attempts remaining).`);
+        setError(res.error || `Access Denied: Invalid credentials (${5 - newFails} attempts remaining).`);
       }
       return;
     }
@@ -393,7 +389,7 @@ export function LoginPage({ onLogin, onPortalSwitch }: LoginPageProps) {
           </div>
 
           {/* Heading */}
-          <div style={{ marginBottom: 22 }}>
+          <div style={{ marginBottom: 18 }}>
             <h2
               style={{
                 fontFamily: "var(--font-display)",
@@ -404,29 +400,29 @@ export function LoginPage({ onLogin, onPortalSwitch }: LoginPageProps) {
                 letterSpacing: "-0.02em",
               }}
             >
-              MBN ADMIN LOGIN
+              MBN STAFF & ADMIN LOGIN
             </h2>
             <p style={{ fontSize: 13, color: "#8B7070" }}>
-              Enter your administrator credentials to access the MAA BEST NETWORK management console.
+              Sign in using your admin-assigned staff email and password.
             </p>
           </div>
 
-          {/* Admin Form */}
+          {/* Admin / Staff Form */}
           <form onSubmit={handleAdminLogin}>
             <FloatingInput
-              label="Admin Username"
+              label="Staff Email or Username"
               value={adminUser}
               onChange={setAdminUser}
-              icon={Shield}
-              placeholder="admin"
+              icon={Mail}
+              placeholder="e.g. staff@maabestnetwork.com or admin"
             />
             <FloatingInput
-              label="Admin Password"
+              label="Password"
               type={showPass ? "text" : "password"}
               value={adminPass}
               onChange={setAdminPass}
               icon={Lock}
-              placeholder="admin123"
+              placeholder="••••••••"
               suffix={
                 <button
                   type="button"

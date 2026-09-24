@@ -58,7 +58,7 @@ function loadStorage<T>(key: string, fallback: T): T {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(fallback)) {
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed as unknown as T;
+          if (Array.isArray(parsed)) return parsed as unknown as T;
         } else if (parsed && typeof parsed === "object") {
           return { ...fallback, ...parsed } as unknown as T;
         }

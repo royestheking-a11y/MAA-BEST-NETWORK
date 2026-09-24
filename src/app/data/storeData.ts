@@ -223,7 +223,15 @@ const STORAGE_KEYS = {
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : fallback;
+    if (item) {
+      const parsed = JSON.parse(item);
+      if (Array.isArray(fallback)) {
+        if (Array.isArray(parsed)) return parsed as unknown as T;
+      } else if (parsed) {
+        return parsed;
+      }
+    }
+    return fallback;
   } catch (e) {
     return fallback;
   }

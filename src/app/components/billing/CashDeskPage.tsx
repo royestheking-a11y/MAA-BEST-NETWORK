@@ -2,10 +2,12 @@ import { useState, useMemo } from "react";
 import {
   CreditCard, Search, Printer, CheckCircle2, QrCode, Phone,
   User, DollarSign, RefreshCw, Send, Check, X, Building2,
-  Receipt, ArrowRight, ShieldCheck, Sparkles
+  Receipt, ArrowRight, ShieldCheck, Sparkles, Download, FileText,
+  MessageCircle, Share2
 } from "lucide-react";
 import { billingStore, type Payment } from "./billingData";
 import { useCustomerContext } from "../../context/CustomerContext";
+import { usePermission } from "../../context/AuthContext";
 
 interface CashDeskPageProps {
   onNavigate?: (page: string) => void;
@@ -25,6 +27,7 @@ interface QuickCustomer {
 
 export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
   const { customers, processPayment } = useCustomerContext();
+  const { canEdit, isReadOnly } = usePermission("cash-desk");
 
   const cashCustomers: QuickCustomer[] = useMemo(() => {
     return customers.map(c => ({
@@ -51,6 +54,296 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
+  const activeReceipt = useMemo(() => {
+    if (printedReceipt) return printedReceipt;
+    if (selectedCust) {
+      return {
+        receiptNo: `REC-${(selectedCust.id.replace(/\D/g, "") || "10029").slice(-6)}`,
+        date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        customer: selectedCust.name,
+        custId: selectedCust.id,
+        phone: selectedCust.phone,
+        zone: selectedCust.zone,
+        pkgName: selectedCust.pkgName,
+        subtotal: Number(collectAmount) || selectedCust.monthlyFee,
+        discount: Number(discountAmount) || 0,
+        netPaid: Math.max(0, (Number(collectAmount) || selectedCust.monthlyFee) - (Number(discountAmount) || 0)),
+        collectedBy: collectedBy || "Cashier - Kalkini Main Branch",
+        isDraft: true,
+      };
+    }
+    return {
+      receiptNo: "REC-100049",
+      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      customer: "Mst. Rohima Akter",
+      custId: "CUST-10004",
+      phone: "01937418702",
+      zone: "Madaripur Sadar",
+      pkgName: "20 Mbps Fiber Standard",
+      subtotal: 1200,
+      discount: 0,
+      netPaid: 1200,
+      collectedBy: "Cashier - Kalkini Main Branch",
+      isDraft: true,
+    };
+  }, [printedReceipt, selectedCust, collectAmount, discountAmount, collectedBy]);
+
+  const handleDownloadPng = (rc: any) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400;
+    canvas.height = 620;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Background
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Border
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+
+    // Header
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 18px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("MAA BEST NETWORK", 200, 42);
+
+    ctx.font = "10px 'Courier New', monospace";
+    ctx.fillStyle = "#64748B";
+    ctx.fillText("Somitir Hat Bazar, Kalkini, Madaripur", 200, 60);
+    ctx.fillText("Hotline: 01788-990011 · help@maabestnetwork.com", 200, 75);
+
+    ctx.font = "bold 11px 'Courier New', monospace";
+    ctx.fillStyle = "#0F172A";
+    ctx.fillText("OFFICIAL MONEY RECEIPT", 200, 95);
+
+    // Dashed line
+    ctx.strokeStyle = "#94A3B8";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(20, 108);
+    ctx.lineTo(380, 108);
+    ctx.stroke();
+
+    // Details Left & Right
+    ctx.setLineDash([]);
+    ctx.font = "11px 'Courier New', monospace";
+    ctx.textAlign = "left";
+
+    let y = 130;
+    const drawRow = (label: string, val: string, isBold = false) => {
+      ctx.fillStyle = "#475569";
+      ctx.font = "11px 'Courier New', monospace";
+      ctx.fillText(label, 25, y);
+      ctx.fillStyle = "#0F172A";
+      ctx.font = isBold ? "bold 11px 'Courier New', monospace" : "11px 'Courier New', monospace";
+      ctx.textAlign = "right";
+      ctx.fillText(val, 375, y);
+      ctx.textAlign = "left";
+      y += 20;
+    };
+
+    drawRow("Receipt No:", rc.receiptNo, true);
+    drawRow("Date & Time:", rc.date);
+    drawRow("Customer:", rc.customer, true);
+    drawRow("Customer ID:", rc.custId);
+    drawRow("Mobile:", rc.phone);
+    if (rc.zone) drawRow("Zone:", rc.zone);
+
+    // Dashed divider
+    y += 5;
+    ctx.strokeStyle = "#94A3B8";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(20, y);
+    ctx.lineTo(380, y);
+    ctx.stroke();
+    y += 20;
+
+    // Items
+    ctx.setLineDash([]);
+    drawRow("Package:", rc.pkgName);
+    drawRow("Subtotal:", `৳${rc.subtotal}`);
+    if (rc.discount > 0) {
+      drawRow("Discount:", `-৳${rc.discount}`);
+    }
+
+    // Total highlight box
+    y += 5;
+    ctx.fillStyle = "#F8FAFC";
+    ctx.fillRect(20, y, 360, 32);
+    ctx.strokeStyle = "#CBD5E1";
+    ctx.strokeRect(20, y, 360, 32);
+
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 14px 'Courier New', monospace";
+    ctx.fillText("NET PAID:", 30, y + 21);
+    ctx.textAlign = "right";
+    ctx.fillText(`৳${rc.netPaid}`, 370, y + 21);
+    ctx.textAlign = "left";
+
+    y += 50;
+    // Footer notes
+    ctx.font = "10px 'Courier New', monospace";
+    ctx.fillStyle = "#64748B";
+    ctx.textAlign = "center";
+    ctx.fillText("Payment Mode: CASH (WALK-IN COUNTER)", 200, y);
+    y += 16;
+    ctx.fillText(`Collected by: ${rc.collectedBy || "Counter Executive"}`, 200, y);
+    y += 22;
+    ctx.font = "bold 11px 'Courier New', monospace";
+    ctx.fillStyle = "#0F172A";
+    ctx.fillText("THANK YOU FOR CHOOSING MAA BEST NETWORK!", 200, y);
+
+    // Trigger download
+    const link = document.createElement("a");
+    link.download = `receipt_${rc.receiptNo}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    showToast(`Thermal Receipt (${rc.receiptNo}.png) downloaded!`);
+  };
+
+  const handleDownloadHtml = (rc: any) => {
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Receipt ${rc.receiptNo} - MAA BEST NETWORK</title>
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      width: 76mm;
+      margin: 0 auto;
+      padding: 10px;
+      color: #000;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .text-center { text-align: center; }
+    .header { border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 8px; }
+    .title { font-size: 16px; font-weight: bold; }
+    .subtitle { font-size: 10px; color: #444; }
+    .row { display: flex; justify-content: space-between; margin: 4px 0; }
+    .divider { border-top: 1px dashed #000; margin: 8px 0; padding-top: 6px; }
+    .total-box { font-size: 15px; font-weight: bold; border-top: 1px solid #000; padding-top: 6px; margin-top: 6px; }
+    .footer { text-align: center; font-size: 10px; margin-top: 12px; border-top: 1px dashed #000; padding-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="header text-center">
+    <div class="title">MAA BEST NETWORK</div>
+    <div class="subtitle">Somitir Hat Bazar, Kalkini, Madaripur · Hotline: 01788-990011</div>
+    <div style="font-weight: bold; margin-top: 4px;">OFFICIAL MONEY RECEIPT</div>
+  </div>
+  <div class="row"><span>Receipt No:</span><strong>${rc.receiptNo}</strong></div>
+  <div class="row"><span>Date:</span><span>${rc.date}</span></div>
+  <div class="row"><span>Customer:</span><strong>${rc.customer}</strong></div>
+  <div class="row"><span>Customer ID:</span><span>${rc.custId}</span></div>
+  <div class="row"><span>Mobile:</span><span>${rc.phone}</span></div>
+  ${rc.zone ? `<div class="row"><span>Zone:</span><span>${rc.zone}</span></div>` : ''}
+  <div class="divider">
+    <div class="row"><span>Package: ${rc.pkgName}</span><span>৳${rc.subtotal}</span></div>
+    ${rc.discount > 0 ? `<div class="row"><span>Discount:</span><span>-৳${rc.discount}</span></div>` : ''}
+    <div class="row total-box"><span>NET PAID:</span><span>৳${rc.netPaid}</span></div>
+  </div>
+  <div class="footer">
+    <div>Payment Mode: CASH (WALK-IN COUNTER)</div>
+    <div>Collected by: ${rc.collectedBy || "Counter-01"}</div>
+    <div style="font-weight: bold; margin-top: 6px;">THANK YOU FOR CHOOSING MAA BEST NETWORK!</div>
+  </div>
+</body>
+</html>`;
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `receipt_${rc.receiptNo}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast(`Thermal Receipt (${rc.receiptNo}.html) downloaded!`);
+  };
+
+  const handleSendWhatsApp = (rc: any) => {
+    const cleanPhone = (rc.phone || "").replace(/\D/g, "");
+    const formattedPhone = cleanPhone.startsWith("88") ? cleanPhone : cleanPhone.startsWith("0") ? `88${cleanPhone}` : `880${cleanPhone}`;
+    const msg = `*MAA BEST NETWORK - OFFICIAL MONEY RECEIPT*\n\n` +
+      `Receipt No: ${rc.receiptNo}\n` +
+      `Date: ${rc.date}\n` +
+      `Customer: ${rc.customer} (${rc.custId})\n` +
+      `Package: ${rc.pkgName}\n` +
+      `Amount Paid: ৳${rc.netPaid}\n` +
+      `Status: PAID (CASH COUNTER)\n` +
+      `Collected by: ${rc.collectedBy}\n\n` +
+      `Thank you for staying with MAA BEST NETWORK!\nHotline: 01788-990011`;
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+    showToast(`Opened WhatsApp with receipt for ${rc.customer}!`);
+  };
+
+  const handlePrintReceipt = (rc: any) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Print Receipt ${rc.receiptNo}</title>
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      width: 72mm;
+      margin: 0 auto;
+      padding: 8px;
+      color: #000;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .text-center { text-align: center; }
+    .header { border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+    .title { font-size: 15px; font-weight: bold; }
+    .subtitle { font-size: 10px; color: #444; }
+    .row { display: flex; justify-content: space-between; margin: 3px 0; }
+    .divider { border-top: 1px dashed #000; margin: 6px 0; padding-top: 4px; }
+    .total-box { font-size: 14px; font-weight: bold; border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
+    .footer { text-align: center; font-size: 10px; margin-top: 10px; border-top: 1px dashed #000; padding-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="header text-center">
+    <div class="title">MAA BEST NETWORK</div>
+    <div class="subtitle">Somitir Hat Bazar, Kalkini, Madaripur · 01788-990011</div>
+    <div style="font-weight: bold; margin-top: 2px;">OFFICIAL MONEY RECEIPT</div>
+  </div>
+  <div class="row"><span>Receipt No:</span><strong>${rc.receiptNo}</strong></div>
+  <div class="row"><span>Date:</span><span>${rc.date}</span></div>
+  <div class="row"><span>Customer:</span><strong>${rc.customer}</strong></div>
+  <div class="row"><span>Customer ID:</span><span>${rc.custId}</span></div>
+  <div class="row"><span>Mobile:</span><span>${rc.phone}</span></div>
+  <div class="divider">
+    <div class="row"><span>Package: ${rc.pkgName}</span><span>৳${rc.subtotal}</span></div>
+    ${rc.discount > 0 ? `<div class="row"><span>Discount:</span><span>-৳${rc.discount}</span></div>` : ''}
+    <div class="row total-box"><span>NET PAID:</span><span>৳${rc.netPaid}</span></div>
+  </div>
+  <div class="footer">
+    <div>Payment Mode: CASH (WALK-IN)</div>
+    <div>Collected by: ${rc.collectedBy}</div>
+    <div style="font-weight: bold; margin-top: 4px;">THANK YOU FOR STAYING WITH US!</div>
+  </div>
+</body>
+</html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   const handleSelectCustomer = (c: QuickCustomer) => {
     setSelectedCust(c);
     setCollectAmount(c.dueAmount > 0 ? c.dueAmount.toString() : c.monthlyFee.toString());
@@ -59,6 +352,10 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
 
   const handleProcessCollection = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your account role has Read-Only access to Cash Desk.");
+      return;
+    }
     if (!selectedCust || !collectAmount) return;
 
     const subtotal = Number(collectAmount);
@@ -281,9 +578,14 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-primary hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer">
+                disabled={isReadOnly || !canEdit}
+                className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all ${
+                  isReadOnly || !canEdit
+                    ? "bg-muted text-muted-foreground cursor-not-allowed border border-border"
+                    : "bg-primary hover:opacity-95 text-white cursor-pointer"
+                }`}>
                 <CheckCircle2 size={16} />
-                <span>Confirm Payment & Print Receipt</span>
+                <span>{isReadOnly || !canEdit ? "Read-Only: Collection Disabled" : "Confirm Payment & Print Receipt"}</span>
               </button>
             </form>
           ) : (
@@ -301,74 +603,117 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
               <span className="text-[10px] font-mono text-muted-foreground">80mm Paper</span>
             </div>
 
-            {printedReceipt ? (
+            {activeReceipt && (
               <div className="p-4 bg-white text-black font-mono text-xs rounded-2xl border border-gray-300 shadow-inner mt-3 space-y-3">
                 <div className="text-center pb-2 border-b border-dashed border-gray-400">
                   <div className="font-black text-sm tracking-wider">MAA BEST NETWORK</div>
                   <div className="text-[10px] text-gray-600">Somitir Hat Bazar, Kalkini, Madaripur · Hotline: 01788-990011</div>
-                  <div className="text-[10px] text-gray-600">OFFICIAL MONEY RECEIPT</div>
+                  <div className="text-[10px] text-gray-600 font-bold mt-0.5">OFFICIAL MONEY RECEIPT</div>
+                  {activeReceipt.isDraft && (
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                      LIVE COUNTER DRAFT
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-1 text-[11px]">
                   <div className="flex justify-between">
                     <span>Receipt No:</span>
-                    <strong>{printedReceipt.receiptNo}</strong>
+                    <strong>{activeReceipt.receiptNo}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Date:</span>
-                    <span>{printedReceipt.date}</span>
+                    <span>{activeReceipt.date}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Customer:</span>
-                    <strong>{printedReceipt.customer}</strong>
+                    <strong>{activeReceipt.customer}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Customer ID:</span>
-                    <span>{printedReceipt.custId}</span>
+                    <span>{activeReceipt.custId}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Mobile:</span>
-                    <span>{printedReceipt.phone}</span>
+                    <span>{activeReceipt.phone}</span>
                   </div>
+                  {activeReceipt.zone && (
+                    <div className="flex justify-between">
+                      <span>Zone:</span>
+                      <span>{activeReceipt.zone}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="py-2 border-t border-b border-dashed border-gray-400 space-y-1 text-[11px]">
                   <div className="flex justify-between">
-                    <span>Package: {printedReceipt.pkgName}</span>
-                    <span>৳{printedReceipt.subtotal}</span>
+                    <span>Package: {activeReceipt.pkgName}</span>
+                    <span>৳{activeReceipt.subtotal}</span>
                   </div>
-                  {printedReceipt.discount > 0 && (
+                  {activeReceipt.discount > 0 && (
                     <div className="flex justify-between text-gray-600">
                       <span>Discount:</span>
-                      <span>-৳{printedReceipt.discount}</span>
+                      <span>-৳{activeReceipt.discount}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-black text-sm pt-1 border-t border-gray-300">
                     <span>NET PAID:</span>
-                    <span>৳{printedReceipt.netPaid}</span>
+                    <span>৳{activeReceipt.netPaid}</span>
                   </div>
                 </div>
 
                 <div className="text-center text-[10px] text-gray-600 pt-1 space-y-1">
                   <div>Payment Mode: CASH (WALK-IN COUNTER)</div>
-                  <div>Collected by: {printedReceipt.collectedBy}</div>
+                  <div>Collected by: {activeReceipt.collectedBy}</div>
                   <div className="font-bold text-black mt-2">THANK YOU FOR CHOOSING MAA BEST NETWORK!</div>
                 </div>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-muted-foreground text-xs italic mt-8">
-                Processed receipts will generate here with 80mm thermal printer format.
               </div>
             )}
           </div>
 
-          {printedReceipt && (
-            <button
-              onClick={() => showToast(`Printing 80mm thermal receipt for ${printedReceipt.customer}...`)}
-              className="w-full mt-4 py-2.5 rounded-2xl bg-card border border-border hover:bg-muted text-foreground font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs">
-              <Printer size={14} />
-              <span>Print Thermal Copy</span>
-            </button>
+          {/* Action Buttons for Download, WhatsApp & Print */}
+          {activeReceipt && (
+            <div className="mt-4 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleDownloadPng(activeReceipt)}
+                  className="py-2.5 px-3 rounded-xl bg-primary hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  title="Download Receipt Image (PNG) to send via WhatsApp or email"
+                >
+                  <Download size={14} />
+                  <span>Download PNG</span>
+                </button>
+
+                <button
+                  onClick={() => handleDownloadHtml(activeReceipt)}
+                  className="py-2.5 px-3 rounded-xl bg-card border border-border hover:bg-muted text-foreground font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                  title="Download HTML Printable File"
+                >
+                  <FileText size={14} />
+                  <span>Download HTML</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleSendWhatsApp(activeReceipt)}
+                  className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  title="Send receipt details to customer via WhatsApp"
+                >
+                  <MessageCircle size={14} />
+                  <span>WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => handlePrintReceipt(activeReceipt)}
+                  className="py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-foreground font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all border border-border"
+                  title="Print on connected 80mm thermal receipt printer"
+                >
+                  <Printer size={14} />
+                  <span>Print Receipt</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

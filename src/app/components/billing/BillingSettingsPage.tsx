@@ -6,12 +6,14 @@ import {
 import {
   billingStore, type BillingSettingsConfig
 } from "./billingData";
+import { usePermission } from "../../context/AuthContext";
 
 interface BillingSettingsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function BillingSettingsPage({ onNavigate }: BillingSettingsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("billing-settings");
   const [settings, setSettings] = useState<BillingSettingsConfig>(billingStore.getSettings());
   const [toast, setToast] = useState("");
 
@@ -24,6 +26,10 @@ export function BillingSettingsPage({ onNavigate }: BillingSettingsPageProps) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleSave = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Billing Settings.");
+      return;
+    }
     billingStore.setSettings(settings);
     showToast("Billing settings, Payment Gateway configurations & notification templates saved!");
   };
@@ -55,10 +61,13 @@ export function BillingSettingsPage({ onNavigate }: BillingSettingsPageProps) {
 
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all"
-          style={{ background: "var(--primary)", fontSize: 13 }}
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+          }`}
+          style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
         >
-          <Save size={14} /> Save All Settings
+          <Save size={14} /> {isReadOnly || !canEdit ? "Read-Only: Locked" : "Save All Settings"}
         </button>
       </div>
 

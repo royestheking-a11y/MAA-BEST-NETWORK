@@ -6,12 +6,14 @@ import {
 import {
   financeStore, type ExpenseItem
 } from "./financeData";
+import { usePermission } from "../../context/AuthContext";
 
 interface ExpensesPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
+  const { canEdit, isReadOnly } = usePermission("expenses");
   const [expenses, setExpenses] = useState<ExpenseItem[]>(financeStore.getExpenses());
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -32,6 +34,10 @@ export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleAdd = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Expenses.");
+      return;
+    }
     if (!newExp.vendor || !newExp.amount) return;
     const exp: ExpenseItem = {
       id: `EXP-${(expenses.length + 106).toString()}`,
@@ -88,8 +94,11 @@ export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-          style={{ background: "var(--primary)", fontSize: 13 }}
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+          }`}
+          style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
         >
           <Plus size={14} /> Record Expense Voucher
         </button>
@@ -299,10 +308,10 @@ export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
               </button>
               <button
                 onClick={handleAdd}
-                disabled={!newExp.vendor || !newExp.amount}
+                disabled={!newExp.vendor || !newExp.amount || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 disabled:opacity-50"
               >
-                Post Expense
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Post Expense"}
               </button>
             </div>
           </div>

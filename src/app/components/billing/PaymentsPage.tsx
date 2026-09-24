@@ -7,6 +7,7 @@ import {
   billingStore, type Payment
 } from "./billingData";
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
+import { usePermission } from "../../context/AuthContext";
 
 interface PaymentsPageProps {
   onNavigate?: (page: string) => void;
@@ -14,6 +15,7 @@ interface PaymentsPageProps {
 
 export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
   const { customers, processPayment } = useCustomerContext();
+  const { canEdit, isReadOnly } = usePermission("payments");
   const [payments, setPayments] = useState<Payment[]>(billingStore.getPayments());
   const [search, setSearch] = useState("");
   const [methodFilter, setMethodFilter] = useState<string>("all");
@@ -69,10 +71,14 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
     }));
     setCustSearchQuery(`${cust.name} (${cust.clientCode || cust.id})`);
     setShowCustSuggestions(false);
-    showToast(`✓ Auto-selected subscriber: ${cust.name} (${cust.clientCode || cust.id})`);
+    showToast(`Auto-selected subscriber: ${cust.name} (${cust.clientCode || cust.id})`);
   };
 
   const handleRecordPayment = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Payments.");
+      return;
+    }
     if (!newPay.customer || !newPay.amount) return;
     const payId = `PAY-${(payments.length + 88313).toString()}`;
     const now = new Date();
@@ -183,13 +189,15 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
           >
             <Download size={14} /> Export CSV
           </button>
-          <button
-            onClick={() => setShowRecordPayment(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-            style={{ background: "#16A34A", fontSize: 13 }}
-          >
-            <Plus size={14} /> Record Payment
-          </button>
+          {canEdit && !isReadOnly && (
+            <button
+              onClick={() => setShowRecordPayment(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
+              style={{ background: "#16A34A", fontSize: 13 }}
+            >
+              <Plus size={14} /> Record Payment
+            </button>
+          )}
         </div>
       </div>
 
@@ -593,10 +601,10 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
               </button>
               <button
                 onClick={handleRecordPayment}
-                disabled={!newPay.customer || !newPay.amount}
+                disabled={!newPay.customer || !newPay.amount || isReadOnly || !canEdit}
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                Confirm Payment
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Confirm Payment"}
               </button>
             </div>
           </div>

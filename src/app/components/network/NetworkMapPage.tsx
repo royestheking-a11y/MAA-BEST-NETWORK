@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Map as MapIcon, Activity, RefreshCw, Layers, Server, Radio, Zap,
   CheckCircle2, AlertTriangle, XCircle, X, MapPin, ZoomIn, ZoomOut,
@@ -7,6 +7,8 @@ import {
 import {
   INITIAL_MAP_NODES, INITIAL_MAP_EDGES, type MapNode, type MapNodeType, type MapNodeStatus
 } from "./networkData";
+import { useNetxLiveData } from "../../services/netxApiService";
+import { useRealtimeHardwareTelemetry } from "../../services/realtimeTelemetryService";
 
 const NR: Record<MapNodeType, number> = { internet: 38, mikrotik: 31, olt: 25, zone: 31 };
 
@@ -35,20 +37,53 @@ interface NetworkMapPageProps {
 }
 
 export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
+  const { oltServers, liveStats, refresh: refreshNetx } = useNetxLiveData(30000);
+  const { telemetry } = useRealtimeHardwareTelemetry(3000);
+
   const [zoom, setZoom] = useState(90);
-  const [selected, setSelected] = useState<string | null>("MK1");
+  const [selected, setSelected] = useState<string | null>("OLT1");
   const [filterType, setFilterType] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  const VW = 1020, VH = 530;
-  const nodeMap = new Map(INITIAL_MAP_NODES.map(n => [n.id, n]));
-  const selNode = selected ? INITIAL_MAP_NODES.find(n => n.id === selected) : null;
-  const hasIssues = INITIAL_MAP_NODES.some(n => n.status !== "online");
+  const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
+  const netxOlt2 = oltServers.find(s => s.name === 'OLT2');
+  const onlineCount = liveStats.filter(c => c.connection_status === 'online').length;
 
-  const filteredNodes = INITIAL_MAP_NODES.filter(n => {
+  const dynamicMapNodes = useMemo(() => {
+    return INITIAL_MAP_NODES.map(node => {
+      if (node.id === "OLT1") {
+        return {
+          ...node,
+          name: "BDCOM OLT 1 (Somitir Hat :1895)",
+          status: (netxOlt1 ? (netxOlt1.last_status === 'online' ? 'online' : 'offline') : 'online') as MapNodeStatus,
+          sessions: netxOlt1?.online_onu_count || 94,
+          traffic: `${netxOlt1?.online_onu_count || 94}/${netxOlt1?.onu_count || 157} ONUs Active`,
+          latency: `${telemetry.olt1.latencyMs || 12}ms`,
+        };
+      }
+      if (node.id === "OLT2") {
+        return {
+          ...node,
+          name: "BDCOM OLT 2 (Kalkini Hub :1896)",
+          status: (netxOlt2 ? (netxOlt2.last_status === 'online' ? 'online' : 'offline') : 'online') as MapNodeStatus,
+          sessions: netxOlt2?.online_onu_count || 16,
+          traffic: `${netxOlt2?.online_onu_count || 16}/${netxOlt2?.onu_count || 156} ONUs Active`,
+          latency: `${telemetry.olt2.latencyMs || 33}ms`,
+        };
+      }
+      return node;
+    });
+  }, [oltServers, liveStats, telemetry, netxOlt1, netxOlt2]);
+
+  const VW = 1020, VH = 530;
+  const nodeMap = new Map(dynamicMapNodes.map(n => [n.id, n]));
+  const selNode = selected ? dynamicMapNodes.find(n => n.id === selected) : null;
+  const hasIssues = dynamicMapNodes.some(n => n.status !== "online");
+
+  const filteredNodes = dynamicMapNodes.filter(n => {
     const matchFilter = filterType === "all" || n.type === filterType;
     const matchSearch = !search || n.name.toLowerCase().includes(search.toLowerCase()) || n.ip.includes(search);
     return matchFilter && matchSearch;
@@ -402,20 +437,20 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-border">
                     <span className="text-muted-foreground">Sessions / Subscriptions</span>
-                    <span className="font-mono font-bold text-primary">{selNode.sessions.toLocaleString()}</span>
+                    <span className="font-mono font-bold text-primary">{(selNode.sessions || 0).toLocaleString()}</span>
                   </div>
-                  {selNode.cpu > 0 && (
+                  {(selNode.cpu || 0) > 0 && (
                     <div className="py-1.5">
                       <div className="flex justify-between mb-1">
                         <span className="text-muted-foreground">CPU Utilization</span>
-                        <span className="font-mono font-semibold text-foreground">{selNode.cpu}%</span>
+                        <span className="font-mono font-semibold text-foreground">{selNode.cpu || 0}%</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-muted">
                         <div
                           className="h-full rounded-full"
                           style={{
-                            width: `${selNode.cpu}%`,
-                            background: selNode.cpu > 75 ? "#DC2626" : "var(--primary)",
+                            width: `${selNode.cpu || 0}%`,
+                            background: (selNode.cpu || 0) > 75 ? "#DC2626" : "var(--primary)",
                           }}
                         />
                       </div>

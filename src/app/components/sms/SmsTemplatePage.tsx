@@ -13,8 +13,14 @@ interface SmsTemplatePageProps {
 export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) => {
   const { customers } = useCustomerContext();
   const [templates, setTemplates] = useState<SmsTemplate[]>(() => {
-    const saved = localStorage.getItem("mbn_sms_templates");
-    return saved ? JSON.parse(saved) : INITIAL_SMS_TEMPLATES;
+    try {
+      const saved = localStorage.getItem("mbn_sms_templates");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return INITIAL_SMS_TEMPLATES;
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,12 +126,14 @@ export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) 
 
   // Render Sample variable replacement for preview
   const renderSamplePreview = (tplText: string) => {
-    const sampleCust = customers[0] || {
+    const sampleCust: any = customers[0] || {
       name: "Sumon Bepari",
       clientCode: "MBN0007",
       phone: "01784659223",
       monthlyBill: 500,
+      price: 500,
       due: 0,
+      dueAmount: 0,
       pppUser: "mbn@sumonbepari",
       package: "PIONEER_HOME_20Mbps"
     };

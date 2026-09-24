@@ -14,6 +14,7 @@ import {
 } from "../../data/storeData";
 import { useCustomerContext } from "../../context/CustomerContext";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePermission } from "../../context/AuthContext";
 
 interface StoreSalesPageProps {
   onNavigate?: (page: string) => void;
@@ -24,6 +25,7 @@ type TabType = "dashboard" | "pos" | "products" | "orders" | "stock_ledger" | "p
 export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
   const { customers } = useCustomerContext();
   const { t, bnNum } = useLanguage();
+  const { canEdit, isReadOnly } = usePermission("store-pos");
 
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [products, setProducts] = useState<StoreProduct[]>(storeService.getProducts());
@@ -124,7 +126,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
   // Cart operations
   const addToCart = (product: StoreProduct) => {
     if (product.stock <= 0) {
-      showToast(`⚠️ ${product.name} is currently OUT OF STOCK!`);
+      showToast(`${product.name} is currently OUT OF STOCK!`);
       return;
     }
 
@@ -132,7 +134,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
     if (existingIndex > -1) {
       const currentQty = cart[existingIndex].quantity;
       if (currentQty >= product.stock) {
-        showToast(`⚠️ Only ${product.stock} units available in stock!`);
+        showToast(`Only ${product.stock} units available in stock!`);
         return;
       }
       const updatedCart = [...cart];
@@ -154,7 +156,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
         }
       ]);
     }
-    showToast(`✓ Added ${product.name} to POS Cart`);
+    showToast(`Added ${product.name} to POS Cart`);
   };
 
   const updateCartQuantity = (productId: string, delta: number) => {
@@ -164,7 +166,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
         const newQty = item.quantity + delta;
         if (newQty <= 0) return null;
         if (product && newQty > product.stock) {
-          showToast(`⚠️ Maximum ${product.stock} units in stock!`);
+          showToast(`Maximum ${product.stock} units in stock!`);
           return item;
         }
         return {
@@ -188,8 +190,12 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
 
   // Complete POS Sale
   const handleCompleteSale = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Store & POS.");
+      return;
+    }
     if (cart.length === 0) {
-      showToast("⚠️ Please add at least one product to the POS bill!");
+      showToast("Please add at least one product to the POS bill!");
       return;
     }
 
@@ -220,14 +226,18 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
 
     setPrintedOrder(newOrder);
     setShowReceiptModal(true);
-    showToast(`✓ Order #${newOrder.orderNumber} successfully completed & recorded!`);
+    showToast(`Order #${newOrder.orderNumber} successfully completed & recorded!`);
   };
 
   // Product Create/Edit
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Store & POS.");
+      return;
+    }
     if (!productForm.name || productForm.sellingPrice <= 0) {
-      showToast("⚠️ Please enter a valid product name and selling price!");
+      showToast("Please enter a valid product name and selling price!");
       return;
     }
 
@@ -245,7 +255,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
         warrantyMonths: Number(productForm.warrantyMonths),
         description: productForm.description,
       });
-      showToast(`✓ Product "${productForm.name}" updated!`);
+      showToast(`Product "${productForm.name}" updated!`);
     } else {
       storeService.addProduct({
         name: productForm.name,
@@ -260,7 +270,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
         warrantyMonths: Number(productForm.warrantyMonths),
         description: productForm.description,
       });
-      showToast(`✓ New product "${productForm.name}" added to catalog!`);
+      showToast(`New product "${productForm.name}" added to catalog!`);
     }
 
     setShowProductModal(false);
@@ -270,6 +280,10 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
   // Stock Adjustment Submit
   const handleStockAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Store & POS.");
+      return;
+    }
     if (!stockTargetProduct || stockQuantity <= 0) return;
 
     storeService.adjustStock(
@@ -281,7 +295,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
       "Super Admin"
     );
 
-    showToast(`✓ Stock ${stockAdjustmentType === "IN" ? "replenished" : "deducted"} for ${stockTargetProduct.name}!`);
+    showToast(`Stock ${stockAdjustmentType === "IN" ? "replenished" : "deducted"} for ${stockTargetProduct.name}!`);
     setShowStockModal(false);
     setStockTargetProduct(null);
   };
@@ -846,10 +860,15 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
 
             {/* Confirm & Complete POS Button */}
             <button
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || isReadOnly || !canEdit}
               onClick={handleCompleteSale}
-              className="w-full py-3 rounded-2xl bg-emerald-600 text-white font-extrabold text-xs shadow-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all cursor-pointer mt-4">
-              <Printer size={15} /> Confirm & Print Invoice (৳ {cartTotal.toLocaleString()})
+              className={`w-full py-3 rounded-2xl font-extrabold text-xs shadow-md flex items-center justify-center gap-2 transition-all mt-4 ${
+                isReadOnly || !canEdit
+                  ? "bg-muted text-muted-foreground cursor-not-allowed border border-border"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              }`}>
+              <Printer size={15} />
+              <span>{isReadOnly || !canEdit ? "Read-Only: Sale Disabled" : `Confirm & Print Invoice (৳ ${cartTotal.toLocaleString()})`}</span>
             </button>
           </div>
         </div>
@@ -1082,7 +1101,7 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
                           value={order.orderStatus}
                           onChange={e => {
                             storeService.updateOrderStatus(order.id, e.target.value as OrderStatus, order.paymentStatus);
-                            showToast(`✓ Order #${order.orderNumber} status updated to ${e.target.value}!`);
+                            showToast(`Order #${order.orderNumber} status updated to ${e.target.value}!`);
                           }}
                           className="px-2 py-1 rounded-xl border border-border bg-card text-[11px] font-bold text-foreground outline-none cursor-pointer">
                           <option value="pending">Pending</option>
@@ -1510,8 +1529,11 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs cursor-pointer shadow-xs">
-                  {editingProduct ? "Save Changes" : "Create Product"}
+                  disabled={isReadOnly || !canEdit}
+                  className={`px-5 py-2 rounded-xl font-bold text-xs shadow-xs ${
+                    isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary text-primary-foreground cursor-pointer"
+                  }`}>
+                  {isReadOnly || !canEdit ? "Read-Only" : editingProduct ? "Save Changes" : "Create Product"}
                 </button>
               </div>
             </form>
@@ -1632,8 +1654,11 @@ export function StoreSalesPage({ onNavigate }: StoreSalesPageProps) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs cursor-pointer shadow-xs">
-                  Record Stock Movement
+                  disabled={isReadOnly || !canEdit}
+                  className={`px-5 py-2 rounded-xl font-bold text-xs shadow-xs ${
+                    isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary text-primary-foreground cursor-pointer"
+                  }`}>
+                  {isReadOnly || !canEdit ? "Read-Only" : "Record Stock Movement"}
                 </button>
               </div>
             </form>

@@ -10,13 +10,15 @@ import {
   type BackboneFiberCable, type PonStandard
 } from "../../data/splitterData";
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
+import { usePermission } from "../../context/AuthContext";
 
 interface SplitterLedgerPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
-  const { customers } = useCustomerContext();
+  const { customers, updateCustomer } = useCustomerContext();
+  const { canEdit, isReadOnly } = usePermission("splitters");
   const [splitters, setSplitters] = useState<SplitterBox[]>(splitterStore.getSplitters());
   const [cables, setCables] = useState<BackboneFiberCable[]>(splitterStore.getCables());
   const [activeTab, setActiveTab] = useState<"splitters" | "pon_capacity" | "cores" | "loss_guide">("splitters");
@@ -180,6 +182,10 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
   // Handle Assigning Customer to Port
   const handleConfirmAssign = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Splitters.");
+      return;
+    }
     if (!assignModal || !selectedCustForPort) return;
 
     splitterStore.assignSubscriberToPort(
@@ -194,7 +200,16 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
       }
     );
 
-    showToast(`✓ Subscriber ${selectedCustForPort.name} connected to Port ${assignModal.portNumber} on ${assignModal.splitterName}!`);
+    // Sync with CustomerContext
+    if (updateCustomer) {
+      updateCustomer(selectedCustForPort.id, {
+        splitterBox: assignModal.splitterName,
+        splitterPort: `Port ${assignModal.portNumber}`,
+        onuSignal: `${testRxPower || "-20.5"} dBm`
+      });
+    }
+
+    showToast(`Subscriber ${selectedCustForPort.name} connected to Port ${assignModal.portNumber} on ${assignModal.splitterName}!`);
     setAssignModal(null);
     setSelectedCustForPort(null);
     setCustSearchQuery("");
@@ -202,6 +217,10 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
 
   // Handle Releasing / Freeing Port
   const handleReleasePort = (splitterId: string, portNumber: number, custName?: string) => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Splitters.");
+      return;
+    }
     if (confirm(`Are you sure you want to disconnect & free Port #${portNumber} (${custName || "Active line"})?`)) {
       splitterStore.releasePort(splitterId, portNumber);
       showToast(`Port #${portNumber} released & marked as Free space!`);
@@ -211,6 +230,10 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
   // Handle Creating New Splitter Box
   const handleCreateSplitter = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Splitters.");
+      return;
+    }
     if (!newBox.name || !newBox.location) return;
 
     const totalPortsMap: Record<string, number> = {
@@ -282,7 +305,10 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setShowAddSplitter(true)}
-            className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-md hover:bg-primary/90 transition-all flex items-center gap-2 cursor-pointer"
+            disabled={isReadOnly || !canEdit}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+            }`}
           >
             <Plus size={15} /> Add Splitter Box
           </button>
@@ -1023,9 +1049,13 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedCustForPort}
-                  className="w-1/2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
-                  <Check size={14} /> Connect Line
+                  disabled={!selectedCustForPort || isReadOnly || !canEdit}
+                  className={`w-1/2 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5 ${
+                    isReadOnly || !canEdit
+                      ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-50"
+                  }`}>
+                  <Check size={14} /> {isReadOnly || !canEdit ? "Read-Only" : "Connect Line"}
                 </button>
               </div>
             </form>
@@ -1164,8 +1194,13 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5">
-                  <Check size={14} /> Create Splitter Box
+                  disabled={isReadOnly || !canEdit}
+                  className={`w-1/2 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5 ${
+                    isReadOnly || !canEdit
+                      ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                      : "bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+                  }`}>
+                  <Check size={14} /> {isReadOnly || !canEdit ? "Read-Only: Locked" : "Create Splitter Box"}
                 </button>
               </div>
             </form>

@@ -6,12 +6,14 @@ import {
 import {
   billingStore, type DiscountRule, type CustomerAdjustment
 } from "./billingData";
+import { usePermission } from "../../context/AuthContext";
 
 interface DiscountsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function DiscountsPage({ onNavigate }: DiscountsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("discounts");
   const [discountRules, setDiscountRules] = useState<DiscountRule[]>(billingStore.getDiscounts());
   const [adjustments, setAdjustments] = useState<CustomerAdjustment[]>(billingStore.getAdjustments());
   const [subTab, setSubTab] = useState<"coupons" | "policies" | "adjustments">("coupons");
@@ -48,6 +50,10 @@ export function DiscountsPage({ onNavigate }: DiscountsPageProps) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleCreatePromo = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Discounts.");
+      return;
+    }
     if (!newPromo.code || !newPromo.value) return;
     const promo: DiscountRule = {
       id: `DISC-${(discountRules.length + 101).toString()}`,
@@ -69,6 +75,10 @@ export function DiscountsPage({ onNavigate }: DiscountsPageProps) {
   };
 
   const handleCreateAdjustment = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Discounts.");
+      return;
+    }
     if (!newAdj.customer || !newAdj.amount) return;
     const adj: CustomerAdjustment = {
       id: `ADJ-${(adjustments.length + 501).toString()}`,
@@ -123,15 +133,21 @@ export function DiscountsPage({ onNavigate }: DiscountsPageProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowNewAdjustment(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
-            style={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 13, color: "var(--foreground)" }}
+            disabled={isReadOnly || !canEdit}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "cursor-pointer"
+            }`}
+            style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--card)", border: "1px solid var(--border)", fontSize: 13, color: "var(--foreground)" }}
           >
             <Plus size={14} /> Custom Adjustment
           </button>
           <button
             onClick={() => setShowNewPromo(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all"
-            style={{ background: "var(--primary)", fontSize: 13 }}
+            disabled={isReadOnly || !canEdit}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+              isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+            }`}
+            style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
           >
             <Tag size={14} /> New Promo Code
           </button>
@@ -637,10 +653,10 @@ export function DiscountsPage({ onNavigate }: DiscountsPageProps) {
               </button>
               <button
                 onClick={handleCreatePromo}
-                disabled={!newPromo.code || !newPromo.value}
+                disabled={!newPromo.code || !newPromo.value || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary disabled:opacity-50"
               >
-                Publish Promo Code
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Publish Promo Code"}
               </button>
             </div>
           </div>
@@ -754,10 +770,10 @@ export function DiscountsPage({ onNavigate }: DiscountsPageProps) {
               </button>
               <button
                 onClick={handleCreateAdjustment}
-                disabled={!newAdj.customer || !newAdj.amount}
+                disabled={!newAdj.customer || !newAdj.amount || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary disabled:opacity-50"
               >
-                Apply Adjustment
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Apply Adjustment"}
               </button>
             </div>
           </div>

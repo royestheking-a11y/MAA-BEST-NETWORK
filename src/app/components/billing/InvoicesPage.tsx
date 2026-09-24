@@ -8,6 +8,7 @@ import {
   billingStore, type Invoice, type Payment
 } from "./billingData";
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
+import { usePermission } from "../../context/AuthContext";
 
 interface InvoicesPageProps {
   onNavigate?: (page: string) => void;
@@ -15,6 +16,7 @@ interface InvoicesPageProps {
 
 export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const { customers, processPayment } = useCustomerContext();
+  const { canEdit, isReadOnly } = usePermission("invoices");
   const [invoices, setInvoices] = useState<Invoice[]>(billingStore.getInvoices());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending" | "overdue" | "cancelled">("all");
@@ -81,11 +83,15 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     }));
     setCustSearchQuery(`${cust.name} (${cust.clientCode || cust.id})`);
     setShowCustSuggestions(false);
-    showToast(`✓ Auto-filled subscriber ${cust.name} (${cust.clientCode || cust.id})`);
+    showToast(`Auto-filled subscriber ${cust.name} (${cust.clientCode || cust.id})`);
   };
 
   // Open manual payment settlement modal for an invoice
   const openManualPaymentModal = (inv: Invoice) => {
+    if (isReadOnly) {
+      showToast("Access Restricted: Your account role has Read-Only access to Invoices.");
+      return;
+    }
     setPayTargetInvoice(inv);
     setPayAmount(inv.amount.toString());
     setPayDiscount("0");
@@ -98,6 +104,10 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
 
   // Confirm manual payment
   const handleConfirmManualPayment = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Invoices.");
+      return;
+    }
     if (!payTargetInvoice || !payAmount) return;
 
     const amountNum = Number(payAmount);
@@ -134,7 +144,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     }
 
     setShowPayModal(false);
-    showToast(`✓ Payment of ৳${effectiveAmount.toLocaleString()} recorded for Invoice ${payTargetInvoice.id} (${payTargetInvoice.customer})!`);
+    showToast(`Payment of ৳${effectiveAmount.toLocaleString()} recorded for Invoice ${payTargetInvoice.id} (${payTargetInvoice.customer})!`);
   };
 
   const filteredInvoices = invoices.filter(inv => {
@@ -164,6 +174,10 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   };
 
   const handleCreateInvoice = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Invoices.");
+      return;
+    }
     if (!newInv.customer || !newInv.amount) return;
     const sub = Number(newInv.amount);
     const disc = Number(newInv.discount || 0);
@@ -256,13 +270,15 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           >
             <Download size={14} /> Export CSV
           </button>
-          <button
-            onClick={() => setShowNewInvoice(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-            style={{ background: "var(--primary)", fontSize: 13 }}
-          >
-            <Plus size={14} /> New Invoice
-          </button>
+          {canEdit && !isReadOnly && (
+            <button
+              onClick={() => setShowNewInvoice(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
+              style={{ background: "var(--primary)", fontSize: 13 }}
+            >
+              <Plus size={14} /> New Invoice
+            </button>
+          )}
         </div>
       </div>
 
@@ -400,7 +416,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                           <Eye size={13} style={{ color: "var(--foreground)" }} />
                         </button>
 
-                        {inv.status !== "paid" && (
+                        {inv.status !== "paid" && canEdit && (
                           <button
                             title="Collect Manual Payment (Cash / bKash / Nagad)"
                             onClick={() => openManualPaymentModal(inv)}
@@ -567,7 +583,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
 
             <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-border bg-muted/30">
               <div>
-                {selectedInvoice.status !== "paid" && (
+                {selectedInvoice.status !== "paid" && canEdit && (
                   <button
                     type="button"
                     onClick={() => {
@@ -820,10 +836,10 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
               </button>
               <button
                 onClick={handleCreateInvoice}
-                disabled={!newInv.customer || !newInv.amount}
+                disabled={!newInv.customer || !newInv.amount || isReadOnly || !canEdit}
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                Generate Invoice
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Generate Invoice"}
               </button>
             </div>
           </div>
@@ -971,8 +987,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
               <button
                 type="button"
                 onClick={handleConfirmManualPayment}
-                className="w-1/2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5">
-                <Check size={14} /> Confirm & Mark Paid
+                disabled={isReadOnly || !canEdit}
+                className={`w-1/2 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-1.5 ${
+                  isReadOnly || !canEdit
+                    ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                }`}>
+                <Check size={14} /> {isReadOnly || !canEdit ? "Read-Only" : "Confirm & Mark Paid"}
               </button>
             </div>
           </div>

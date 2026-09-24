@@ -7,6 +7,7 @@ import {
   crmStore, type SupportTicket
 } from "./crmData";
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
+import { usePermission } from "../../context/AuthContext";
 
 interface TicketsPageProps {
   onNavigate?: (page: string) => void;
@@ -14,6 +15,7 @@ interface TicketsPageProps {
 
 export function TicketsPage({ onNavigate }: TicketsPageProps) {
   const { customers } = useCustomerContext();
+  const { canEdit, isReadOnly } = usePermission("tickets");
   const [tickets, setTickets] = useState<SupportTicket[]>(crmStore.getTickets());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -70,6 +72,10 @@ export function TicketsPage({ onNavigate }: TicketsPageProps) {
   };
 
   const handleCreate = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Support Tickets.");
+      return;
+    }
     if (!newTicket.customerName || !newTicket.subject) return;
     const assigned = newTicket.assignedTech.trim() || "NOC Support Desk";
     const tck: SupportTicket = {
@@ -96,6 +102,10 @@ export function TicketsPage({ onNavigate }: TicketsPageProps) {
   };
 
   const handleResolve = (id: string) => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Support Tickets.");
+      return;
+    }
     crmStore.resolveTicket(id);
     showToast(`Ticket #${id} marked as resolved! Resolution SMS sent.`);
   };
@@ -143,8 +153,11 @@ export function TicketsPage({ onNavigate }: TicketsPageProps) {
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-          style={{ background: "var(--primary)", fontSize: 13 }}
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+          }`}
+          style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
         >
           <Plus size={14} /> Open Support Ticket
         </button>
@@ -302,9 +315,14 @@ export function TicketsPage({ onNavigate }: TicketsPageProps) {
                   {t.status !== "resolved" && (
                     <button
                       onClick={() => handleResolve(t.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm mt-1"
+                      disabled={isReadOnly || !canEdit}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm mt-1 ${
+                        isReadOnly || !canEdit
+                          ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                          : "bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+                      }`}
                     >
-                      <Check size={12} /> Mark Fixed
+                      <Check size={12} /> {isReadOnly || !canEdit ? "Read-Only" : "Mark Fixed"}
                     </button>
                   )}
                 </div>
@@ -535,10 +553,10 @@ export function TicketsPage({ onNavigate }: TicketsPageProps) {
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!newTicket.customerName || !newTicket.subject}
+                disabled={!newTicket.customerName || !newTicket.subject || isReadOnly || !canEdit}
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                Open Ticket & Dispatch
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Open Ticket & Dispatch"}
               </button>
             </div>
           </div>

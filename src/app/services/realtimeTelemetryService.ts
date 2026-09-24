@@ -90,8 +90,8 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     status: "online",
     latencyMs: 31,
     webService: "BDCOM EPON CLI Telnet v1.0",
-    activeOnus: 93,
-    totalOnus: 157,
+    activeOnus: 0,
+    totalOnus: 0,
     ports: [
       { port: "EPON0/1", online: 24, total: 39, rxPowerDbm: -18.4, status: "healthy" },
       { port: "EPON0/2", online: 23, total: 40, rxPowerDbm: -19.2, status: "healthy" },
@@ -109,8 +109,8 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     status: "online",
     latencyMs: 33,
     webService: "BDCOM EPON CLI Telnet v1.0",
-    activeOnus: 59,
-    totalOnus: 156,
+    activeOnus: 0,
+    totalOnus: 0,
     ports: [
       { port: "EPON0/1", online: 15, total: 39, rxPowerDbm: -19.1, status: "healthy" },
       { port: "EPON0/2", online: 15, total: 39, rxPowerDbm: -20.3, status: "healthy" },
@@ -184,26 +184,8 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 2500) {
         }
       } catch (_) {}
 
-      // Slight natural variance on interfaces to keep real-time UI active if offline
+      // Offline fallback: preserve existing real telemetry without synthetic jitter
       if (isMounted) {
-        setTelemetry(prev => ({
-          ...prev,
-          lastUpdated: Date.now(),
-          timestamp: new Date().toISOString(),
-          mikrotik: {
-            ...prev.mikrotik,
-            cpuUsagePercent: Math.min(22, Math.max(8, prev.mikrotik.cpuUsagePercent + Math.floor(Math.random() * 3) - 1)),
-            interfaces: prev.mikrotik.interfaces.map(iface => ({
-              ...iface,
-              rxMbps: Number((iface.rxMbps + (Math.random() * 2 - 1)).toFixed(1)),
-              txMbps: Number((iface.txMbps + (Math.random() * 1.5 - 0.7)).toFixed(1)),
-            }))
-          },
-          olt1: {
-            ...prev.olt1,
-            latencyMs: Math.max(11, Math.min(35, (prev.olt1.latencyMs || 14) + Math.floor(Math.random() * 3) - 1)),
-          }
-        }));
         setLastSyncTime(new Date().toLocaleTimeString());
       }
     }

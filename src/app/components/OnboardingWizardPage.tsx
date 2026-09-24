@@ -569,7 +569,7 @@ export function OnboardingWizardPage({ onNavigate, onComplete }: OnboardingWizar
                           color: item.status === "complete" ? "#16A34A" : item.status === "skipped" ? "#D97706" : "#6B7280",
                         }}
                       >
-                        {item.status === "complete" ? "✓ Done" : item.status === "skipped" ? "Skipped" : "Pending"}
+                        {item.status === "complete" ? "Done" : item.status === "skipped" ? "Skipped" : "Pending"}
                       </span>
                     </div>
                   );

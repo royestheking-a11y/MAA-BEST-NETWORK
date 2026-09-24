@@ -80,6 +80,7 @@ export interface OltDevice {
   activeOnu: number;
   offlineOnu: number;
   totalOnu: number;
+  unassignedOnu?: number;
   rxPower: number | null;
   status: "online" | "warning" | "offline";
   lastSync: string;
@@ -147,27 +148,13 @@ export const INITIAL_MAP_NODES: MapNode[] = [
     latency: "28ms",
   },
   {
-    id: "MK1",
-    name: "MikroTik-MBN-Core",
-    type: "mikrotik",
-    ip: "103.12.173.136",
-    status: "online",
-    x: 510,
-    y: 190,
-    cpu: 12,
-    ram: "7.5 / 32 GB",
-    sessions: 295,
-    traffic: "1.37 Gbps",
-    latency: "1ms",
-  },
-  {
     id: "OLT1",
     name: "BDCOM OLT 1 (Madaripur)",
     type: "olt",
     ip: "103.12.173.136:1895",
     status: "online",
     x: 280,
-    y: 350,
+    y: 260,
     sessions: 150,
     traffic: "53 ONUs Active",
     latency: "53ms",
@@ -179,7 +166,7 @@ export const INITIAL_MAP_NODES: MapNode[] = [
     ip: "103.12.173.136:1896",
     status: "online",
     x: 740,
-    y: 350,
+    y: 260,
     sessions: 156,
     traffic: "59 ONUs Active",
     latency: "33ms",
@@ -220,10 +207,8 @@ export const INITIAL_MAP_NODES: MapNode[] = [
 ];
 
 export const INITIAL_MAP_EDGES: MapEdge[] = [
-  { from: "INET-BDIX", to: "MK1", status: "online", label: "BDIX 902M" },
-  { from: "INET-IIG", to: "MK1", status: "online", label: "IIG 465M" },
-  { from: "MK1", to: "OLT1", status: "online", label: "10G SFP+" },
-  { from: "MK1", to: "OLT2", status: "online", label: "10G SFP+" },
+  { from: "INET-BDIX", to: "OLT1", status: "online", label: "BDIX 902M" },
+  { from: "INET-IIG", to: "OLT2", status: "online", label: "IIG 465M" },
   { from: "OLT1", to: "ZONE-SADAR", status: "online", label: "PON 1-2" },
   { from: "OLT1", to: "ZONE-PORT", status: "online", label: "PON 3-4" },
   { from: "OLT2", to: "ZONE-KALKINI", status: "online", label: "PON 1-4" },
@@ -231,28 +216,28 @@ export const INITIAL_MAP_EDGES: MapEdge[] = [
 
 export const INITIAL_MIKROTIK: MikrotikServer[] = [
   {
-    id: "MK-01",
-    name: "MikroTik-MBN-Core",
+    id: "MK-03",
+    name: "DC-CA",
     ip: "103.12.173.136",
     apiPort: 8728,
     winboxPort: 8291,
-    username: "mbn@netx.com",
+    username: "billing@mbn",
     password: "••••••••",
-    model: "RouterOS x86 (72-Core Xeon Core Server)",
+    model: "x84 (RouterOS x86)",
     rosVersion: "7.15.3 (x86_64)",
     cpuLoad: 12,
     memoryUsed: 7554,
     memoryTotal: 32064,
     uptime: "284 days, 4h",
-    activePppoe: 191,
+    activePppoe: 194,
     activeHotspot: 0,
-    activeStatic: 104,
-    totalSessions: 295,
+    activeStatic: 0,
+    totalSessions: 194,
     downloadMbps: 902.0,
     uploadMbps: 412.3,
     status: "online",
     lastSync: "Just now (Realtime)",
-    role: "Core BGP Router & PPPoE Gateway",
+    role: "PPPoE Concentrator & Edge BRAS",
   }
 ];
 
@@ -272,9 +257,9 @@ export const INITIAL_OLTS: OltDevice[] = [
     location: "Somitir Hat Core POP",
     ponPorts: 8,
     usedPorts: 6,
-    activeOnu: 93,
-    offlineOnu: 64,
-    totalOnu: 157,
+    activeOnu: 53,
+    offlineOnu: 97,
+    totalOnu: 150,
     rxPower: -19.4,
     status: "online",
     lastSync: "Just now (Realtime)",
@@ -286,7 +271,7 @@ export const INITIAL_OLTS: OltDevice[] = [
     vendor: "BDCOM",
     model: "BDCOM P3616-2TE EPON OLT",
     ip: "103.12.173.136",
-    port: 1896,
+    port: 1894,
     connectionProtocol: "Telnet",
     username: "mbn@netx.com",
     password: "••••••••",
@@ -295,9 +280,9 @@ export const INITIAL_OLTS: OltDevice[] = [
     location: "Kalkini Distribution Hub",
     ponPorts: 8,
     usedPorts: 4,
-    activeOnu: 59,
-    offlineOnu: 97,
-    totalOnu: 156,
+    activeOnu: 49,
+    offlineOnu: 96,
+    totalOnu: 145,
     rxPower: -20.2,
     status: "online",
     lastSync: "Just now (Realtime)",
@@ -305,7 +290,47 @@ export const INITIAL_OLTS: OltDevice[] = [
   }
 ];
 
-export const INITIAL_ZONES: ServiceZone[] = [];
+export const INITIAL_ZONES: ServiceZone[] = [
+  {
+    id: "ZONE-SADAR",
+    name: "Madaripur Sadar & Somitir Hat",
+    code: "SADAR",
+    subzones: 4,
+    customers: 85,
+    active: 85,
+    due: 14,
+    mikrotik: "MikroTik-MBN-Core",
+    olt: "OLT1",
+    bandwidth: "850 Mbps",
+    status: "healthy",
+  },
+  {
+    id: "ZONE-PORT",
+    name: "Charmuguria Commercial Port",
+    code: "PORT",
+    subzones: 3,
+    customers: 65,
+    active: 65,
+    due: 10,
+    mikrotik: "MikroTik-MBN-Core",
+    olt: "OLT1",
+    bandwidth: "650 Mbps",
+    status: "healthy",
+  },
+  {
+    id: "ZONE-KALKINI",
+    name: "Kalkini & Thana Road Hub",
+    code: "KALKINI",
+    subzones: 6,
+    customers: 44,
+    active: 44,
+    due: 20,
+    mikrotik: "MikroTik-MBN-Core",
+    olt: "OLT2",
+    bandwidth: "450 Mbps",
+    status: "healthy",
+  }
+];
 
 export const INITIAL_INCIDENTS: NetworkIncident[] = [];
 
@@ -314,7 +339,7 @@ export const INITIAL_TELEMETRY: MetricPoint[] = [];
 // ─── Reactive Network Store with LocalStorage Persistence ─────────────────────
 
 const STORAGE_KEY_OLTS = "isp_network_olts_v2";
-const STORAGE_KEY_MIKROTIK = "isp_network_mikrotik_v2";
+const STORAGE_KEY_MIKROTIK = "isp_network_mikrotik_v4";
 const STORAGE_KEY_ZONES = "isp_network_zones_v2";
 const STORAGE_KEY_INCIDENTS = "isp_network_incidents_v2";
 
@@ -322,10 +347,12 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     if (typeof window !== "undefined" && window.localStorage) {
       const item = localStorage.getItem(key);
-      if (item) {
+      if (item !== null) {
         const parsed = JSON.parse(item);
-        if (Array.isArray(fallback) ? Array.isArray(parsed) : parsed) {
-          return parsed;
+        if (Array.isArray(fallback)) {
+          if (Array.isArray(parsed)) return parsed as unknown as T;
+        } else if (parsed && typeof parsed === "object") {
+          return { ...fallback, ...parsed } as unknown as T;
         }
       }
     }
@@ -345,14 +372,128 @@ function saveToStorage<T>(key: string, data: T): void {
   }
 }
 
+import {
+  subscribeToMikrotik,
+  saveMikrotikToFirestore,
+  deleteMikrotikFromFirestore,
+  subscribeToOlts,
+  saveOltToFirestore,
+  deleteOltFromFirestore,
+  subscribeToZones,
+  saveZoneToFirestore,
+  deleteZoneFromFirestore,
+  subscribeToIncidents,
+  saveIncidentToFirestore,
+} from "../../../lib/firestoreService";
+
 let sharedMikrotik = loadFromStorage(STORAGE_KEY_MIKROTIK, [...INITIAL_MIKROTIK]);
 let sharedOlts = loadFromStorage(STORAGE_KEY_OLTS, [...INITIAL_OLTS]);
 let sharedZones = loadFromStorage(STORAGE_KEY_ZONES, [...INITIAL_ZONES]);
 let sharedIncidents = loadFromStorage(STORAGE_KEY_INCIDENTS, [...INITIAL_INCIDENTS]);
 
-const listeners = new Set<() => void>();
+const listeners = new Set<(state?: any) => void>();
 function notify() {
-  listeners.forEach(cb => cb());
+  const currentState = { mikrotik: sharedMikrotik, olts: sharedOlts, zones: sharedZones, incidents: sharedIncidents };
+  listeners.forEach(cb => cb(currentState));
+}
+
+// Background Real-Time Cloud Firestore Sync
+let isInitialized = false;
+let hasMikrotikSynced = false;
+let hasOltsSynced = false;
+let hasZonesSynced = false;
+
+export function initNetworkFirestoreSync() {
+  if (isInitialized || typeof window === "undefined") return;
+  isInitialized = true;
+
+  subscribeToMikrotik(cloudMikrotik => {
+    if (cloudMikrotik && cloudMikrotik.length > 0) {
+      sharedMikrotik = cloudMikrotik as MikrotikServer[];
+      saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+      notify();
+    } else if (!hasMikrotikSynced && (!cloudMikrotik || cloudMikrotik.length === 0)) {
+      const wasInit = localStorage.getItem("isp_mikrotik_initialized");
+      if (!wasInit && INITIAL_MIKROTIK.length > 0) {
+        localStorage.setItem("isp_mikrotik_initialized", "true");
+        sharedMikrotik = [...INITIAL_MIKROTIK];
+        saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+        sharedMikrotik.forEach(m => saveMikrotikToFirestore(m));
+        notify();
+      } else {
+        sharedMikrotik = [];
+        saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+        notify();
+      }
+    } else {
+      sharedMikrotik = (cloudMikrotik || []) as MikrotikServer[];
+      saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+      notify();
+    }
+    hasMikrotikSynced = true;
+  });
+
+  subscribeToOlts(cloudOlts => {
+    if (cloudOlts && cloudOlts.length > 0) {
+      sharedOlts = cloudOlts as OltDevice[];
+      saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+      notify();
+    } else if (!hasOltsSynced && (!cloudOlts || cloudOlts.length === 0)) {
+      const wasInit = localStorage.getItem("isp_olts_initialized");
+      if (!wasInit && INITIAL_OLTS.length > 0) {
+        localStorage.setItem("isp_olts_initialized", "true");
+        sharedOlts = [...INITIAL_OLTS];
+        saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+        sharedOlts.forEach(o => saveOltToFirestore(o));
+        notify();
+      } else {
+        sharedOlts = [];
+        saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+        notify();
+      }
+    } else {
+      sharedOlts = (cloudOlts || []) as OltDevice[];
+      saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+      notify();
+    }
+    hasOltsSynced = true;
+  });
+
+  subscribeToZones(cloudZones => {
+    if (cloudZones && cloudZones.length > 0) {
+      sharedZones = cloudZones as ServiceZone[];
+      saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+      notify();
+    } else if (!hasZonesSynced && (!cloudZones || cloudZones.length === 0)) {
+      const wasInit = localStorage.getItem("isp_zones_initialized");
+      if (!wasInit && INITIAL_ZONES.length > 0) {
+        localStorage.setItem("isp_zones_initialized", "true");
+        sharedZones = [...INITIAL_ZONES];
+        saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+        sharedZones.forEach(z => saveZoneToFirestore(z));
+        notify();
+      } else {
+        sharedZones = [];
+        saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+        notify();
+      }
+    } else {
+      sharedZones = (cloudZones || []) as ServiceZone[];
+      saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+      notify();
+    }
+    hasZonesSynced = true;
+  });
+
+  subscribeToIncidents(cloudIncidents => {
+    sharedIncidents = (cloudIncidents || []) as NetworkIncident[];
+    saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
+    notify();
+  });
+}
+
+if (typeof window !== "undefined") {
+  setTimeout(() => initNetworkFirestoreSync(), 50);
 }
 
 export const networkStore = {
@@ -360,11 +501,26 @@ export const networkStore = {
   setMikrotik: (data: MikrotikServer[]) => {
     sharedMikrotik = data;
     saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+    data.forEach(s => saveMikrotikToFirestore(s));
     notify();
   },
   addMikrotik: (srv: MikrotikServer) => {
     sharedMikrotik = [srv, ...sharedMikrotik];
     saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+    saveMikrotikToFirestore(srv);
+    notify();
+  },
+  updateMikrotik: (id: string, updates: Partial<MikrotikServer>) => {
+    sharedMikrotik = sharedMikrotik.map(s => s.id === id ? { ...s, ...updates } : s);
+    saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+    const updated = sharedMikrotik.find(s => s.id === id);
+    if (updated) saveMikrotikToFirestore(updated);
+    notify();
+  },
+  deleteMikrotik: (id: string) => {
+    sharedMikrotik = sharedMikrotik.filter(s => s.id !== id);
+    saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
+    deleteMikrotikFromFirestore(id);
     notify();
   },
 
@@ -372,21 +528,26 @@ export const networkStore = {
   setOlts: (data: OltDevice[]) => {
     sharedOlts = data;
     saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+    data.forEach(o => saveOltToFirestore(o));
     notify();
   },
   addOlt: (olt: OltDevice) => {
     sharedOlts = [olt, ...sharedOlts];
     saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+    saveOltToFirestore(olt);
     notify();
   },
   updateOlt: (id: string, updates: Partial<OltDevice>) => {
     sharedOlts = sharedOlts.map(o => o.id === id ? { ...o, ...updates } : o);
     saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+    const updated = sharedOlts.find(o => o.id === id);
+    if (updated) saveOltToFirestore(updated);
     notify();
   },
   deleteOlt: (id: string) => {
     sharedOlts = sharedOlts.filter(o => o.id !== id);
     saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
+    deleteOltFromFirestore(id);
     notify();
   },
 
@@ -394,11 +555,19 @@ export const networkStore = {
   setZones: (data: ServiceZone[]) => {
     sharedZones = data;
     saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+    data.forEach(z => saveZoneToFirestore(z));
     notify();
   },
   addZone: (z: ServiceZone) => {
     sharedZones = [z, ...sharedZones];
     saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+    saveZoneToFirestore(z);
+    notify();
+  },
+  deleteZone: (id: string) => {
+    sharedZones = sharedZones.filter(z => z.id !== id);
+    saveToStorage(STORAGE_KEY_ZONES, sharedZones);
+    deleteZoneFromFirestore(id);
     notify();
   },
 
@@ -406,23 +575,28 @@ export const networkStore = {
   setIncidents: (data: NetworkIncident[]) => {
     sharedIncidents = data;
     saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
+    data.forEach(inc => saveIncidentToFirestore(inc));
     notify();
   },
   addIncident: (inc: NetworkIncident) => {
     sharedIncidents = [inc, ...sharedIncidents];
     saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
+    saveIncidentToFirestore(inc);
     notify();
   },
   resolveIncident: (id: string) => {
     sharedIncidents = sharedIncidents.map(i => i.id === id ? { ...i, status: "resolved" } : i);
     saveToStorage(STORAGE_KEY_INCIDENTS, sharedIncidents);
+    const updated = sharedIncidents.find(i => i.id === id);
+    if (updated) saveIncidentToFirestore(updated);
     notify();
   },
 
-  subscribe: (cb: () => void) => {
+  subscribe: (cb: (state?: any) => void) => {
     listeners.add(cb);
     return () => {
       listeners.delete(cb);
     };
   }
 };
+

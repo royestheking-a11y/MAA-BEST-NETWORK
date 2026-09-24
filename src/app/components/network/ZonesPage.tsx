@@ -1,17 +1,22 @@
+import { useNetxLiveData } from "../../services/netxApiService";
 import { useState, useEffect } from "react";
 import {
   Layers, MapPin, Users, Plus, Search, ChevronRight, CheckCircle2,
-  AlertTriangle, XCircle, X, Shield, Activity, Radio, Server
+  AlertTriangle, XCircle, X, Shield, Activity, Radio, Server, Trash2
 } from "lucide-react";
 import {
   networkStore, type ServiceZone
 } from "./networkData";
+
+import { usePermission } from "../../context/AuthContext";
 
 interface ZonesPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function ZonesPage({ onNavigate }: ZonesPageProps) {
+  const { canEdit, isReadOnly } = usePermission("zones");
+  const { isLoading: isNetxLoading } = useNetxLiveData(30000);
   const [zones, setZones] = useState<ServiceZone[]>(networkStore.getZones());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -43,9 +48,13 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
   });
 
   const handleAddZone = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role only has Read (View Only) permission for Zones.");
+      return;
+    }
     if (!newZone.name || !newZone.code) return;
     const zone: ServiceZone = {
-      id: `ZN-${(zones.length + 1).toString().padStart(2, "0")}`,
+      id: `ZN-${Date.now().toString().slice(-4)}`,
       name: newZone.name,
       code: newZone.code.toUpperCase(),
       subzones: Number(newZone.subzones),
@@ -74,6 +83,15 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
     color: "var(--foreground)",
   };
 
+  if (isNetxLoading) {
+    return (
+      <div className="p-6 h-screen flex flex-col items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-muted-foreground font-medium">Synchronizing Network Zones...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-3 sm:p-6">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
@@ -94,8 +112,11 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
 
         <button
           onClick={() => setShowAddZone(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-          style={{ background: "var(--primary)", fontSize: 13 }}
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+          }`}
+          style={isReadOnly || !canEdit ? {} : { background: "var(--primary)", fontSize: 13 }}
         >
           <Plus size={14} /> Add Service Zone
         </button>
@@ -111,7 +132,7 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
             </div>
           </div>
           <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, color: "var(--foreground)", marginBottom: 2 }}>
-            {totalSubscribers.toLocaleString()}
+            {(totalSubscribers || 0).toLocaleString()}
           </p>
           <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>Across all active territory zones</p>
         </div>
@@ -126,7 +147,7 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
           <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, color: "#2563EB", marginBottom: 2 }}>
             {Math.round((totalActive / (totalSubscribers || 1)) * 100)}%
           </p>
-          <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{totalActive.toLocaleString()} subscribers online</p>
+          <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{(totalActive || 0).toLocaleString()} subscribers online</p>
         </div>
 
         <div className="rounded-xl p-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
@@ -226,12 +247,12 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
                     {z.subzones} Clusters
                   </td>
                   <td className="px-5 py-4 font-mono text-xs font-bold text-foreground">
-                    {z.customers.toLocaleString()}
+                    {(z.customers || 0).toLocaleString()}
                   </td>
                   <td className="px-5 py-4">
                     <div>
                       <span className="font-mono text-xs font-bold" style={{ color: hasIssue ? "#DC2626" : "#16A34A" }}>
-                        {z.active.toLocaleString()}
+                        {(z.active || 0).toLocaleString()}
                       </span>
                       <span style={{ fontSize: 11, color: "var(--muted-foreground)", marginLeft: 4 }}>({activePct}%)</span>
                     </div>
@@ -259,15 +280,33 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
                     </span>
                   </td>
                   <td className="px-5 py-4">
-                    <button
-                      onClick={() => {
-                        setSelectedZone(z);
-                        showToast(`Viewing sub-zone details for ${z.name}`);
-                      }}
-                      className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                    >
-                      Inspect <ChevronRight size={13} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedZone(z);
+                          showToast(`Viewing sub-zone details for ${z.name}`);
+                        }}
+                        className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        Inspect <ChevronRight size={13} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (isReadOnly || !canEdit) {
+                            showToast("Access Restricted: View Only Mode.");
+                            return;
+                          }
+                          if (window.confirm(`Permanently delete coverage zone "${z.name}" (${z.code})?`)) {
+                            networkStore.deleteZone(z.id);
+                            showToast(`Zone "${z.name}" deleted from database.`);
+                          }
+                        }}
+                        className="p-1 rounded-md text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Delete zone"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -381,10 +420,10 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
               </button>
               <button
                 onClick={handleAddZone}
-                disabled={!newZone.name || !newZone.code}
+                disabled={!newZone.name || !newZone.code || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary disabled:opacity-50"
               >
-                Create Zone
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Create Zone"}
               </button>
             </div>
           </div>

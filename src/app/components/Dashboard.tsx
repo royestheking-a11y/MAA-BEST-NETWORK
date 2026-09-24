@@ -1,18 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, Cell
+  ResponsiveContainer, BarChart, Bar
 } from "recharts";
 import {
-  Users, TrendingUp, AlertTriangle, Wifi, DollarSign, ArrowUpRight,
-  ArrowDownRight, Circle, Server, Radio, BrainCircuit,
-  AlertCircle, ShieldAlert, ChevronRight, Clock, CheckCircle2,
-  CreditCard, Zap, Sparkles, Send, MapPin, Inbox, Mail, Receipt, Activity, Percent,
-  UserPlus, Calendar, FileText, Wallet, Landmark, CheckSquare
+  Users, AlertTriangle, Wifi, Circle, Server, Radio,
+  AlertCircle, ChevronRight, Clock, CheckCircle2,
+  CreditCard, Zap, Sparkles, Send, MapPin, Inbox,
+  UserPlus, Calendar, CheckSquare
 } from "lucide-react";
 import { useCustomerContext } from "../context/CustomerContext";
 import { billingStore } from "./billing/billingData";
-import { crmStore } from "./crm/crmData";
 import { useLanguage } from "../context/LanguageContext";
 import { useNetxLiveData } from "../services/netxApiService";
 
@@ -20,67 +18,6 @@ function fmt(n: number) {
   if (n >= 100000) return `৳${(n / 100000).toFixed(1)}L`;
   if (n >= 1000) return `৳${(n / 1000).toFixed(0)}K`;
   return `৳${n.toLocaleString()}`;
-}
-
-interface KPICardProps {
-  label: string;
-  value: string;
-  sub: string;
-  icon: React.ElementType;
-  iconColor: string;
-  iconBg: string;
-  trend?: { val: string; up: boolean };
-  onClick?: () => void;
-}
-
-function KPICard({ label, value, sub, icon: Icon, iconColor, iconBg, trend, onClick }: KPICardProps) {
-  return (
-    <div
-      onClick={onClick}
-      className={`rounded-xl p-5 transition-all ${onClick ? "cursor-pointer hover:shadow-md" : ""}`}
-      style={{
-        background: "var(--card)",
-        border: "1px solid var(--border)",
-      }}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div
-          className="flex items-center justify-center rounded-lg"
-          style={{ width: 36, height: 36, background: iconBg }}
-        >
-          <Icon size={18} style={{ color: iconColor }} />
-        </div>
-        {trend && (
-          <div
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full"
-            style={{
-              background: trend.up ? "#DCFCE7" : "#FEE2E2",
-              fontSize: 11,
-              fontWeight: 600,
-              color: trend.up ? "#16A34A" : "#DC2626",
-            }}
-          >
-            {trend.up ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-            {trend.val}
-          </div>
-        )}
-      </div>
-      <p
-        style={{
-          fontFamily: "var(--font-display)",
-          fontWeight: 700,
-          fontSize: 24,
-          color: "var(--foreground)",
-          lineHeight: 1.1,
-          marginBottom: 4,
-        }}
-      >
-        {value}
-      </p>
-      <p style={{ fontSize: 13, fontWeight: 500, color: "var(--foreground)", marginBottom: 2 }}>{label}</p>
-      <p style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{sub}</p>
-    </div>
-  );
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -138,32 +75,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   // Real-time NetX live stats & OLT servers data
-  const { oltServers, liveStats } = useNetxLiveData(30000);
+  const { oltServers, liveStats, isLoading: isNetxLoading } = useNetxLiveData(30000);
 
   // ── REAL AGGREGATIONS CALCULATED DIRECTLY FROM LIVE DATABASE ──────────
   const totalCustomers = customers.length;
   const activeSubscribers = useMemo(() => customers.filter(c => c.status === "active"), [customers]);
   const activeCustomersCount = activeSubscribers.length;
-  const onlineCustomersCount = useMemo(() => customers.filter(c => c.netStatus === "online").length, [customers]);
-  const dueCustomers = useMemo(() => customers.filter(c => (c.dueAmount || 0) > 0 || c.status === "due"), [customers]);
-  const totalDue = useMemo(() => customers.reduce((sum, c) => sum + (c.dueAmount || 0), 0), [customers]);
+  const onlineCustomersCount = useMemo(() => {
+    if (liveStats && liveStats.length > 0) {
+      return liveStats.filter(c => c.connection_status === 'online').length;
+    }
+    return 0;
+  }, [liveStats]);
+  const dueCustomers = useMemo(() => customers.filter(c => c.userType !== "free" && ((c.dueAmount || 0) > 0 || c.status === "due")), [customers]);
+  const totalDue = useMemo(() => customers.filter(c => c.userType !== "free").reduce((sum, c) => sum + (c.dueAmount || 0), 0), [customers]);
   const monthlyRevenue = useMemo(() => activeSubscribers.reduce((sum, c) => sum + (c.monthlyBill || c.price || 500), 0), [activeSubscribers]);
   const paidCustomersCount = useMemo(() => activeSubscribers.filter(c => (c.dueAmount || 0) === 0).length, [activeSubscribers]);
 
-  // Top 20 Unpaid Clients List sorted by highest due amount
+  // Top 20 Unpaid Clients List sorted by highest due amount (excludes Free tier)
   const top20UnpaidClients = useMemo(() => {
     return customers
-      .filter(c => (c.dueAmount || 0) > 0)
+      .filter(c => c.userType !== "free" && (c.dueAmount || 0) > 0)
       .sort((a, b) => (b.dueAmount || 0) - (a.dueAmount || 0) || (a.clientCode || a.id).localeCompare(b.clientCode || b.id))
       .slice(0, 20);
   }, [customers]);
-
-  // Company Performance Active Client Growth
-  const companyPerformanceData = [
-    { month: "Jul", count: 190, fill: "#F97316" },
-    { month: "Aug", count: 164, fill: "#0EA5E9" },
-    { month: "Sep", count: activeCustomersCount > 0 ? activeCustomersCount : 164, fill: "#0EA5E9" },
-  ];
 
   // Merge customer internal payment history and direct cashier billing payments
   const allPayments = useMemo(() => {
@@ -220,57 +155,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       { month: currentMonthName, revenue: monthlyRevenue, collection: todayCollected > 0 ? todayCollected : monthlyRevenue }
     ];
   }, [monthlyRevenue, todayCollected]);
-
-  const [crmTickets, setCrmTickets] = useState(crmStore.getTickets());
-  useEffect(() => {
-    return crmStore.subscribe(() => {
-      setCrmTickets(crmStore.getTickets());
-    });
-  }, []);
-
-  const problemSolvers = useMemo(() => {
-    const techCounts: Record<string, number> = {
-      "Sumon (Kalkini Hub)": 0,
-      "Nasir Uddin (Somitir Hat Unit)": 0,
-      "Tareq Hossain (NOC Support)": 0,
-      "Rahim (Madaripur Sadar)": 0,
-    };
-
-    crmTickets.forEach(t => {
-      if (t.status === "resolved" || t.status === "closed") {
-        const key = Object.keys(techCounts).find(k => k.toLowerCase().includes(t.assignedTech.toLowerCase())) || "Tareq Hossain (NOC Support)";
-        techCounts[key] = (techCounts[key] || 0) + 1;
-      }
-    });
-
-    const list = [
-      { name: "Nasir Uddin (Somitir Hat Unit)", solved: 42 + techCounts["Nasir Uddin (Somitir Hat Unit)"] },
-      { name: "Sumon (Kalkini Hub)", solved: 38 + techCounts["Sumon (Kalkini Hub)"] },
-      { name: "Tareq Hossain (NOC Support)", solved: 29 + techCounts["Tareq Hossain (NOC Support)"] },
-      { name: "Rahim (Madaripur Sadar)", solved: 19 + techCounts["Rahim (Madaripur Sadar)"] },
-    ];
-    const max = Math.max(...list.map(l => l.solved), 1);
-    return list.map(l => ({ ...l, percentage: Math.round((l.solved / max) * 100) }));
-  }, [crmTickets]);
-
-  const monthlyNewClients = useMemo(() => {
-    const total = customers.length || 192;
-    const apr = Math.max(15, Math.round(total * 0.52));
-    const may = Math.max(25, Math.round(total * 0.65));
-    const jun = Math.max(40, Math.round(total * 0.76));
-    const jul = Math.max(60, Math.round(total * 0.86));
-    const currentCount = total;
-
-    const currentMonthName = now.toLocaleDateString("en-GB", { month: "short" });
-
-    return [
-      { month: "Apr", count: apr, h: `${Math.round((apr / currentCount) * 100)}%` },
-      { month: "May", count: may, h: `${Math.round((may / currentCount) * 100)}%` },
-      { month: "Jun", count: jun, h: `${Math.round((jun / currentCount) * 100)}%` },
-      { month: "Jul", count: jul, h: `${Math.round((jul / currentCount) * 100)}%` },
-      { month: currentMonthName, count: currentCount, h: "100%", current: true },
-    ];
-  }, [customers, now]);
 
   const networkDevices = useMemo(() => {
     const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
@@ -375,15 +259,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
+            onClick={() => onNavigate?.("add-client")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-card border border-border hover:bg-muted text-xs font-bold text-foreground transition-all cursor-pointer shadow-2xs"
+          >
+            <UserPlus size={13} className="text-primary" />
+            <span>{t("Add New Client")}</span>
+          </button>
+
+          <button
             onClick={() => onNavigate?.("onu-events")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-card border border-border hover:bg-muted text-xs font-bold text-foreground transition-all cursor-pointer shadow-2xs">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-card border border-border hover:bg-muted text-xs font-bold text-foreground transition-all cursor-pointer shadow-2xs"
+          >
             <MapPin size={13} className="text-primary" />
             <span>{t("ONU Spatial Map")}</span>
           </button>
 
           <button
             onClick={() => onNavigate?.("mikrotik")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-primary hover:opacity-95 text-xs font-bold text-white transition-all cursor-pointer shadow-2xs">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-primary hover:opacity-95 text-xs font-bold text-white transition-all cursor-pointer shadow-2xs"
+          >
             <Server size={13} />
             <span>{t("MikroTik Provisioning")}</span>
           </button>
@@ -398,271 +292,190 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      {/* ── MAA BEST NETWORK 8 CORE KPI STATS (System Theme Styling) ── */}
-      <div className="space-y-3">
-        {/* Row 1: SMS Balance, Remaining Balance, Daily Charged, Approximate Rechargable */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* SMS Balance */}
-          <div
-            onClick={() => onNavigate?.("sms")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">SMS Balance</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ 0</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">0 SMS In Gateway</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Mail size={20} />
-            </div>
+      {/* ── UNIFIED CORE ISP PERFORMANCE METRICS (8 Real-Time Dynamic KPI Cards) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+        
+        {/* Total Clients */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("customers")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("customers"); } }}
+          title="Click to view All Clients list"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-purple-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-purple-500/20 transition-all">
+            <Users size={24} />
           </div>
-
-          {/* Remaining Balance */}
-          <div
-            onClick={() => onNavigate?.("accounts")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Remaining Balance</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ -596.86</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Cash Desk Float Balance</p>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Total Clients</p>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <span className="font-extrabold text-xl leading-none">৳</span>
-            </div>
-          </div>
-
-          {/* Daily Charged */}
-          <div
-            onClick={() => onNavigate?.("invoices")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Daily Charged</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ 1119.34</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Today's Recurring Bandwidth</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Clock size={20} />
-            </div>
-          </div>
-
-          {/* Approximate Rechargable */}
-          <div
-            onClick={() => onNavigate?.("due-customers")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Approximate Rechargable</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ 43,930.00</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Projected Monthly Billables</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <CreditCard size={20} />
-            </div>
+            <h3 className="text-2xl font-black text-purple-600 dark:text-purple-400">{totalCustomers}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{activeCustomersCount} Active Subscriptions</p>
           </div>
         </div>
 
-        {/* Row 2: Monthly Charged, Monthly Payment, Monthly Discount, Balance Due */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Monthly Charged */}
-          <div
-            onClick={() => onNavigate?.("invoices")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Monthly Charged</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ 1119.34</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Sep 2026 Invoiced Sum</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Receipt size={20} />
-            </div>
+        {/* Active Subscriptions */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("customers")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("customers"); } }}
+          title="Click to view Active Clients"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-emerald-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all">
+            <CheckCircle2 size={24} />
           </div>
-
-          {/* Monthly Payment */}
-          <div
-            onClick={() => onNavigate?.("payments")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Monthly Payment</p>
-              <h3 className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">৳ {todayCollected.toFixed(2)}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Realized Collections</p>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Active Subscriptions</p>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <CheckCircle2 size={20} />
-            </div>
-          </div>
-
-          {/* Monthly Discount */}
-          <div
-            onClick={() => onNavigate?.("discounts")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Monthly Discount</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ 0.00</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Waivers & Adjustments</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Percent size={20} />
-            </div>
-          </div>
-
-          {/* Balance Due */}
-          <div
-            onClick={() => onNavigate?.("due-customers")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Balance Due</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ {totalDue.toLocaleString()}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{dueCustomers.length} Overdue Accounts Pending</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <AlertCircle size={20} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PROBLEM OCCURRENCE & ONLINE CLIENT ANALYTICS (Theme Layout) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Zone Wise Problem Occurrence */}
-        <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="border-b border-border pb-2.5">
-            <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">Zone Wise Problem Occurrence</h4>
-          </div>
-          <div className="py-6 text-center text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">No data</p>
-            <p className="text-[11px] mt-1 text-emerald-600 dark:text-emerald-400 font-medium">All zones reporting 100% optical stability</p>
-          </div>
-          <div className="pt-2 border-t border-border flex justify-between text-[11px] text-muted-foreground">
-            <span>DHAKA DIVISION: 0</span>
-            <span>MADARIPUR: 0</span>
+            <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCustomersCount}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Operational Lines</p>
           </div>
         </div>
 
-        {/* Sub-Zone Wise Problem Occurrence */}
-        <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="border-b border-border pb-2.5">
-            <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">Sub-Zone Wise Problem Occurrence</h4>
+        {/* Online Now */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("online-clients")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("online-clients"); } }}
+          title="Click to view Online Clients Monitoring"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-sky-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-sky-500/20 transition-all">
+            <Wifi size={24} />
           </div>
-          <div className="py-6 text-center text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">No data</p>
-            <p className="text-[11px] mt-1 text-emerald-600 dark:text-emerald-400 font-medium">Kalkini Somitir Hat PON lines 0 LOS events</p>
-          </div>
-          <div className="pt-2 border-t border-border flex justify-between text-[11px] text-muted-foreground">
-            <span>SOMITIR HAT: 0</span>
-            <span>MIRPUR-10: 0</span>
-          </div>
-        </div>
-
-        {/* Total Online Clients & Google DNS (Stacked Theme Tiles) */}
-        <div className="flex flex-col gap-3">
-          {/* Total Online Clients Card */}
-          <div
-            onClick={() => onNavigate?.("online-clients")}
-            className="rounded-xl p-4 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <h4 className="text-xs font-bold text-foreground uppercase">Total Online Clients</h4>
-              <p className="text-base font-bold text-primary mt-0.5">Total users:{onlineCustomersCount}</p>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Online Now</p>
+              <span className="text-[10px] text-sky-600 dark:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
-            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary border border-primary/15 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Wifi size={18} />
+            <h3 className="text-2xl font-black text-sky-600 dark:text-sky-400">{isNetxLoading ? <span className="animate-pulse opacity-50">...</span> : onlineCustomersCount}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Live Telemetry Sessions</p>
+          </div>
+        </div>
+
+        {/* Due Clients */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("due-customers")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("due-customers"); } }}
+          title="Click to view Due Clients list & Send Reminders"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-rose-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-rose-500/20 transition-all">
+            <AlertTriangle size={24} />
+          </div>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Due Clients</p>
+              <span className="text-[10px] text-rose-600 dark:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
+            <h3 className="text-2xl font-black text-rose-600 dark:text-rose-400">{dueCustomers.length}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Accounts Pending Clearance</p>
           </div>
+        </div>
 
-          {/* Google DNS (Last Ping) */}
-          <div
-            onClick={() => onNavigate?.("monitoring")}
-            className="rounded-xl p-4 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <h4 className="text-xs font-bold text-foreground uppercase">Google DNS (Last Ping)</h4>
-              <p className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">8.8.8.8 · 12ms (0% Loss)</p>
+        {/* Monthly Expected Bill */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("invoices")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("invoices"); } }}
+          title="Click to view Monthly Invoices & Subscriptions"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-indigo-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all">
+            <Calendar size={24} />
+          </div>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Monthly Expected Bill</p>
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Activity size={18} />
+            <h3 className="text-2xl font-black text-indigo-600 dark:text-indigo-400">৳{monthlyRevenue.toLocaleString()}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Active Subscribers Expected</p>
+          </div>
+        </div>
+
+        {/* Collected This Month */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("payments")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("payments"); } }}
+          title="Click to view Bill Collections & History"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-emerald-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all">
+            <CheckSquare size={24} />
+          </div>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Collected Bill</p>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
+            <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400">৳{todayCollected.toLocaleString()}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Real-time Verified Payments</p>
           </div>
         </div>
 
-        {/* Monthly Problem Occurrence */}
-        <div className="bg-card border border-border rounded-xl p-4 shadow-xs flex flex-col justify-between">
-          <div className="border-b border-border pb-2.5">
-            <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">Monthly Problem Occurrence</h4>
+        {/* Total Outstanding Due */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("due-customers")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("due-customers"); } }}
+          title="Click to view Outstanding Dues"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-rose-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-rose-500/20 transition-all">
+            <AlertCircle size={24} />
           </div>
-          <div className="py-6 text-center text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">No data</p>
-            <p className="text-[11px] mt-1 text-primary font-medium">99.9% SLA optical line uptime</p>
-          </div>
-          <div className="pt-2 border-t border-border flex justify-between text-[11px] text-muted-foreground">
-            <span>Avg Resolve: 15m</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold">Complaints: 0</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── MOST PROBLEM SOLVER & MONTHLY NEW CLIENT CHARTS (Theme Styling) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Most Problem Solver (Quantity) */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-2.5">
-            <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">Most Problem Solver (Quantity)</h3>
-            <span className="text-[11px] text-muted-foreground font-medium">Top Field Engineers</span>
-          </div>
-
-          <div className="space-y-3 pt-1">
-            {problemSolvers.map((tech, i) => (
-              <div key={tech.name} className="space-y-1">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-foreground">{tech.name}</span>
-                  <span className="font-bold text-primary">{tech.solved} solved</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500 bg-primary"
-                    style={{ width: `${tech.percentage}%`, opacity: 1 - i * 0.18 }}
-                  />
-                </div>
-              </div>
-            ))}
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Total Outstanding Due</p>
+              <span className="text-[10px] text-rose-600 dark:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
+            </div>
+            <h3 className="text-2xl font-black text-rose-600 dark:text-rose-400">৳{totalDue.toLocaleString()}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Excludes Free & VIP Exemptions</p>
           </div>
         </div>
 
-        {/* Monthly New Client */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-2.5">
-            <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">Monthly New Client</h3>
-            <span className="text-[11px] text-primary font-bold">+{customers.length} Total Subscribers</span>
+        {/* Paid / Cleared Accounts */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavigate?.("customers")}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.("customers"); } }}
+          title="Click to view Paid Subscribers in Good Standing"
+          className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-teal-500/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all group select-none"
+        >
+          <div className="w-12 h-12 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:bg-teal-500/20 transition-all">
+            <CreditCard size={24} />
           </div>
-
-          <div className="h-44 flex items-end justify-between gap-3 pt-4 px-2">
-            {monthlyNewClients.map(item => (
-              <div key={item.month} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                <span className="text-[11px] font-bold text-foreground">{item.count}</span>
-                <div
-                  className="w-full max-w-[42px] rounded-t-lg transition-all"
-                  style={{
-                    height: item.h,
-                    background: item.current
-                      ? "var(--primary)"
-                      : "var(--muted)",
-                  }}
-                />
-                <span className="text-[11px] font-medium text-muted-foreground">{item.month}</span>
-              </div>
-            ))}
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1 mb-1">
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Cleared Accounts</p>
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
+            </div>
+            <h3 className="text-2xl font-black text-teal-600 dark:text-teal-400">{paidCustomersCount}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Zero Due · Good Standing</p>
           </div>
         </div>
+
       </div>
 
       {/* ── Active Incident & 1-Click Solution Bar ────────────── */}
       {activeIssues.length > 0 && (
-        <div className="rounded-3xl p-4 md:p-5 bg-card border border-border shadow-xs space-y-3">
+        <div className="rounded-3xl p-4 md:p-5 bg-card border border-border shadow-xs space-y-3 mb-6">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="flex h-2.5 w-2.5 relative">
@@ -723,7 +536,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       )}
 
-      {/* Revenue chart + Network health */}
+      {/* ── Revenue Analytics + Network Health ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 mb-6">
         {/* Revenue chart */}
         <div
@@ -747,15 +560,23 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 Monthly revenue vs. collection trends
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 rounded-full" style={{ background: "#8B2020" }} />
-                <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>Revenue</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded-full" style={{ background: "#8B2020" }} />
+                  <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>Revenue</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded-full" style={{ background: "#C4847A" }} />
+                  <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>Collection</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 rounded-full" style={{ background: "#C4847A" }} />
-                <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>Collection</span>
-              </div>
+              <button
+                onClick={() => onNavigate?.("revenue-reports")}
+                className="text-xs font-semibold text-primary hover:underline ml-2 cursor-pointer"
+              >
+                Detailed Report →
+              </button>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
@@ -881,15 +702,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             })}
           </div>
           <div className="mt-auto pt-3 flex gap-4" style={{ borderTop: "1px solid var(--border)", marginTop: 12 }}>
-            <button onClick={() => onNavigate?.("mikrotik")} className="flex-1 text-center hover:opacity-80 transition-opacity">
+            <button onClick={() => onNavigate?.("mikrotik")} className="flex-1 text-center hover:opacity-80 transition-opacity cursor-pointer">
               <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>MikroTik</p>
               <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>1/1</p>
             </button>
-            <button onClick={() => onNavigate?.("olt")} className="flex-1 text-center hover:opacity-80 transition-opacity" style={{ borderLeft: "1px solid var(--border)" }}>
+            <button onClick={() => onNavigate?.("olt")} className="flex-1 text-center hover:opacity-80 transition-opacity cursor-pointer" style={{ borderLeft: "1px solid var(--border)" }}>
               <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>OLT</p>
               <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>1/1</p>
             </button>
-            <button onClick={() => onNavigate?.("network-map")} className="flex-1 text-center hover:opacity-80 transition-opacity" style={{ borderLeft: "1px solid var(--border)" }}>
+            <button onClick={() => onNavigate?.("network-map")} className="flex-1 text-center hover:opacity-80 transition-opacity cursor-pointer" style={{ borderLeft: "1px solid var(--border)" }}>
               <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>ONU</p>
               <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>{onlineCustomersCount}/{totalCustomers}</p>
             </button>
@@ -897,188 +718,72 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      {/* Bottom: Zone collection + Due customers */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Zone collection bar chart */}
+      {/* ── Operational Breakdown: Collection by Zone + Top 20 Unpaid Clients ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Left: Zone collection bar chart */}
         <div
-          className="rounded-xl p-5"
-          style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+          className="lg:col-span-5 rounded-2xl p-5 bg-card border border-border shadow-xs flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between mb-4">
-            <h2
-              style={{
-                fontFamily: "var(--font-display)",
-                fontWeight: 600,
-                fontSize: 15,
-                color: "var(--foreground)",
-              }}
-            >
-              Collection by Zone
-            </h2>
+          <div className="flex items-center justify-between border-b border-border pb-3 mb-3">
+            <div>
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">
+                Collection by Zone
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Real-time revenue & dues by geographic area</p>
+            </div>
             <button
               onClick={() => onNavigate?.("revenue-reports")}
-              className="text-xs font-semibold text-primary hover:underline"
+              className="text-xs font-semibold text-primary hover:underline cursor-pointer"
             >
-              View Zone Matrix →
+              View Matrix →
             </button>
           </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={collectionByZone} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
-              <XAxis
-                dataKey="zone"
-                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tickFormatter={v => `৳${(v / 1000).toFixed(0)}K`}
-                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                formatter={(v, name) => [fmt(v as number), name === "collected" ? "Collected" : "Outstanding"]}
-                contentStyle={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-              />
-              <Bar key="bar-collected" isAnimationActive={false} dataKey="collected" fill="#8B2020" radius={[3, 3, 0, 0]} name="collected" />
-              <Bar key="bar-due" isAnimationActive={false} dataKey="due" fill="#FECACA" radius={[3, 3, 0, 0]} name="due" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Due Customers (Real) */}
-        <div
-          className="rounded-xl"
-          style={{ background: "var(--card)", border: "1px solid var(--border)", overflow: "hidden" }}
-        >
-          <div
-            className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: "1px solid var(--border)" }}
-          >
-            <h2
-              style={{
-                fontFamily: "var(--font-display)",
-                fontWeight: 600,
-                fontSize: 15,
-                color: "var(--foreground)",
-              }}
-            >
-              Due Customers ({dueCustomers.length})
-            </h2>
-            <button
-              onClick={() => onNavigate?.("due-customers")}
-              className="flex items-center gap-1"
-              style={{ fontSize: 12, color: "var(--primary)", fontWeight: 500 }}
-            >
-              View all <ChevronRight size={13} />
-            </button>
-          </div>
-          <div>
-            {dueCustomers.length === 0 ? (
-              <div className="p-8 text-center flex flex-col items-center justify-center text-muted-foreground">
-                <CheckCircle2 size={32} className="text-emerald-500 mb-2 opacity-80" />
-                <p className="text-xs font-bold text-foreground">Zero Overdue Accounts</p>
-                <p className="text-[11px] text-muted-foreground">All subscriber accounts are currently in good standing.</p>
-              </div>
-            ) : (
-              dueCustomers.map((c, i) => (
-                <div
-                  key={c.id}
-                  onClick={() => onNavigate?.("due-customers")}
-                  className="flex items-center justify-between px-5 py-3 transition-colors cursor-pointer"
-                  style={{ borderBottom: i < dueCustomers.length - 1 ? "1px solid var(--border)" : "none" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "var(--muted)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="flex items-center justify-center rounded-full text-white flex-shrink-0"
-                      style={{
-                        width: 30,
-                        height: 30,
-                        background: "var(--primary)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {c.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 500, color: "var(--foreground)" }}>{c.name}</p>
-                      <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                        {c.subzone || c.zone} · {c.package}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "#DC2626",
-                      }}
-                    >
-                      ৳{c.dueAmount.toLocaleString()}
-                    </p>
-                    <p style={{ fontSize: 11, color: "#D97706" }}>Payment Due</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── COMPANY PERFORMANCE (ACTIVE CLIENT) & TOP 20 UNPAID CLIENT TABLE ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left: Company Performance (Active Client) */}
-        <div className="lg:col-span-5 bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between border-b border-border pb-3 mb-3">
-            <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">
-              Company Performance (Active Client)
-            </h3>
-            <span className="w-4 h-2 bg-primary rounded-xs inline-block" />
-          </div>
-
-          <div className="h-56 w-full pt-2">
+          <div className="h-56 w-full pt-1">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={companyPerformanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={collectionByZone} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 300]} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  formatter={(v) => [`${v} Active Subscribers`, "Active Clients"]}
-                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                <XAxis
+                  dataKey="zone"
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {companyPerformanceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
+                <YAxis
+                  tickFormatter={v => `৳${(v / 1000).toFixed(0)}K`}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  formatter={(v, name) => [fmt(v as number), name === "collected" ? "Collected" : "Outstanding"]}
+                  contentStyle={{
+                    background: "var(--card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Bar key="bar-collected" isAnimationActive={false} dataKey="collected" fill="#8B2020" radius={[3, 3, 0, 0]} name="collected" />
+                <Bar key="bar-due" isAnimationActive={false} dataKey="due" fill="#FECACA" radius={[3, 3, 0, 0]} name="due" />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <div className="flex items-center justify-center gap-6 pt-3 border-t border-border text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#F97316]" /> Jul: 190</div>
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#0EA5E9]" /> Aug: 164</div>
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#0EA5E9]" /> Sep: {activeCustomersCount > 0 ? activeCustomersCount : 164}</div>
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#8B2020]" /> Collected: ৳{todayCollected.toLocaleString()}</div>
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#FECACA]" /> Total Due: ৳{totalDue.toLocaleString()}</div>
           </div>
         </div>
 
         {/* Right: TOP 20 UNPAID CLIENT Table */}
         <div className="lg:col-span-7 bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-border pb-3 mb-2">
-            <h3 className="text-xs font-bold text-foreground uppercase tracking-wide flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              TOP 20 UNPAID CLIENT ({dueCustomers.length} Total Unpaid)
-            </h3>
+            <div>
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wide flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                Top Unpaid Accounts ({dueCustomers.length} Total Overdue)
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Prioritized by highest outstanding due</p>
+            </div>
             <button
               onClick={() => onNavigate?.("due-customers")}
               className="text-xs font-semibold text-primary hover:underline cursor-pointer"
@@ -1087,168 +792,49 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </button>
           </div>
 
-          <div className="overflow-x-auto max-h-[260px] overflow-y-auto scrollbar-thin">
+          <div className="overflow-x-auto max-h-[240px] overflow-y-auto scrollbar-thin">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-muted/90 backdrop-blur-xs text-muted-foreground border-b border-border">
                 <tr>
-                  <th className="text-left py-2 px-3 font-semibold">User Name</th>
-                  <th className="text-left py-2 px-3 font-semibold">Mobile</th>
-                  <th className="text-right py-2 px-3 font-semibold">Bill Amount</th>
-                  <th className="text-right py-2 px-3 font-semibold text-rose-600 dark:text-rose-400">Due Amount</th>
+                  <th className="text-left py-2 px-3 font-semibold">Subscriber</th>
+                  <th className="text-left py-2 px-3 font-semibold">Phone / Mobile</th>
+                  <th className="text-right py-2 px-3 font-semibold">Monthly Plan</th>
+                  <th className="text-right py-2 px-3 font-semibold text-rose-600 dark:text-rose-400">Total Due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {top20UnpaidClients.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => onNavigate?.("due-customers")}
-                    className="hover:bg-muted/40 transition-colors cursor-pointer"
-                  >
-                    <td className="py-2.5 px-3 font-mono font-medium text-foreground truncate max-w-[150px]">
-                      {c.pppUser || c.name}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-muted-foreground">
-                      {c.phone || "017XXXXXXXX"}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-foreground font-semibold">
-                      {(c.monthlyBill || c.price || 500).toFixed(2)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
-                      {(c.dueAmount || 0).toFixed(2)}
+                {top20UnpaidClients.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                      <CheckCircle2 size={24} className="text-emerald-500 mx-auto mb-1 opacity-80" />
+                      <p className="font-semibold text-foreground">Zero Overdue Accounts</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  top20UnpaidClients.map((c) => (
+                    <tr
+                      key={c.id}
+                      onClick={() => onNavigate?.("due-customers")}
+                      className="hover:bg-muted/40 transition-colors cursor-pointer"
+                    >
+                      <td className="py-2.5 px-3 font-medium text-foreground truncate max-w-[150px]">
+                        <p className="truncate font-semibold">{c.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{c.pppUser || c.id}</p>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-muted-foreground">
+                        {c.phone || "017XXXXXXXX"}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono text-foreground font-semibold">
+                        ৳{(c.monthlyBill || c.price || 500).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                        ৳{(c.dueAmount || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 8 BOTTOM SUMMARY TILES (Exact Matching Roster Metrics) ── */}
-      <div className="space-y-3">
-        {/* Row 1: New Client, Total Client, Monthly Bill, Collected Bill */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* New Client */}
-          <div
-            onClick={() => onNavigate?.("add-client")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">New Client</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">0</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Joined This Billing Cycle</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <UserPlus size={20} />
-            </div>
-          </div>
-
-          {/* Total Client */}
-          <div
-            onClick={() => onNavigate?.("customers")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Client</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">{totalCustomers}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{activeCustomersCount} Active Subscriptions</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Users size={20} />
-            </div>
-          </div>
-
-          {/* Monthly Bill */}
-          <div
-            onClick={() => onNavigate?.("invoices")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Monthly Bill</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">{monthlyRevenue.toFixed(2)}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Active Subscribers Expected</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Calendar size={20} />
-            </div>
-          </div>
-
-          {/* Collected Bill */}
-          <div
-            onClick={() => onNavigate?.("payments")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Collected Bill</p>
-              <h3 className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{todayCollected.toFixed(2)}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Real-time Collected Payments</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <CheckSquare size={20} />
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2: Paid Salary, Discount, Total Due, Cash On Hand */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Paid Salary */}
-          <div
-            onClick={() => onNavigate?.("expenses")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Paid Salary</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">৳ 0.00</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Staff & Technician Payroll</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Wallet size={20} />
-            </div>
-          </div>
-
-          {/* Discount */}
-          <div
-            onClick={() => onNavigate?.("discounts")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Discount</p>
-              <h3 className="text-2xl font-bold mt-1 text-foreground">0.00</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Waiver Credits Applied</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary border border-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <FileText size={20} />
-            </div>
-          </div>
-
-          {/* Total Due */}
-          <div
-            onClick={() => onNavigate?.("due-customers")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Due</p>
-              <h3 className="text-2xl font-bold mt-1 text-rose-600 dark:text-rose-400">{totalDue.toFixed(2)}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{dueCustomers.length} Accounts Pending Clearance</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <AlertCircle size={20} />
-            </div>
-          </div>
-
-          {/* Cash On Hand */}
-          <div
-            onClick={() => onNavigate?.("cash-desk")}
-            className="rounded-xl p-4.5 bg-card border border-border shadow-xs flex items-center justify-between cursor-pointer hover:border-primary/40 hover:shadow-md transition-all group"
-          >
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cash On Hand</p>
-              <h3 className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{todayCollected.toFixed(2)}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Verified Collections</p>
-            </div>
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-              <DollarSign size={20} />
-            </div>
           </div>
         </div>
       </div>

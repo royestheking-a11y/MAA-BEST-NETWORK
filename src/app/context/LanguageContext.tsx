@@ -9,7 +9,7 @@ const DICTIONARY: Record<string, string> = {
   "FIBER OPERATING SYSTEM": "ফাইবার অপারেটিং সিস্টেম",
   "Operating Console": "অপারেটিং কনসোল",
   "All Systems Active": "সকল সিস্টেম সক্রিয়",
-  "NOC Live Operations Center": "এনওসি লাইভ অপারেশন সেন্টার",
+  "NOC OLT Center": "এনওসি ওএলটি সেন্টার",
 
   // Navigation & Menus
   "Dashboard": "ড্যাশবোর্ড",
@@ -32,6 +32,11 @@ const DICTIONARY: Record<string, string> = {
   "Discounts & Penalties": "ডিসকাউন্ট ও পেনাল্টি",
   "Billing Settings": "বিলিং সেটিংস",
   "Network": "নেটওয়ার্ক কোর",
+  "Network Infrastructure": "নেটওয়ার্ক অবকাঠামো",
+  "Live Monitoring & NOC": "লাইভ মনিটরিং ও এনওসি",
+  "NOC Wallboard": "এনওসি লাইভ ওয়ালবোর্ড",
+  "Monitoring Hub": "মনিটরিং হাব",
+  "Splitter & ODN": "স্প্লিটার ও ওডিএন লেজার",
   "Network Map": "নেটওয়ার্ক ম্যাপ",
   "NOC Wall Screen": "এনওসি লাইভ ওয়াল",
   "MikroTik": "মাইক্রোটিক",

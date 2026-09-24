@@ -7,6 +7,7 @@ import {
 import {
   automationStore, type SmsGatewayConfig
 } from "./automationData";
+import { usePermission } from "../../context/AuthContext";
 
 interface SmsAutomationPageProps {
   onNavigate?: (page: string) => void;
@@ -32,6 +33,7 @@ const INITIAL_LOGS: OutboundSmsLog[] = [
 ];
 
 export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
+  const { canEdit, isReadOnly } = usePermission("sms");
   const [config, setConfig] = useState<SmsGatewayConfig>(automationStore.getSms());
   const [logs, setLogs] = useState<OutboundSmsLog[]>(INITIAL_LOGS);
   const [activeTab, setActiveTab] = useState<"broadcast" | "logs" | "settings">("broadcast");
@@ -56,6 +58,10 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleTestSms = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to SMS Automation.");
+      return;
+    }
     if (!testPhone || !testText) return;
     const newLog: OutboundSmsLog = {
       id: `SMS-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -75,6 +81,10 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
 
   const handleSendBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to SMS Automation.");
+      return;
+    }
     if (!broadcastMsg.trim()) return;
 
     setIsSending(true);
@@ -107,6 +117,10 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
   };
 
   const handleSaveConfig = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to SMS Automation.");
+      return;
+    }
     automationStore.updateSms(config);
     showToast("✓ SMS Gateway credentials & Sender ID updated successfully!");
   };
@@ -146,9 +160,12 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
 
         <button
           onClick={handleSaveConfig}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-primary hover:opacity-95 text-xs font-bold text-white shadow-xs cursor-pointer">
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold shadow-xs ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary hover:opacity-95 text-white cursor-pointer"
+          }`}>
           <Key size={14} />
-          <span>Save Gateway Settings</span>
+          <span>{isReadOnly || !canEdit ? "Read-Only: Locked" : "Save Gateway Settings"}</span>
         </button>
       </div>
 
@@ -269,10 +286,12 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
                 </div>
                 <button
                   type="submit"
-                  disabled={isSending || !broadcastMsg.trim()}
-                  className="px-5 py-2.5 rounded-2xl bg-primary hover:opacity-95 text-white font-bold text-xs flex items-center gap-2 shadow-xs cursor-pointer">
+                  disabled={isSending || !broadcastMsg.trim() || isReadOnly || !canEdit}
+                  className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 shadow-xs ${
+                    isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary hover:opacity-95 text-white cursor-pointer"
+                  }`}>
                   <Send size={14} />
-                  <span>{isSending ? "Dispatching Queue..." : "Dispatch SMS Broadcast"}</span>
+                  <span>{isReadOnly || !canEdit ? "Read-Only: Disabled" : isSending ? "Dispatching Queue..." : "Dispatch SMS Broadcast"}</span>
                 </button>
               </div>
             </form>
@@ -307,9 +326,12 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
               <button
                 type="button"
                 onClick={handleTestSms}
-                className="w-full py-2.5 rounded-2xl bg-primary hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+                disabled={isReadOnly || !canEdit}
+                className={`w-full py-2.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs ${
+                  isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary hover:opacity-95 text-white cursor-pointer"
+                }`}>
                 <Send size={14} />
-                <span>Send 1x Test SMS</span>
+                <span>{isReadOnly || !canEdit ? "Read-Only: Test Disabled" : "Send 1x Test SMS"}</span>
               </button>
             </div>
           </div>

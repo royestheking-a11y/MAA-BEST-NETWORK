@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   UserPlus, User, Network, Sliders, CheckCircle2,
   Calendar, Phone, Mail, MapPin, Plus, Edit2,
@@ -6,10 +6,13 @@ import {
   HardDrive, Server, Layers, FileText, Sparkles, Image,
   Eye, EyeOff, Key, Copy, ArrowRight, ShieldCheck, Zap,
   Radio, Laptop, Wifi, Hash, Tag, Award, CheckCircle,
-  Home, Building2, Globe2, Landmark
+  Home, Building2, Globe2, Landmark, RefreshCw
 } from "lucide-react";
 import { useCustomerContext, Customer } from "../context/CustomerContext";
 import { useLanguage } from "../context/LanguageContext";
+import { usePermission } from "../context/AuthContext";
+import { billingStore, type IspPackage } from "./billing/billingData";
+import { networkStore, type MikrotikServer } from "./network/networkData";
 
 interface AddNewClientPageProps {
   onNavigate?: (page: string) => void;
@@ -17,6 +20,7 @@ interface AddNewClientPageProps {
 
 export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const { customers, addCustomer } = useCustomerContext();
+  const { canEdit, isReadOnly } = usePermission("add-client");
   const { t } = useLanguage();
 
   // Active step / tab in studio
@@ -62,6 +66,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   ]);
 
   // Section 1: Client Information
+  const [customClientCode, setCustomClientCode] = useState("");
   const [clientName, setClientName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -83,10 +88,40 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [regFormPicName, setRegFormPicName] = useState("");
 
   // Section 2: Network & Product Info
-  const [selectedPackage, setSelectedPackage] = useState("20 Mbps Fiber Standard — ৳1,200");
-  const [serverName, setServerName] = useState("MikroTik-MBN-Core");
+  const [packagesList, setPackagesList] = useState<IspPackage[]>(() => billingStore.getPackages());
+  const [mikrotikList, setMikrotikList] = useState<MikrotikServer[]>(() => networkStore.getMikrotik());
+
+  useEffect(() => {
+    const unsubBilling = billingStore.subscribe(pkgs => {
+      if (pkgs && pkgs.length > 0) setPackagesList(pkgs);
+    });
+    const unsubNetwork = networkStore.subscribe(state => {
+      if (state.mikrotik && state.mikrotik.length > 0) {
+        setMikrotikList(state.mikrotik);
+        setServerName(prev => {
+          if (!prev || prev === "MikroTik-MBN-Core") {
+            return state.mikrotik[0]?.name || "DC-CA";
+          }
+          return prev;
+        });
+      }
+    });
+    return () => {
+      unsubBilling();
+      unsubNetwork();
+    };
+  }, []);
+
+  const [selectedPackage, setSelectedPackage] = useState(() => {
+    const pkgs = billingStore.getPackages();
+    return pkgs[0] ? `${pkgs[0].name} — ৳${pkgs[0].price.toLocaleString()}` : "20 Mbps Fiber Standard — ৳1,200";
+  });
+  const [serverName, setServerName] = useState(() => networkStore.getMikrotik()[0]?.name || "DC-CA");
   const [protocolType, setProtocolType] = useState("pppoe");
-  const [profileName, setProfileName] = useState("20 Mbps Fiber Standard");
+  const [profileName, setProfileName] = useState(() => {
+    const pkgs = billingStore.getPackages();
+    return pkgs[0]?.name || "20 Mbps Fiber Standard";
+  });
   const [selectedOlt, setSelectedOlt] = useState<"OLT1" | "OLT2">("OLT1");
   const [selectedPonPort, setSelectedPonPort] = useState("epon 0/1");
   const [selectedZone, setSelectedZone] = useState("MADARIPUR SADAR");
@@ -106,6 +141,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
 
   // Section 3: Service Information
   const [wantDisableClient, setWantDisableClient] = useState(false);
+  const [userType, setUserType] = useState<"normal" | "free" | "unlimited">("normal");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -138,19 +174,8 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
     showToast("✓ Generated new secure password!");
   };
 
-  // Auto-fill demo
   const handleAutoFillDemo = () => {
-    setClientName("Md Tariqul Islam");
-    setMobileNumber("01712-489921");
-    setPhoneNumber("01911-382910");
-    setEmail("tariqul.mbn@gmail.com");
-    setAddress("House 24, Road 3, Somitir Hat, Kalkini");
-    setNidNumber("19925481928374");
-    setOccupation("Business Enterprise");
-    setUsername("Mbn@tariqulislam");
-    setPassword("tariqul@2026");
-    setDeviceSerial("4C:46:D1:88:99:A2");
-    showToast("✓ Loaded demo subscriber credentials!");
+    showToast("✓ Demo auto-fill has been removed in production.");
   };
 
   const showToast = (msg: string) => {
@@ -166,6 +191,8 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
     }, 0);
     return `MBN${String(maxExistingNum + 1).padStart(4, "0")}`;
   }, [customers]);
+
+  const effectiveClientCode = (customClientCode.trim() || nextClientCode).toUpperCase();
 
   // Optical core color swatches
   const CORE_COLORS = [
@@ -183,18 +210,32 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
     { name: "Aqua", hex: "#06b6d4" },
   ];
 
-  // Packages list
-  const PACKAGES = [
-    { name: "10 Mbps — ৳800", speed: "10/5 Mbps", price: 800, badge: "Budget Fiber" },
-    { name: "20 Mbps Fiber Standard — ৳1,200", speed: "20/10 Mbps", price: 1200, badge: "Most Popular" },
-    { name: "30 Mbps Home Fiber — ৳1,500", speed: "30/15 Mbps", price: 1500, badge: "High Speed" },
-    { name: "50 Mbps Ultra Fiber Pro — ৳2,500", speed: "50/25 Mbps", price: 2500, badge: "Pro Gaming" },
-    { name: "100 Mbps Enterprise Dedicated — ৳4,500", speed: "100/50 Mbps", price: 4500, badge: "Enterprise" },
-  ];
+  // Packages list from live billing store
+  const PACKAGES = useMemo(() => {
+    const source = packagesList.length > 0 ? packagesList : billingStore.getPackages();
+    if (source.length === 0) {
+      return [
+        { name: "10 Mbps — ৳800", speed: "10/5 Mbps", price: 800, badge: "Budget Fiber" },
+        { name: "20 Mbps Fiber Standard — ৳1,200", speed: "20/10 Mbps", price: 1200, badge: "Most Popular" },
+        { name: "30 Mbps Home Fiber — ৳1,500", speed: "30/15 Mbps", price: 1500, badge: "High Speed" },
+      ];
+    }
+    return source.map((pkg, idx) => ({
+      name: `${pkg.name} — ৳${pkg.price.toLocaleString()}`,
+      cleanName: pkg.name,
+      speed: `${pkg.down}/${pkg.up} Mbps`,
+      price: pkg.price,
+      badge: idx === 1 ? "Most Popular" : pkg.type === "Corporate Lease" ? "Enterprise" : "Standard Fiber"
+    }));
+  }, [packagesList]);
 
   // Form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly) {
+      showToast("Access Restricted: Your account role has Read-Only access.");
+      return;
+    }
 
     if (!clientName.trim()) {
       showToast("Please enter Client Name.");
@@ -217,11 +258,12 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       return;
     }
 
-    const nextNum = parseInt(nextClientCode.replace("MBN", ""), 10) || (customers.length + 1);
+    const finalClientCode = effectiveClientCode;
+    const nextNum = parseInt(finalClientCode.replace(/\D/g, ""), 10) || (customers.length + 1);
 
     const newCust: Partial<Customer> = {
-      id: nextClientCode,
-      clientCode: nextClientCode,
+      id: finalClientCode,
+      clientCode: finalClientCode,
       name: clientName,
       phone: mobileNumber,
       phone2: phoneNumber,
@@ -249,18 +291,20 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       speed: selectedPackage.includes("100") ? "100/50" : selectedPackage.includes("50") ? "50/25" : selectedPackage.includes("30") ? "30/15" : selectedPackage.includes("20") ? "20/10" : "10/5",
       downloadSpeedMbps: selectedPackage.includes("100") ? 100 : selectedPackage.includes("50") ? 50 : selectedPackage.includes("30") ? 30 : selectedPackage.includes("20") ? 20 : 10,
       uploadSpeedMbps: selectedPackage.includes("100") ? 50 : selectedPackage.includes("50") ? 25 : selectedPackage.includes("30") ? 15 : selectedPackage.includes("20") ? 10 : 5,
-      price: Number(monthlyBill) || 1200,
-      monthlyBill: Number(monthlyBill) || 1200,
-      status: wantDisableClient ? "suspended" : "active",
-      netStatus: wantDisableClient ? "offline" : "online",
+      price: userType === "free" ? 0 : (Number(monthlyBill) || 1200),
+      monthlyBill: userType === "free" ? 0 : (Number(monthlyBill) || 1200),
+      status: userType === "free" ? "active" : (wantDisableClient ? "suspended" : "active"),
+      netStatus: userType === "free" ? "online" : (wantDisableClient ? "offline" : "online"),
+      userType: userType,
       billingDate: 1,
       startDate: joiningDate,
-      endDate: expireDate,
-      daysRemaining: 30,
+      endDate: userType === "free" || userType === "unlimited" ? "Permanent / Lifetime" : expireDate,
+      daysRemaining: userType === "free" || userType === "unlimited" ? 999 : 30,
       dueAmount: 0,
       due: 0,
       ipAddress: "100.64.10." + (nextNum % 250 + 2),
       mac: deviceSerial || ("4C:46:D1:" + Array.from({length: 3}, () => Math.floor(Math.random()*256).toString(16).padStart(2,'0').toUpperCase()).join(":")),
+      passcode: `mbn@${finalClientCode.replace(/\D/g, "") || "0001"}`,
       pppUser: username || `Mbn@client${nextNum}`,
       pppPass: password || "123456",
       mikrotik: serverName || "MikroTik-MBN-Core",
@@ -271,7 +315,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       monthlyUsageGB: 0,
       joinDate: joiningDate,
       clientType: clientType,
-      billingStatus: billingStatus,
+      billingStatus: userType === "free" ? "Prepaid" : billingStatus,
       billingStartMonth: billingStartMonth,
       expireDate: expireDate,
       cableMetre: Number(cableMetre) || 100,
@@ -279,7 +323,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       coreNumber: Number(numberOfCore) || 2,
       coreColor: coreColor,
       deviceType: device,
-      deviceSerial: deviceSerial || `BDCOM-${nextClientCode}`,
+      deviceSerial: deviceSerial || `BDCOM-${finalClientCode}`,
       deviceVendor: deviceVendor,
       purchaseDate: purchaseDate,
       splitterBox: splitterBox,
@@ -290,7 +334,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
 
     addCustomer(newCust);
 
-    showToast(`✓ Subscriber "${clientName}" (${nextClientCode}) provisioned successfully!`);
+    showToast(`✓ Subscriber "${clientName}" (${finalClientCode}) [${userType.toUpperCase()}] provisioned successfully!`);
     setTimeout(() => {
       if (onNavigate) onNavigate("online-clients");
     }, 1800);
@@ -318,7 +362,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 Subscriber Provisioning Studio
               </h1>
               <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
-                PROVISIONING {nextClientCode}
+                PROVISIONING {effectiveClientCode}
               </span>
             </div>
             <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
@@ -328,14 +372,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            type="button"
-            onClick={handleAutoFillDemo}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-muted/80 hover:bg-muted text-foreground border border-border flex items-center gap-1.5 transition-all shadow-xs"
-          >
-            <Sparkles size={14} className="text-amber-500" />
-            <span>Auto-Fill Demo</span>
-          </button>
+          {/* Auto-fill demo button removed for production */}
 
           <button
             type="button"
@@ -438,6 +475,122 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 <span className="text-xs font-bold text-muted-foreground px-3 py-1 rounded-full bg-muted">
                   Required Fields Marked *
                 </span>
+              </div>
+
+              {/* User Account Type Selector */}
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-primary" />
+                    <span>Subscriber Account Type & Cutoff Policy</span>
+                  </label>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                    Admin Choice
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Normal User */}
+                  <div
+                    onClick={() => setUserType("normal")}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      userType === "normal"
+                        ? "border-primary bg-primary/10 shadow-xs"
+                        : "border-border bg-card hover:bg-muted/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-black text-xs text-foreground">
+                      <User size={14} className={userType === "normal" ? "text-primary" : "text-muted-foreground"} />
+                      <span>Normal User</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                      Follows standard monthly billing cycle, auto-invoicing, normal due ledger, and standard cutoff on overdue.
+                    </p>
+                  </div>
+
+                  {/* Free User */}
+                  <div
+                    onClick={() => {
+                      setUserType("free");
+                      setMonthlyBill("0");
+                    }}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      userType === "free"
+                        ? "border-emerald-500 bg-emerald-500/10 shadow-xs"
+                        : "border-border bg-card hover:bg-muted/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-black text-xs text-emerald-600 dark:text-emerald-400">
+                      <ShieldCheck size={14} />
+                      <span>Free User</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                      ৳0 monthly bill. <strong>Never cut off</strong>, never disconnected, and 100% exempt from overdue/due lists.
+                    </p>
+                  </div>
+
+                  {/* VIP Unlimited */}
+                  <div
+                    onClick={() => setUserType("unlimited")}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      userType === "unlimited"
+                        ? "border-amber-500 bg-amber-500/10 shadow-xs"
+                        : "border-border bg-card hover:bg-muted/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-black text-xs text-amber-600 dark:text-amber-400">
+                      <Sparkles size={14} />
+                      <span>VIP Unlimited Client</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                      Permanent VIP subscription with highest QoS priority line. <strong>Never cut off</strong> by daemon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subscriber ID / Client Code Customization */}
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-2">
+                    <Tag size={14} className="text-primary" />
+                    <span>Subscriber ID / Client Code</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                      {customClientCode.trim() ? "Custom ID Set" : "Auto-Generated"}
+                    </span>
+                  </label>
+                  {customClientCode.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => { setCustomClientCode(""); showToast(`Reset to auto-generated ID (${nextClientCode})`); }}
+                      className="text-[11px] font-bold text-primary hover:underline cursor-pointer">
+                      Reset to Auto ({nextClientCode})
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={customClientCode || nextClientCode}
+                      onChange={e => setCustomClientCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                      placeholder="e.g. MBN0034 or CUST-1002"
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-card border border-border text-foreground font-mono font-bold outline-none focus:border-primary transition-all tracking-wider uppercase"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomClientCode(nextClientCode);
+                      showToast(`Set to sequential ID: ${nextClientCode}`);
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl border border-border text-xs font-bold bg-card hover:bg-muted text-foreground flex items-center gap-1.5 cursor-pointer shadow-xs">
+                    <RefreshCw size={12} /> Auto ID
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Admin can customize this Subscriber ID or keep the auto-sequential code. This ID is used across the system for login credentials, billing invoices, and optical drops.
+                </p>
               </div>
 
               {/* Row 1: Basic Names & Contacts */}
@@ -718,6 +871,37 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                     <h3 className="text-base font-bold text-foreground">Optical Network, OLT & FTTH Drop Routing</h3>
                     <p className="text-xs text-muted-foreground">Map the physical fiber core, splitter ODB box, OLT station and CPE terminal</p>
                   </div>
+                </div>
+              </div>
+
+              {/* Row 0: MikroTik Core Gateway Router */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Server size={14} className="text-primary" /> MikroTik Core Gateway Router *</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">Radius / PPPoE NAS Target</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {(mikrotikList.length > 0 ? mikrotikList : [{ id: "MK-03", name: "DC-CA", ip: "103.12.173.136", model: "x84" }]).map(mk => {
+                    const isSel = serverName === mk.name;
+                    return (
+                      <button
+                        key={mk.id}
+                        type="button"
+                        onClick={() => setServerName(mk.name)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSel
+                            ? "bg-primary/10 border-primary text-primary font-bold shadow-xs ring-1 ring-primary/30"
+                            : "bg-muted/30 border-border text-foreground hover:bg-muted/60"
+                        }`}
+                      >
+                        <div className="text-xs font-bold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">{mk.name}</span>
+                          {isSel && <CheckCircle2 size={13} />}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono">{mk.ip} · {mk.model || "RouterOS"}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1236,7 +1420,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 </span>
               </div>
               <span className="px-2.5 py-0.5 rounded-md font-mono text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
-                {nextClientCode}
+                {effectiveClientCode}
               </span>
             </div>
 
@@ -1334,10 +1518,15 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-2xl text-xs font-extrabold bg-gradient-to-r from-primary via-rose-600 to-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+                disabled={isReadOnly}
+                className={`w-full py-3.5 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 uppercase tracking-wider ${
+                  isReadOnly
+                    ? "bg-muted text-muted-foreground border border-border cursor-not-allowed"
+                    : "bg-gradient-to-r from-primary via-rose-600 to-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:opacity-95 cursor-pointer"
+                }`}
               >
                 <Zap size={16} />
-                <span>Provision & Register Subscriber</span>
+                <span>{isReadOnly ? "Read-Only: Registration Disabled" : "Provision & Register Subscriber"}</span>
               </button>
             </div>
           </div>

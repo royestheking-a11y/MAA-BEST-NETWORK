@@ -6,12 +6,14 @@ import {
 import {
   automationStore, type AutomationWorkflow
 } from "./automationData";
+import { usePermission } from "../../context/AuthContext";
 
 interface WorkflowsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function WorkflowsPage({ onNavigate }: WorkflowsPageProps) {
+  const { canEdit, isReadOnly } = usePermission("workflows");
   const [workflows, setWorkflows] = useState<AutomationWorkflow[]>(automationStore.getWorkflows());
   const [showAddModal, setShowAddModal] = useState(false);
   const [toast, setToast] = useState("");
@@ -32,12 +34,20 @@ export function WorkflowsPage({ onNavigate }: WorkflowsPageProps) {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleToggle = (id: string) => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Workflows.");
+      return;
+    }
     automationStore.toggleWorkflow(id);
     const wf = workflows.find(w => w.id === id);
     showToast(`Workflow "${wf?.name}" ${!wf?.enabled ? "Activated" : "Paused"}!`);
   };
 
   const handleAdd = () => {
+    if (isReadOnly || !canEdit) {
+      showToast("Access Restricted: Your role has Read-Only access to Workflows.");
+      return;
+    }
     if (!newWf.name) return;
     const wf: AutomationWorkflow = {
       id: `WF-${(workflows.length + 1).toString().padStart(2, "0")}`,
@@ -91,8 +101,11 @@ export function WorkflowsPage({ onNavigate }: WorkflowsPageProps) {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all cursor-pointer"
-          style={{ background: "var(--primary)", fontSize: 13 }}
+          disabled={isReadOnly || !canEdit}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${
+            isReadOnly || !canEdit ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground" : "text-white cursor-pointer"
+          }`}
+          style={isReadOnly || !canEdit ? { fontSize: 13 } : { background: "var(--primary)", fontSize: 13 }}
         >
           <Plus size={14} /> Create Automation Rule
         </button>
@@ -121,7 +134,10 @@ export function WorkflowsPage({ onNavigate }: WorkflowsPageProps) {
 
                 <button
                   onClick={() => handleToggle(wf.id)}
-                  className="px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5"
+                  disabled={isReadOnly || !canEdit}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    isReadOnly || !canEdit ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                  }`}
                   style={{
                     background: wf.enabled ? "#DCFCE7" : "var(--muted)",
                     color: wf.enabled ? "#16A34A" : "var(--muted-foreground)",
@@ -239,10 +255,10 @@ export function WorkflowsPage({ onNavigate }: WorkflowsPageProps) {
               </button>
               <button
                 onClick={handleAdd}
-                disabled={!newWf.name}
+                disabled={!newWf.name || isReadOnly || !canEdit}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary disabled:opacity-50"
               >
-                Save Rule
+                {isReadOnly || !canEdit ? "Read-Only: Locked" : "Save Rule"}
               </button>
             </div>
           </div>
