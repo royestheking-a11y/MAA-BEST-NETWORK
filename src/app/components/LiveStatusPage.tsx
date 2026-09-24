@@ -217,26 +217,50 @@ export function LiveStatusPage() {
 
   // ── Build Accurate Real-Time Sessions List ──
   const baseSessions: Session[] = useMemo(() => {
-    // Build lookup map from real NetX live telemetry
+    // Build lookup map from real NetX live telemetry with multi-key normalization
     const liveMap = new Map<string, NetxLiveCustomer>();
     if (Array.isArray(liveStats)) {
       liveStats.forEach(c => {
-        if (c.pppoe_username) liveMap.set(c.pppoe_username.toLowerCase(), c);
-        if (c.full_name) liveMap.set(c.full_name.toLowerCase(), c);
-        if (c.user_id) liveMap.set(c.user_id.toLowerCase(), c);
+        const candidates = [c.pppoe_username, c.full_name, c.user_id];
+        candidates.forEach(cand => {
+          if (cand) {
+            const clean = cand.toLowerCase().trim();
+            liveMap.set(clean, c);
+            liveMap.set(clean.replace(/@/g, ""), c);
+            liveMap.set(clean.replace(/[^a-z0-9]/g, ""), c);
+            if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+              liveMap.set("mbn@" + clean.slice(3), c);
+            }
+          }
+        });
       });
     }
+
+    const getLiveMatch = (c: any) => {
+      const candidates = [c.pppUser, c.name, c.clientCode, c.id];
+      for (const cand of candidates) {
+        if (!cand) continue;
+        const clean = cand.toLowerCase().trim();
+        if (liveMap.has(clean)) return liveMap.get(clean);
+        if (liveMap.has(clean.replace(/@/g, ""))) return liveMap.get(clean.replace(/@/g, ""));
+        if (liveMap.has(clean.replace(/[^a-z0-9]/g, ""))) return liveMap.get(clean.replace(/[^a-z0-9]/g, ""));
+        if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+          const withAt = "mbn@" + clean.slice(3);
+          if (liveMap.has(withAt)) return liveMap.get(withAt);
+        }
+      }
+      return null;
+    };
 
     if (viewScope === "subscribers") {
       // 1. DIRECT 1-TO-1 MAPPING TO REAL REGISTERED CUSTOMERS IN FIRESTORE
       return customers.map((c, idx) => {
-        const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-        const liveMatch = liveMap.get(cleanUser) || liveMap.get((c.name || "").toLowerCase()) || liveMap.get((c.clientCode || c.id || "").toLowerCase());
-
+        const liveMatch = getLiveMatch(c);
         const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
         const realRx = liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null
           ? Number(liveMatch.onu_rx_power)
           : (c.onuSignal ? parseFloat(c.onuSignal) : -18.5 - ((idx % 7) * 0.8));
+
 
         const rxStr = `${realRx.toFixed(1)} dBm`;
         const pkgDown = c.downloadSpeedMbps || 20;
@@ -427,9 +451,16 @@ export function LiveStatusPage() {
     }, 500);
   }, [refreshNetx, refreshIntervalMs, liveTick]);
 
-  // Aggregate Metrics
-  const onlineCount = useMemo(() => sessions.filter(s => s.status === "online").length, [sessions]);
-  const offlineCount = useMemo(() => sessions.filter(s => s.status === "offline").length, [sessions]);
+  // Aggregate Metrics (Synchronized with authentic NetX Telemetry)
+  const onlineCount = useMemo(() => {
+    if (Array.isArray(liveStats) && liveStats.length > 0) {
+      return liveStats.filter(c => c.connection_status === 'online').length;
+    }
+    return sessions.filter(s => s.status === "online").length;
+  }, [liveStats, sessions]);
+  const offlineCount = useMemo(() => {
+    return Math.max(0, sessions.length - onlineCount);
+  }, [sessions.length, onlineCount]);
   const weakCount = useMemo(() => sessions.filter(s => s.rxPowerNum < -26).length, [sessions]);
 
   const totalLiveDown = useMemo(

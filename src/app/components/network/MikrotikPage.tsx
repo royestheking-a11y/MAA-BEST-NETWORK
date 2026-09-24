@@ -673,8 +673,14 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
     setTerminalInput("");
   };
 
-  const onlineSessionsCount = activeSessions.filter(s => s.status === "online").length;
-  const offlineSessionsCount = activeSessions.length - onlineSessionsCount;
+  const onlineSessionsCount = useMemo(() => {
+    if (Array.isArray(liveStats) && liveStats.length > 0) {
+      return liveStats.filter(c => c.connection_status === 'online').length;
+    }
+    return activeSessions.filter(s => s.status === "online").length;
+  }, [liveStats, activeSessions]);
+  const offlineSessionsCount = Math.max(0, activeSessions.length - onlineSessionsCount);
+
 
   return (
     <div className="p-4 md:p-6 space-y-5 min-h-[calc(100vh-64px)]">

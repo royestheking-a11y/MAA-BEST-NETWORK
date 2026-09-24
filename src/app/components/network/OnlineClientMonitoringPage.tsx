@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+
 import {
   Users, CheckCircle2, WifiOff, RefreshCw, Search, Filter,
   Layers, Server, Wifi, Activity, ArrowUpDown, ArrowUp, ArrowDown, Network,
@@ -171,18 +172,44 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     return ["all", ...Array.from(set).sort()];
   }, [customers]);
 
-  // Build lookup map from real live NetX customer stats
+  // Build lookup map from real live NetX customer stats with multi-key normalization
   const liveStatsMap = useMemo(() => {
     const map = new Map<string, any>();
     if (Array.isArray(liveStats)) {
       liveStats.forEach(ls => {
-        if (ls.pppoe_username) map.set(ls.pppoe_username.toLowerCase(), ls);
-        if (ls.full_name) map.set(ls.full_name.toLowerCase(), ls);
-        if (ls.user_id) map.set(ls.user_id.toLowerCase(), ls);
+        const candidates = [ls.pppoe_username, ls.full_name, ls.user_id];
+        candidates.forEach(cand => {
+          if (cand) {
+            const clean = cand.toLowerCase().trim();
+            map.set(clean, ls);
+            map.set(clean.replace(/@/g, ""), ls);
+            map.set(clean.replace(/[^a-z0-9]/g, ""), ls);
+            if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+              map.set("mbn@" + clean.slice(3), ls);
+            }
+          }
+        });
       });
     }
     return map;
   }, [liveStats]);
+
+  const getLiveMatch = useCallback((c: any) => {
+    const candidates = [c.pppUser, c.name, c.clientCode, c.id];
+    for (const cand of candidates) {
+      if (!cand) continue;
+      const clean = cand.toLowerCase().trim();
+      if (liveStatsMap.has(clean)) return liveStatsMap.get(clean);
+      if (liveStatsMap.has(clean.replace(/@/g, ""))) return liveStatsMap.get(clean.replace(/@/g, ""));
+      if (liveStatsMap.has(clean.replace(/[^a-z0-9]/g, ""))) return liveStatsMap.get(clean.replace(/[^a-z0-9]/g, ""));
+      if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+        const withAt = "mbn@" + clean.slice(3);
+        if (liveStatsMap.has(withAt)) return liveStatsMap.get(withAt);
+      }
+    }
+    return null;
+  }, [liveStatsMap]);
+
 
   // Tab mismatch counts
   const tabCounts = useMemo(() => {
@@ -215,8 +242,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   // Tab Filtering & Search Filtering
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
-      const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-      const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
+      const liveMatch = getLiveMatch(c);
       const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
 
       // Tab check
@@ -293,12 +319,10 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       let valA: any = "";
       let valB: any = "";
 
-      const cleanUserA = (a.pppUser || a.name || "").toLowerCase();
-      const liveMatchA = liveStatsMap.get(cleanUserA) || liveStatsMap.get((a.name || "").toLowerCase());
+      const liveMatchA = getLiveMatch(a);
       const isOnlineA = liveMatchA ? (liveMatchA.connection_status === "online") : (a.netStatus === "online" || a.status === "active");
 
-      const cleanUserB = (b.pppUser || b.name || "").toLowerCase();
-      const liveMatchB = liveStatsMap.get(cleanUserB) || liveStatsMap.get((b.name || "").toLowerCase());
+      const liveMatchB = getLiveMatch(b);
       const isOnlineB = liveMatchB ? (liveMatchB.connection_status === "online") : (b.netStatus === "online" || b.status === "active");
 
       switch (sortKey) {
@@ -386,12 +410,14 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   // Statistics counters (100% dynamic from live customer dataset)
   const totalUsersCount = customers.length;
   const onlineUsersCount = useMemo(() => {
+    if (Array.isArray(liveStats) && liveStats.length > 0) {
+      return liveStats.filter(c => c.connection_status === 'online').length;
+    }
     return customers.filter(c => {
-      const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-      const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
+      const liveMatch = getLiveMatch(c);
       return liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
     }).length;
-  }, [customers, liveStatsMap]);
+  }, [liveStats, customers, getLiveMatch]);
 
   const offlineUsersCount = totalUsersCount - onlineUsersCount;
 
@@ -417,8 +443,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     ];
 
     const rows = sortedCustomers.map(c => {
-      const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-      const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
+      const liveMatch = getLiveMatch(c);
       const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
       const displayIp = liveMatch?.live_ip || (isConnected ? c.ipAddress : "—");
       const displayDuration = liveMatch?.live_uptime || (isConnected ? (c.duration || "Active") : "—");
@@ -1030,8 +1055,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                 </tr>
               ) : (
                 paginatedCustomers.map((c, idx) => {
-                  const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-                  const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
+                  const liveMatch = getLiveMatch(c);
                   const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
                   const displayIp = liveMatch?.live_ip || (isConnected ? (c.ipAddress || "Dynamic IP") : "—");
                   const baseUptimeSec = parseUptimeToSeconds(liveMatch?.live_uptime || c.duration || c.sessionUptime, idx + 1);
@@ -1259,8 +1283,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       {/* MODAL 1: Topology / Box Node Modal */}
       {selectedClientForTopology && (() => {
         const c = selectedClientForTopology;
-        const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-        const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
+        const liveMatch = getLiveMatch(c);
         const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
         const displaySignal = liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "-19.2 dBm");
 
@@ -1364,8 +1387,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       {/* MODAL 2: Live Optical & Bandwidth Graph */}
       {selectedClientForGraph && (() => {
         const c = selectedClientForGraph;
-        const cleanUser = (c.pppUser || c.name || "").toLowerCase();
-        const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
+        const liveMatch = getLiveMatch(c);
         const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
         const displayIp = liveMatch?.live_ip || (isConnected ? (c.ipAddress || "10.200.201.51") : "—");
         let modalOfflineSec = 0;
