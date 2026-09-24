@@ -64,6 +64,10 @@ let liveStatsLastFetch = 0;
 let cachedOltServers = null;
 let oltServersLastFetch = 0;
 
+// Deduplicated MBN Subscribers cache
+let cachedMbnUsers = null;
+let mbnUsersLastFetch = 0;
+
 // Main telemetry object for frontend consumption
 let cachedTelemetry = {
   timestamp: new Date().toISOString(),
@@ -375,6 +379,146 @@ export function fetchMikrotikLiveStatus(host = "103.12.173.136", port = 8728, us
   });
 }
 
+function normalizeMbnUsername(name) {
+  if (!name) return "";
+  let clean = name.toLowerCase().trim();
+  if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+    clean = "mbn@" + clean.slice(3);
+  }
+  return clean;
+}
+
+export function fetchDeduplicatedMbnUsers(host = "103.12.173.136", port = 8728, user = "billing@mbn", pass = "Billing@mBn234#9530$") {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(8000);
+    let stage = 0;
+    let rxBuf = Buffer.alloc(0);
+    const rawSecrets = [];
+    const rawActive = [];
+
+    socket.connect(port, host, () => {
+      const cmd = Buffer.concat([
+        encodeWord("/login"),
+        encodeWord(`=name=${user}`),
+        encodeWord(`=password=${pass}`),
+        Buffer.from([0])
+      ]);
+      socket.write(cmd);
+    });
+
+    socket.on("data", (chunk) => {
+      rxBuf = Buffer.concat([rxBuf, chunk]);
+      const sentences = decodeSentences(rxBuf);
+      for (const s of sentences) {
+        if (s[0] === "!done" && stage === 0) {
+          stage = 1;
+          rxBuf = Buffer.alloc(0);
+          socket.write(Buffer.concat([encodeWord("/ppp/secret/print"), Buffer.from([0])]));
+          return;
+        } else if (stage === 1 && s[0] === "!re") {
+          const entry = {};
+          for (const item of s.slice(1)) {
+            if (item.startsWith("=")) {
+              const eq = item.indexOf("=", 1);
+              if (eq > 1) entry[item.slice(1, eq)] = item.slice(eq + 1);
+            }
+          }
+          if ((entry.name || "").toLowerCase().includes("mbn")) rawSecrets.push(entry);
+        } else if (stage === 1 && s[0] === "!done") {
+          stage = 2;
+          rxBuf = Buffer.alloc(0);
+          socket.write(Buffer.concat([encodeWord("/ppp/active/print"), Buffer.from([0])]));
+          return;
+        } else if (stage === 2 && s[0] === "!re") {
+          const entry = {};
+          for (const item of s.slice(1)) {
+            if (item.startsWith("=")) {
+              const eq = item.indexOf("=", 1);
+              if (eq > 1) entry[item.slice(1, eq)] = item.slice(eq + 1);
+            }
+          }
+          if ((entry.name || "").toLowerCase().includes("mbn")) rawActive.push(entry);
+        } else if (stage === 2 && s[0] === "!done") {
+          socket.destroy();
+
+          const activeMap = new Map();
+          for (const a of rawActive) {
+            const u = normalizeMbnUsername(a.name);
+            if (u && !activeMap.has(u)) {
+              activeMap.set(u, a);
+            }
+          }
+
+          const userMap = new Map();
+          for (const s of rawSecrets) {
+            const u = normalizeMbnUsername(s.name);
+            if (!u) continue;
+            // Exclude purely artificial test accounts if needed
+            if (u === "mbn@test") continue;
+
+            if (userMap.has(u)) {
+              const existing = userMap.get(u);
+              if (s.disabled === "false") existing.disabled = false;
+              if (s["last-caller-id"]) existing.lastCallerId = s["last-caller-id"];
+              if (s["last-logged-out"]) existing.lastLoggedOut = s["last-logged-out"];
+            } else {
+              userMap.set(u, {
+                username: u,
+                rawName: s.name,
+                profile: s.profile || "35M",
+                disabled: s.disabled === "true",
+                lastCallerId: s["last-caller-id"] || "",
+                lastLoggedOut: s["last-logged-out"] || "",
+                isOnline: false,
+                ip: "",
+                mac: s["last-caller-id"] || "",
+                uptime: "Offline / Standby",
+                status: "offline"
+              });
+            }
+          }
+
+          let onlineCount = 0;
+          for (const [u, userObj] of userMap.entries()) {
+            const live = activeMap.get(u);
+            if (live) {
+              userObj.isOnline = true;
+              userObj.status = "online";
+              userObj.ip = live.address || userObj.ip;
+              userObj.mac = live["caller-id"] || userObj.mac;
+              userObj.uptime = live.uptime || "Online";
+              userObj.sessionId = live["session-id"] || "";
+              onlineCount++;
+            }
+          }
+
+          const subscribers = Array.from(userMap.values()).sort((a, b) => {
+            if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+            return a.username.localeCompare(b.username);
+          });
+
+          const result = {
+            success: true,
+            totalSubscribers: subscribers.length,
+            onlineCount,
+            offlineCount: subscribers.length - onlineCount,
+            subscribers
+          };
+
+          cachedMbnUsers = result;
+          mbnUsersLastFetch = Date.now();
+          resolve(result);
+        }
+      }
+    });
+
+    socket.on("error", (err) => { socket.destroy(); resolve({ success: false, error: err.message, subscribers: [] }); });
+    socket.on("timeout", () => { socket.destroy(); resolve({ success: false, error: "Timed out", subscribers: [] }); });
+  });
+}
+
+
 // ─── Main Refresh Worker ─────────────────────────────────────────────────────
 
 export async function refreshLiveHardwareTelemetry() {
@@ -441,6 +585,15 @@ export function getCachedOltServers() {
     ageMs: Date.now() - oltServersLastFetch
   };
 }
+
+export function getCachedMbnUsers() {
+  return {
+    data: cachedMbnUsers,
+    lastFetch: mbnUsersLastFetch,
+    ageMs: Date.now() - mbnUsersLastFetch
+  };
+}
+
 
 // ─── Background Workers ──────────────────────────────────────────────────────
 

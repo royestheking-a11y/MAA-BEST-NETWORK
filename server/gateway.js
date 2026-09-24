@@ -1,5 +1,5 @@
 import http from 'http';
-import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus } from './telemetry-service.js';
+import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, getCachedMbnUsers } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
 
@@ -148,14 +148,33 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 10. MikroTik Force Direct Probe & Sync
+  // 10. MikroTik Deduplicated MBN Subscribers List
+  if (url.pathname === '/api/mikrotik/users' || url.pathname === '/api/mikrotik/subscribers') {
+    const cached = getCachedMbnUsers();
+    if (cached.data && (Date.now() - cached.lastFetch < 15000)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, cached: true, ...cached.data }));
+      return;
+    }
+    const fresh = await fetchDeduplicatedMbnUsers();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, cached: false, ...fresh }));
+    return;
+  }
+
+  // 11. MikroTik Force Direct Probe & Sync
   if (url.pathname === '/api/mikrotik/sync') {
-    const status = await fetchMikrotikLiveStatus();
+    const [status, mbnUsers] = await Promise.all([
+      fetchMikrotikLiveStatus(),
+      fetchDeduplicatedMbnUsers()
+    ]);
     await refreshLiveHardwareTelemetry();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
-      data: status
+      message: 'MikroTik hardware and deduplicated MBN subscriber pool synced',
+      data: status,
+      subscribers: mbnUsers
     }));
     return;
   }
