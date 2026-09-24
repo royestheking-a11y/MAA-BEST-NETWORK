@@ -169,6 +169,7 @@ const navSections: NavSection[] = [
 import { useLanguage } from "../context/LanguageContext";
 import { useCustomerContext } from "../context/CustomerContext";
 import { useAuth } from "../context/AuthContext";
+import { useNetxLiveData } from "../services/netxApiService";
 
 interface SidebarProps {
   currentPage: Page;
@@ -184,9 +185,12 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOp
   const { t, bnNum } = useLanguage();
   const { customers } = useCustomerContext();
   const { currentUser, logout, canAccessPage, getPageAccess } = useAuth();
+  const { liveStats } = useNetxLiveData(30000);
   const [menuSearch, setMenuSearch] = useState("");
 
-  const onlineCount = customers.filter(c => c.netStatus === "online" || c.status === "active").length;
+  const onlineCount = (Array.isArray(liveStats) && liveStats.length > 0)
+    ? liveStats.filter(c => c.connection_status === "online").length
+    : customers.filter(c => c.netStatus === "online" || c.status === "active").length;
   const dueCount = customers.filter(c => (c.dueAmount || 0) > 0 || c.status === "due").length;
   const disconnectedCount = customers.filter(c => c.status === "disconnected" || c.status === "offline").length;
 
