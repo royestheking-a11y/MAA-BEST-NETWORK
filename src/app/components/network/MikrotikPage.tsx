@@ -212,16 +212,28 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
   };
 
   // ── Sync PPPoE Sessions & Customers directly with Automatic Deduplication ──────────
-  const activeSessions = useMemo(() => {
-    const liveMap = new Map();
+  const liveStatsMap = useMemo(() => {
+    const map = new Map<string, any>();
     if (Array.isArray(liveStats)) {
-      liveStats.forEach(c => {
-        if (c.pppoe_username) liveMap.set(c.pppoe_username.toLowerCase(), c);
-        if (c.full_name) liveMap.set(c.full_name.toLowerCase(), c);
-        if (c.user_id) liveMap.set(c.user_id.toLowerCase(), c);
+      liveStats.forEach(ls => {
+        const candidates = [ls.pppoe_username, ls.full_name, ls.user_id];
+        candidates.forEach(cand => {
+          if (cand) {
+            const clean = cand.toLowerCase().trim();
+            map.set(clean, ls);
+            map.set(clean.replace(/@/g, ""), ls);
+            map.set(clean.replace(/[^a-z0-9]/g, ""), ls);
+            if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+              map.set("mbn@" + clean.slice(3), ls);
+            }
+          }
+        });
       });
     }
+    return map;
+  }, [liveStats]);
 
+  const activeSessions = useMemo(() => {
     const routerMap = new Map();
     if (Array.isArray(routerSubscribers)) {
       routerSubscribers.forEach(s => {
@@ -240,6 +252,22 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       return clean;
     };
 
+    const getLiveMatch = (c: any) => {
+      const candidates = [c.pppUser, c.name, c.clientCode, c.id];
+      for (const cand of candidates) {
+        if (!cand) continue;
+        const clean = cand.toLowerCase().trim();
+        if (liveStatsMap.has(clean)) return liveStatsMap.get(clean);
+        if (liveStatsMap.has(clean.replace(/@/g, ""))) return liveStatsMap.get(clean.replace(/@/g, ""));
+        if (liveStatsMap.has(clean.replace(/[^a-z0-9]/g, ""))) return liveStatsMap.get(clean.replace(/[^a-z0-9]/g, ""));
+        if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+          const withAt = "mbn@" + clean.slice(3);
+          if (liveStatsMap.has(withAt)) return liveStatsMap.get(withAt);
+        }
+      }
+      return null;
+    };
+
     // Filter out duplicates so every subscriber appears exactly once
     const seenUsernames = new Set<string>();
     const deduplicatedCustomers = customers.filter(c => {
@@ -254,7 +282,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       const cleanUser = (c.pppUser || c.name || "").toLowerCase().trim();
       const normalizedUser = normalizeU(cleanUser);
 
-      const liveMatch = liveMap.get(cleanUser) || liveMap.get(normalizedUser) || liveMap.get((c.name || "").toLowerCase()) || liveMap.get((c.clientCode || c.id || "").toLowerCase());
+      const liveMatch = getLiveMatch(c);
       const routerMatch = routerMap.get(cleanUser) || routerMap.get(normalizedUser);
 
       const isOnline = routerMatch
@@ -812,11 +840,11 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
               s.router.toLowerCase() === srv.name.toLowerCase() || 
               (servers.length === 1 && srv.name.toLowerCase() === "dc-ca")
             );
-            const routerOnlineCount = routerSessions.filter(s => s.status === "online").length;
+            const isPrimary = srv.ip === "103.12.173.136" || srv.name === "DC-CA";
+            const routerOnlineCount = isPrimary && onlineSessionsCount > 0 ? onlineSessionsCount : routerSessions.filter(s => s.status === "online").length;
             const routerTotalCount = routerSessions.length > 0 ? routerSessions.length : activeSessions.length;
 
             // Real router metrics directly from RouterOS hardware & telemetry
-            const isPrimary = srv.ip === "103.12.173.136" || srv.name === "DC-CA";
             const realUptimeRaw = (isPrimary && telemetry.mikrotik?.uptime) ? telemetry.mikrotik.uptime : (srv.uptime || "43w 5d 5h 52m");
             const baseUptimeSec = parseUptimeToSeconds(realUptimeRaw);
             const liveUptimeStr = baseUptimeSec > 0 ? formatTickingUptime(baseUptimeSec + liveTick) : realUptimeRaw;
