@@ -272,16 +272,141 @@ export async function testOltConnection(serverId) {
   }
 }
 
+// ─── RouterOS API: Direct MikroTik Hardware Probe ───────────────────────────
+
+function encodeWord(word) {
+  const buf = Buffer.from(word, "utf-8");
+  const len = buf.length;
+  let lenBuf;
+  if (len < 0x80) lenBuf = Buffer.from([len]);
+  else if (len < 0x4000) lenBuf = Buffer.from([(len >> 8) | 0x80, len & 0xFF]);
+  else lenBuf = Buffer.from([(len >> 16) | 0xC0, (len >> 8) & 0xFF, len & 0xFF]);
+  return Buffer.concat([lenBuf, buf]);
+}
+
+function decodeSentences(buffer) {
+  const results = [];
+  let offset = 0;
+  let currentSentence = [];
+
+  while (offset < buffer.length) {
+    const b0 = buffer[offset];
+    let len = 0, headerLen = 0;
+
+    if (b0 === 0) {
+      offset += 1;
+      if (currentSentence.length > 0) {
+        results.push(currentSentence);
+        currentSentence = [];
+      }
+      continue;
+    } else if ((b0 & 0x80) === 0) {
+      len = b0; headerLen = 1;
+    } else if ((b0 & 0xC0) === 0x80) {
+      len = ((b0 & 0x3F) << 8) | buffer[offset + 1]; headerLen = 2;
+    } else if ((b0 & 0xE0) === 0xC0) {
+      len = ((b0 & 0x1F) << 16) | (buffer[offset + 1] << 8) | buffer[offset + 2]; headerLen = 3;
+    } else break;
+
+    const word = buffer.slice(offset + headerLen, offset + headerLen + len).toString("utf-8");
+    currentSentence.push(word);
+    offset += headerLen + len;
+  }
+  return results;
+}
+
+export function fetchMikrotikLiveStatus(host = "103.12.173.136", port = 8728, user = "billing@mbn", pass = "Billing@mBn234#9530$") {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const socket = new net.Socket();
+    socket.setTimeout(4000);
+
+    let stage = 0;
+    let rxBuf = Buffer.alloc(0);
+    const output = { host, port, online: false, latencyMs: 0 };
+
+    socket.connect(port, host, () => {
+      output.latencyMs = Date.now() - t0;
+      output.online = true;
+      const cmd = Buffer.concat([
+        encodeWord("/login"),
+        encodeWord(`=name=${user}`),
+        encodeWord(`=password=${pass}`),
+        Buffer.from([0])
+      ]);
+      socket.write(cmd);
+    });
+
+    socket.on("data", (chunk) => {
+      rxBuf = Buffer.concat([rxBuf, chunk]);
+      const sentences = decodeSentences(rxBuf);
+
+      for (const s of sentences) {
+        if (s[0] === "!done" && stage === 0) {
+          stage = 1;
+          rxBuf = Buffer.alloc(0);
+          socket.write(Buffer.concat([encodeWord("/system/resource/print"), Buffer.from([0])]));
+          return;
+        } else if (stage === 1 && s[0] === "!re") {
+          for (const item of s.slice(1)) {
+            const [k, v] = item.slice(1).split("=");
+            if (k) output[k] = v;
+          }
+        } else if (stage === 1 && s[0] === "!done") {
+          stage = 2;
+          rxBuf = Buffer.alloc(0);
+          socket.write(Buffer.concat([encodeWord("/ppp/active/print"), encodeWord("=count-only="), Buffer.from([0])]));
+          return;
+        } else if (stage === 2) {
+          if (s[0] === "!done") {
+            for (const item of s.slice(1)) {
+              if (item.startsWith("=ret=")) output.activePppoe = parseInt(item.slice(5), 10);
+            }
+            socket.destroy();
+            resolve(output);
+            return;
+          }
+        }
+      }
+    });
+
+    socket.on("error", (err) => { socket.destroy(); resolve({ ...output, online: false, error: err.message }); });
+    socket.on("timeout", () => { socket.destroy(); resolve({ ...output, online: false, error: "Timed out" }); });
+  });
+}
+
 // ─── Main Refresh Worker ─────────────────────────────────────────────────────
 
 export async function refreshLiveHardwareTelemetry() {
-  const [p1, p2] = await Promise.all([
+  const [p1, p2, mStatus] = await Promise.all([
     probeTcp('103.12.173.136', 1895),
-    probeTcp('103.12.173.136', 1896)
+    probeTcp('103.12.173.136', 1896),
+    fetchMikrotikLiveStatus().catch(() => null)
   ]);
 
   cachedTelemetry.timestamp = new Date().toISOString();
   cachedTelemetry.lastUpdated = Date.now();
+
+  // Update MikroTik real telemetry from direct RouterOS API
+  if (mStatus && mStatus.online) {
+    cachedTelemetry.mikrotik.status = 'online';
+    cachedTelemetry.mikrotik.latencyMs = mStatus.latencyMs;
+    cachedTelemetry.mikrotik.uptime = mStatus.uptime || cachedTelemetry.mikrotik.uptime;
+    cachedTelemetry.mikrotik.sysName = 'DC-CA';
+    cachedTelemetry.mikrotik.version = mStatus.version || '7.11 (stable)';
+    if (mStatus['cpu-load']) cachedTelemetry.mikrotik.cpuUsagePercent = parseInt(mStatus['cpu-load'], 10);
+    if (mStatus['cpu-count']) cachedTelemetry.mikrotik.cpuCores = parseInt(mStatus['cpu-count'], 10);
+    if (mStatus['total-memory']) cachedTelemetry.mikrotik.totalRamMb = Math.round(parseInt(mStatus['total-memory'], 10) / (1024 * 1024));
+    if (mStatus['free-memory']) {
+      const freeMb = Math.round(parseInt(mStatus['free-memory'], 10) / (1024 * 1024));
+      cachedTelemetry.mikrotik.freeRamMb = freeMb;
+      cachedTelemetry.mikrotik.usedRamMb = (cachedTelemetry.mikrotik.totalRamMb || 32064) - freeMb;
+    }
+    if (mStatus.activePppoe !== undefined) {
+      cachedTelemetry.mikrotik.activePppoe = mStatus.activePppoe;
+    }
+    cachedTelemetry.mikrotik.lastSync = new Date().toISOString();
+  }
 
   // Update latency from TCP probe
   cachedTelemetry.olt1.latencyMs = p1.latency || null;

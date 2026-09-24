@@ -223,12 +223,12 @@ export const INITIAL_MIKROTIK: MikrotikServer[] = [
     winboxPort: 8291,
     username: "billing@mbn",
     password: "••••••••",
-    model: "x84 (RouterOS x86)",
-    rosVersion: "7.15.3 (x86_64)",
-    cpuLoad: 12,
-    memoryUsed: 7554,
+    model: "RouterOS x86 (Intel Xeon 72-Core)",
+    rosVersion: "7.11 (stable)",
+    cpuLoad: 10,
+    memoryUsed: 3757,
     memoryTotal: 32064,
-    uptime: "284 days, 4h",
+    uptime: "43w 5d 4h 55m",
     activePppoe: 194,
     activeHotspot: 0,
     activeStatic: 0,
@@ -236,8 +236,9 @@ export const INITIAL_MIKROTIK: MikrotikServer[] = [
     downloadMbps: 902.0,
     uploadMbps: 412.3,
     status: "online",
-    lastSync: "Just now (Realtime)",
+    lastSync: "Just now (Live RouterOS Sync)",
     role: "PPPoE Concentrator & Edge BRAS",
+    location: "DC-CA Core Rack"
   }
 ];
 

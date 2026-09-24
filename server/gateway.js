@@ -1,5 +1,5 @@
 import http from 'http';
-import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats } from './telemetry-service.js';
+import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
 
@@ -133,6 +133,29 @@ const server = http.createServer(async (req, res) => {
       liveStatsAge: Math.round(liveStats.ageMs / 1000) + 's',
       liveStatsCount: liveStats.data ? liveStats.data.length : 0,
       oltServersAge: Math.round(oltServers.ageMs / 1000) + 's'
+    }));
+    return;
+  }
+
+  // 9. MikroTik Live Status from direct RouterOS API
+  if (url.pathname === '/api/mikrotik/live-status' || url.pathname === '/api/mikrotik') {
+    const data = getCachedTelemetry();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      data: data.mikrotik
+    }));
+    return;
+  }
+
+  // 10. MikroTik Force Direct Probe & Sync
+  if (url.pathname === '/api/mikrotik/sync') {
+    const status = await fetchMikrotikLiveStatus();
+    await refreshLiveHardwareTelemetry();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      data: status
     }));
     return;
   }
