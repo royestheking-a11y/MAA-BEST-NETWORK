@@ -386,7 +386,20 @@ import {
   saveIncidentToFirestore,
 } from "../../../lib/firestoreService";
 
-let sharedMikrotik = loadFromStorage(STORAGE_KEY_MIKROTIK, [...INITIAL_MIKROTIK]);
+export function sanitizeMikrotikFleet(list: MikrotikServer[]): MikrotikServer[] {
+  if (!Array.isArray(list)) return [...INITIAL_MIKROTIK];
+  const filtered = list.filter(m => 
+    m &&
+    m.id !== "MK-01" && 
+    m.id !== "MK-02" && 
+    m.name !== "MikroTik-MBN-Core" &&
+    m.ip !== "103.12.173.138"
+  );
+  return filtered.length > 0 ? filtered : [...INITIAL_MIKROTIK];
+}
+
+let sharedMikrotik = sanitizeMikrotikFleet(loadFromStorage(STORAGE_KEY_MIKROTIK, [...INITIAL_MIKROTIK]));
+saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
 let sharedOlts = loadFromStorage(STORAGE_KEY_OLTS, [...INITIAL_OLTS]);
 let sharedZones = loadFromStorage(STORAGE_KEY_ZONES, [...INITIAL_ZONES]);
 let sharedIncidents = loadFromStorage(STORAGE_KEY_INCIDENTS, [...INITIAL_INCIDENTS]);
@@ -407,12 +420,17 @@ export function initNetworkFirestoreSync() {
   if (isInitialized || typeof window === "undefined") return;
   isInitialized = true;
 
+  // Proactively purge old fake routers from Firestore if they were previously uploaded
+  deleteMikrotikFromFirestore("MK-01").catch(() => {});
+  deleteMikrotikFromFirestore("MK-02").catch(() => {});
+
   subscribeToMikrotik(cloudMikrotik => {
-    if (cloudMikrotik && cloudMikrotik.length > 0) {
-      sharedMikrotik = cloudMikrotik as MikrotikServer[];
+    const sanitized = sanitizeMikrotikFleet(cloudMikrotik || []);
+    if (sanitized.length > 0) {
+      sharedMikrotik = sanitized;
       saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
       notify();
-    } else if (!hasMikrotikSynced && (!cloudMikrotik || cloudMikrotik.length === 0)) {
+    } else if (!hasMikrotikSynced) {
       const wasInit = localStorage.getItem("isp_mikrotik_initialized");
       if (!wasInit && INITIAL_MIKROTIK.length > 0) {
         localStorage.setItem("isp_mikrotik_initialized", "true");
@@ -426,7 +444,7 @@ export function initNetworkFirestoreSync() {
         notify();
       }
     } else {
-      sharedMikrotik = (cloudMikrotik || []) as MikrotikServer[];
+      sharedMikrotik = sanitized;
       saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
       notify();
     }
