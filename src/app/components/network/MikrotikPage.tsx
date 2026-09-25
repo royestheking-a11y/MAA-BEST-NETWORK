@@ -872,7 +872,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
 
             // RouterOS Version & Total Active on Concentrator
             const rosVersion = (isPrimary && telemetry.mikrotik?.version) ? telemetry.mikrotik.version : (srv.rosVersion || "7.11 (stable)");
-            const totalPppActiveOnRouter = (isPrimary && telemetry.mikrotik?.activePppoe) ? telemetry.mikrotik.activePppoe : 843;
+            const totalPppActiveOnRouter = telemetry.mikrotik?.activePppoe ?? onlineSessionsCount;
 
             return (
               <div

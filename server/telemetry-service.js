@@ -319,15 +319,19 @@ function decodeSentences(buffer) {
   return results;
 }
 
+// Track previous interface byte counters for delta Mbps computation
+let prevIfaceSnapshot = {};
+
 export function fetchMikrotikLiveStatus(host = "103.12.173.136", port = 8728, user = "billing@mbn", pass = "Billing@mBn234#9530$") {
   return new Promise((resolve) => {
     const t0 = Date.now();
     const socket = new net.Socket();
-    socket.setTimeout(4000);
+    socket.setTimeout(6000);
 
     let stage = 0;
     let rxBuf = Buffer.alloc(0);
-    const output = { host, port, online: false, latencyMs: 0 };
+    const output = { host, port, online: false, latencyMs: 0, interfaces: [] };
+    const ifaceList = [];
 
     socket.connect(port, host, () => {
       output.latencyMs = Date.now() - t0;
@@ -366,10 +370,43 @@ export function fetchMikrotikLiveStatus(host = "103.12.173.136", port = 8728, us
             for (const item of s.slice(1)) {
               if (item.startsWith("=ret=")) output.activePppoe = parseInt(item.slice(5), 10);
             }
-            socket.destroy();
-            resolve(output);
+            // Stage 3: Fetch real interface traffic stats
+            stage = 3;
+            rxBuf = Buffer.alloc(0);
+            socket.write(Buffer.concat([encodeWord("/interface/print"), encodeWord("=stats="), Buffer.from([0])]));
             return;
           }
+        } else if (stage === 3 && s[0] === "!re") {
+          const entry = {};
+          for (const item of s.slice(1)) {
+            const eq = item.indexOf("=", 1);
+            if (eq > 1) entry[item.slice(1, eq)] = item.slice(eq + 1);
+          }
+          if (entry.name && entry["rx-byte"] !== undefined) ifaceList.push(entry);
+        } else if (stage === 3 && s[0] === "!done") {
+          const now = Date.now();
+          output.interfaces = ifaceList.map(iface => {
+            const name = iface.name || "";
+            const rxBytes = parseInt(iface["rx-byte"] || "0", 10);
+            const txBytes = parseInt(iface["tx-byte"] || "0", 10);
+            const isRunning = iface.running === "true" || !!iface["last-link-up-time"];
+            let rxMbps = 0, txMbps = 0;
+            const prev = prevIfaceSnapshot[name];
+            if (prev && (now - prev.ts) > 500) {
+              const elapsedSec = (now - prev.ts) / 1000;
+              rxMbps = Math.max(0, ((rxBytes - prev.rx) * 8) / (elapsedSec * 1000000));
+              txMbps = Math.max(0, ((txBytes - prev.tx) * 8) / (elapsedSec * 1000000));
+            }
+            prevIfaceSnapshot[name] = { rx: rxBytes, tx: txBytes, ts: now };
+            return {
+              name, status: isRunning ? "up" : "down",
+              rxMbps: Math.round(rxMbps * 10) / 10,
+              txMbps: Math.round(txMbps * 10) / 10,
+              totalRxGb: Math.round((rxBytes / 1e9) * 10) / 10,
+              totalTxGb: Math.round((txBytes / 1e9) * 10) / 10,
+            };
+          }).filter(i => i.status === "up" || i.totalRxGb > 0);
+          socket.destroy(); resolve(output); return;
         }
       }
     });
@@ -548,6 +585,18 @@ export async function refreshLiveHardwareTelemetry() {
     }
     if (mStatus.activePppoe !== undefined) {
       cachedTelemetry.mikrotik.activePppoe = mStatus.activePppoe;
+    }
+    // Wire real interface traffic stats (from Stage 3 /interface/print)
+    if (mStatus.interfaces && mStatus.interfaces.length > 0) {
+      cachedTelemetry.mikrotik.interfaces = mStatus.interfaces.map((iface, idx) => ({
+        id: idx + 1,
+        name: iface.name,
+        status: iface.status,
+        rxMbps: iface.rxMbps,
+        txMbps: iface.txMbps,
+        totalRxGb: iface.totalRxGb,
+        totalTxGb: iface.totalTxGb,
+      }));
     }
     cachedTelemetry.mikrotik.lastSync = new Date().toISOString();
   }
