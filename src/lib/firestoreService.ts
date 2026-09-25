@@ -61,7 +61,7 @@ export function subscribeToCustomers(
       const docs: Customer[] = [];
       snapshot.forEach(docSnap => {
         const raw = docSnap.data() as any;
-        if (!raw || !raw.id) return;
+        if (!raw || !raw.id || raw.id.startsWith("CUST-")) return;
         const data: Customer = {
           ...raw,
           price: typeof raw.price === "number" ? raw.price : (Number(raw.price) || 0),

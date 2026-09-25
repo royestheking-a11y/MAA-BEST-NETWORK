@@ -272,15 +272,17 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       return null;
     };
 
-    // Filter out duplicates so every subscriber appears exactly once
+    // Filter out duplicates and legacy template accounts so every subscriber appears exactly once
     const seenUsernames = new Set<string>();
-    const deduplicatedCustomers = customers.filter(c => {
-      const u = normalizeU(c.pppUser || c.name || c.id || "");
-      if (!u) return true;
-      if (seenUsernames.has(u)) return false;
-      seenUsernames.add(u);
-      return true;
-    });
+    const deduplicatedCustomers = customers
+      .filter(c => c && c.id && !c.id.startsWith("CUST-"))
+      .filter(c => {
+        const u = normalizeU(c.pppUser || c.name || c.id || "");
+        if (!u) return true;
+        if (seenUsernames.has(u)) return false;
+        seenUsernames.add(u);
+        return true;
+      });
 
     return deduplicatedCustomers.map((c, i) => {
       const cleanUser = (c.pppUser || c.name || "").toLowerCase().trim();

@@ -191,14 +191,22 @@ interface CustomerContextType {
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
+const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v12_authentic_194_subscribers";
+
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
-      const saved = localStorage.getItem("isp_customers_store_v11_authentic_netx_macs");
+      // Purge old cache keys containing stale 195th dummy customer (CUST-10001)
+      localStorage.removeItem("isp_customers_store_v11_authentic_netx_macs");
+      localStorage.removeItem("isp_customers_store_v10");
+      localStorage.removeItem("isp_customers_store_v9");
+
+      const saved = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const clean = parsed.filter((c: any) => c && c.id && !c.id.startsWith("CUST-"));
+          if (clean.length > 0) return clean;
         }
       }
     } catch (e) {
@@ -233,7 +241,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     // 2. Subscribe to realtime updates for customers
     const unsubCustomers = subscribeToCustomers(cloudCustomers => {
       if (cloudCustomers && cloudCustomers.length > 0) {
-        setCustomers(cloudCustomers);
+        const clean = cloudCustomers.filter(c => c && c.id && !c.id.startsWith("CUST-"));
+        if (clean.length > 0) {
+          setCustomers(clean);
+        }
       }
     });
 
@@ -253,7 +264,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       if (customers && customers.length > 0) {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(customers));
+        const clean = customers.filter(c => c && c.id && !c.id.startsWith("CUST-"));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(clean));
       }
     } catch (e) {
       console.error(e);
@@ -386,7 +398,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const updatedList = [newCustomer, ...customers];
     setCustomers(updatedList);
     try {
-      localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updatedList));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updatedList));
     } catch (e) {
       console.error(e);
     }
@@ -474,7 +486,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const updatedList = [...createdCustomers, ...customers];
     setCustomers(updatedList);
     try {
-      localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updatedList));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updatedList));
     } catch (e) {
       console.error(e);
     }
@@ -542,7 +554,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -571,7 +583,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     setCustomers(prev => {
       const updated = prev.filter(c => c.id !== id);
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -599,7 +611,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       // Save all updated targets to firestore
       updated.filter(c => customerIds.includes(c.id)).forEach(target => saveCustomerToFirestore(target));
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -641,7 +653,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       const target = updated.find(c => c.id === customerId);
       if (target) saveCustomerToFirestore(target);
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -679,7 +691,7 @@ const toggleNetStatus = (id: string, enable: boolean) => {
       const target = updated.find(c => c.id === id);
       if (target) saveCustomerToFirestore(target);
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -799,7 +811,7 @@ const toggleNetStatus = (id: string, enable: boolean) => {
       const target = updated.find(c => c.id === customerId);
       if (target) saveCustomerToFirestore(target);
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -970,7 +982,7 @@ const toggleNetStatus = (id: string, enable: boolean) => {
       const targetUpdated = updated.find(c => c.id === customerId);
       if (targetUpdated) saveCustomerToFirestore(targetUpdated);
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
@@ -1006,7 +1018,7 @@ const toggleNetStatus = (id: string, enable: boolean) => {
       const targetUpdated = updated.find(c => c.id === customerId);
       if (targetUpdated) saveCustomerToFirestore(targetUpdated);
       try {
-        localStorage.setItem("isp_customers_store_v11_authentic_netx_macs", JSON.stringify(updated));
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error(e);
       }
