@@ -105,16 +105,25 @@ function realtimeTelemetryPlugin() {
             res.end(JSON.stringify({ success: false, error: 'command required' }));
             return;
           }
-          const parts = command.trim().split(/\s+/);
-          const words: string[] = [];
-          parts.forEach((p: string, i: number) => {
-            if (i === 0) { words.push(p); return; }
-            if (p.startsWith('?') || p.startsWith('=') || p.startsWith('.')) {
-              words.push(p);
+          let clean = command.trim();
+          if (!clean.startsWith('/')) clean = '/' + clean;
+          const parts = clean.split(/\s+/);
+          const pathWords: string[] = [];
+          const paramWords: string[] = [];
+          for (const p of parts) {
+            if (p.startsWith('=') || p.startsWith('?') || p.startsWith('.')) {
+              paramWords.push(p);
+            } else if (p.includes('=')) {
+              paramWords.push(`=${p}`);
+            } else if (pathWords.length > 0 && ['print', 'get', 'set', 'add', 'remove', 'enable', 'disable', 'reset', 'comment'].includes(pathWords[pathWords.length - 1])) {
+              paramWords.push(`=${p}`);
             } else {
-              words.push(`=${p}`);
+              pathWords.push(p.replace(/^\//, ''));
             }
-          });
+          }
+          const apiPath = '/' + pathWords.join('/');
+          const words = [apiPath, ...paramWords];
+
           const result = await executeRouterOsCommand(words);
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');

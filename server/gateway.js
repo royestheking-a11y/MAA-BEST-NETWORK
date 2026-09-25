@@ -195,17 +195,26 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ success: false, error: 'command field required' }));
       return;
     }
-    // Parse command string into RouterOS API words
-    const parts = command.trim().split(/\s+/);
-    const words = [];
-    parts.forEach((p, i) => {
-      if (i === 0) { words.push(p); return; }
-      if (p.startsWith('?') || p.startsWith('=') || p.startsWith('.')) {
-        words.push(p);
+    // Parse command string into RouterOS API words (e.g. /system resource print -> /system/resource/print)
+    let clean = command.trim();
+    if (!clean.startsWith('/')) clean = '/' + clean;
+    const parts = clean.split(/\s+/);
+    const pathWords = [];
+    const paramWords = [];
+    for (const p of parts) {
+      if (p.startsWith('=') || p.startsWith('?') || p.startsWith('.')) {
+        paramWords.push(p);
+      } else if (p.includes('=')) {
+        paramWords.push(`=${p}`);
+      } else if (pathWords.length > 0 && ['print', 'get', 'set', 'add', 'remove', 'enable', 'disable', 'reset', 'comment'].includes(pathWords[pathWords.length - 1])) {
+        paramWords.push(`=${p}`);
       } else {
-        words.push(`=${p}`);
+        pathWords.push(p.replace(/^\//, ''));
       }
-    });
+    }
+    const apiPath = '/' + pathWords.join('/');
+    const words = [apiPath, ...paramWords];
+
     const result = await executeRouterOsCommand(words);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
