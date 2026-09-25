@@ -1109,16 +1109,21 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                     </div>
                   </div>
 
-                  {/* Informative Connection & Hardware Runtime Status Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-muted/30 border border-border text-[11px]">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                      <span className="text-muted-foreground whitespace-nowrap">Added to MBN:</span>
-                      <span className="font-semibold text-foreground whitespace-nowrap">{addedAtDateLabel}</span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">({liveSystemUptimeStr})</span>
+                  {/* Informative Connection & Hardware Runtime Status Card */}
+                  <div className="p-3 rounded-2xl bg-muted/30 border border-border text-[11px] space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="text-muted-foreground">Added to MBN:</span>
+                        <span className="font-bold text-foreground">{addedAtDateLabel}</span>
+                      </div>
+                      <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {liveSystemUptimeStr} Active
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] whitespace-nowrap shrink-0 pl-4 sm:pl-0 border-t sm:border-t-0 pt-1.5 sm:pt-0 border-border/50">
-                      <span>Physical Machine:</span>
+
+                    <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40 text-[10px]">
+                      <span className="text-muted-foreground">Physical Machine Uptime (DC-CA Xeon Rack):</span>
                       <span className="font-mono font-bold text-foreground">{liveHardwareUptimeStr}</span>
                     </div>
                   </div>
