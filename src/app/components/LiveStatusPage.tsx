@@ -298,7 +298,7 @@ export function LiveStatusPage() {
         };
       });
     } else {
-      // 2. FULL 365 PHYSICAL OLT HARDWARE SLOTS (Including spare / unassigned ONUs)
+      // 2. HARDWARE ONU VIEW — All 191 ONUs, each mapped 1-to-1 with a subscriber
       const custMap = new Map<string, any>();
       const macMap = new Map<string, any>();
 
@@ -554,7 +554,7 @@ export function LiveStatusPage() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* View Scope Switcher */}
+          {/* View Scope Switcher - Subscriber ONUs only (all ONUs are now subscriber-assigned) */}
           <div className="flex rounded-xl p-1 bg-muted border border-border">
             <button
               onClick={() => setViewScope("subscribers")}
@@ -570,7 +570,7 @@ export function LiveStatusPage() {
                 viewScope === "all_hardware" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               }`}>
               <Cpu size={13} />
-              <span>All Hardware ({AUTHENTIC_NETX_ONUS.length})</span>
+              <span>ONU Hardware ({AUTHENTIC_NETX_ONUS.length})</span>
             </button>
           </div>
 
