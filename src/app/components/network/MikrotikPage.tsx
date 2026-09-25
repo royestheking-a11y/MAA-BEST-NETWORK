@@ -1040,9 +1040,16 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground border border-border">
                           {srv.id}
                         </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+                          72-Core Xeon
+                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {srv.location} · <span className="font-mono text-foreground font-bold">{srv.ip}</span> · RouterOS v{rosVersion} (72-Core Intel Xeon)
+                      <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
+                        <span>{srv.location}</span>
+                        <span className="opacity-40">·</span>
+                        <span className="font-mono text-foreground font-bold">{srv.ip}</span>
+                        <span className="opacity-40">·</span>
+                        <span>RouterOS v{rosVersion}</span>
                       </p>
                     </div>
                   </div>
@@ -1073,20 +1080,20 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                 {/* Metrics */}
                 <div className="p-5 space-y-4">
                   <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="p-3 rounded-2xl bg-muted/30 border border-border">
+                    <div className="p-3 rounded-2xl bg-muted/30 border border-border flex flex-col justify-center">
                       <Cpu size={16} className="mx-auto mb-1 text-primary" />
                       <p className="font-mono text-sm font-black text-foreground">{realCpu}%</p>
-                      <span className="text-[10px] text-muted-foreground font-bold">CPU LOAD</span>
+                      <span className="text-[10px] text-muted-foreground font-bold tracking-wider">CPU LOAD</span>
                     </div>
-                    <div className="p-3 rounded-2xl bg-muted/30 border border-border">
+                    <div className="p-3 rounded-2xl bg-muted/30 border border-border flex flex-col justify-center">
                       <MemoryStick size={16} className="mx-auto mb-1 text-blue-500" />
                       <p className="font-mono text-sm font-black text-foreground">
                         {ramPercent}%
                       </p>
-                      <span className="text-[10px] text-muted-foreground font-bold">RAM ALLOCATED</span>
+                      <span className="text-[10px] text-muted-foreground font-bold tracking-wider">RAM ALLOCATED</span>
                     </div>
                     <div 
-                      className="p-3 rounded-2xl bg-muted/30 border border-border cursor-pointer hover:bg-muted/50 transition group"
+                      className="p-3 rounded-2xl bg-muted/30 border border-border cursor-pointer hover:bg-muted/50 transition group flex flex-col justify-center"
                       onClick={() => setUptimeViewMode(v => v === "system" ? "hardware" : "system")}
                       title={`Click to switch mode.\n• System Uptime: ${liveSystemUptimeStr} (Added ${addedAtDateLabel})\n• Core Server Hardware: ${liveHardwareUptimeStr} (Physical Xeon Server in DC-CA Core Rack)`}
                     >
@@ -1098,28 +1105,21 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                         <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">
                           {uptimeViewMode === "system" ? "SYSTEM UPTIME" : "HARDWARE UPTIME"}
                         </span>
-                        <span className={`text-[8px] px-1 py-0.5 rounded font-black uppercase ${
-                          uptimeViewMode === "system" 
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
-                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                        }`}>
-                          {uptimeViewMode === "system" ? "Added 24 Sep" : "Xeon OS"}
-                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Informative Connection & Hardware Runtime Banner */}
-                  <div className="flex items-center justify-between px-3 py-2 rounded-2xl bg-muted/30 border border-border text-[11px]">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-muted-foreground">
-                        Added to MBN: <span className="font-bold text-foreground">{addedAtDateLabel}</span>
-                        {" "}(<span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{liveSystemUptimeStr}</span> active)
-                      </span>
+                  {/* Informative Connection & Hardware Runtime Status Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-muted/30 border border-border text-[11px]">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span className="text-muted-foreground whitespace-nowrap">Added to MBN:</span>
+                      <span className="font-semibold text-foreground whitespace-nowrap">{addedAtDateLabel}</span>
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">({liveSystemUptimeStr})</span>
                     </div>
-                    <div className="text-[10px] font-mono text-muted-foreground hidden sm:block" title="Physical RouterOS kernel runtime without reboot in DC-CA Core Rack">
-                      Physical Machine: <span className="text-foreground font-bold">{liveHardwareUptimeStr}</span>
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] whitespace-nowrap shrink-0 pl-4 sm:pl-0 border-t sm:border-t-0 pt-1.5 sm:pt-0 border-border/50">
+                      <span>Physical Machine:</span>
+                      <span className="font-mono font-bold text-foreground">{liveHardwareUptimeStr}</span>
                     </div>
                   </div>
 
@@ -1147,17 +1147,21 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                   </div>
 
                   {/* Live Real-Time Throughput */}
-                  <div className="p-2.5 rounded-2xl bg-muted/40 border border-border flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                      <ArrowDownRight size={14} />
-                      <span>↓ {liveDownMbps.toFixed(1)} Mbps</span>
+                  <div className="p-3 rounded-2xl bg-muted/40 border border-border flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                        <ArrowDownRight size={15} />
+                        <span>{liveDownMbps.toFixed(1)} Mbps</span>
+                        <span className="text-[9px] font-sans font-bold uppercase text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">Rx</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                        <ArrowUpRight size={15} />
+                        <span>{liveUpMbps.toFixed(1)} Mbps</span>
+                        <span className="text-[9px] font-sans font-bold uppercase text-blue-700 dark:text-blue-300 bg-blue-500/10 px-1 py-0.2 rounded border border-blue-500/20">Tx</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                      <ArrowUpRight size={14} />
-                      <span>↑ {liveUpMbps.toFixed(1)} Mbps</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-mono">
-                      {routerOnlineCount} online queues · {totalPppActiveOnRouter} on BRAS
+                    <div className="text-[11px] text-muted-foreground font-mono whitespace-nowrap">
+                      <strong className="text-foreground">{routerOnlineCount}</strong> online queues · <strong className="text-foreground">{totalPppActiveOnRouter}</strong> on BRAS
                     </div>
                   </div>
 
@@ -1214,23 +1218,25 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                   )}
 
                   {/* Live Database Subscriber Connection Counts */}
-                  <div className="flex items-center justify-between pt-3 border-t border-border text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <Users size={14} className="text-primary" />
-                      <span className="font-mono font-black text-foreground">{routerOnlineCount}</span>
-                      <span className="text-muted-foreground">/ {routerTotalCount} MBN Subscribers Online ({routerOnlineCount} Online · 0 Duplicates)</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-border text-xs gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Users size={14} className="text-primary shrink-0" />
+                      <span className="font-mono font-black text-foreground shrink-0">{routerOnlineCount}</span>
+                      <span className="text-muted-foreground truncate">
+                        / {routerTotalCount} MBN Subscribers Online ({routerOnlineCount} Online · 0 Duplicates)
+                      </span>
                     </div>
-                    <span className="text-muted-foreground text-[11px] font-mono">
+                    <span className="text-muted-foreground text-[11px] font-mono shrink-0 whitespace-nowrap">
                       API: {srv.apiPort || 8728} · WinBox: {srv.winboxPort || 8291}
                     </span>
                   </div>
                 </div>
 
                 {/* Card Action Buttons */}
-                <div className="flex border-t border-border text-xs font-bold">
+                <div className="flex border-t border-border text-xs font-bold divide-x divide-border">
                   <button
                     onClick={() => initTerminal(srv)}
-                    className="flex-1 py-3 flex items-center justify-center gap-1.5 hover:bg-muted border-r border-border text-foreground cursor-pointer transition">
+                    className="flex-1 py-3.5 flex items-center justify-center gap-2 hover:bg-muted text-foreground cursor-pointer transition">
                     <Terminal size={14} className="text-emerald-500" />
                     <span>CLI Terminal</span>
                   </button>
@@ -1240,7 +1246,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                       setRouterFilter(srv.name);
                       setActiveTab("sessions");
                     }}
-                    className="flex-1 py-3 flex items-center justify-center gap-1.5 hover:bg-muted border-r border-border text-foreground cursor-pointer transition">
+                    className="flex-1 py-3.5 flex items-center justify-center gap-2 hover:bg-muted text-foreground cursor-pointer transition">
                     <Activity size={14} className="text-blue-500" />
                     <span>Subscribers</span>
                   </button>
@@ -1264,7 +1270,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                     }}
                     disabled={isReadOnly || !canEdit}
                     title={isReadOnly || !canEdit ? "Read-only mode: Editing router is restricted" : "Edit Router Configuration"}
-                    className={`px-3 py-3 flex items-center justify-center border-r border-border ${
+                    className={`px-4 py-3.5 flex items-center justify-center transition ${
                       isReadOnly || !canEdit ? "opacity-30 cursor-not-allowed text-muted-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
                     }`}>
                     <Edit size={14} />
@@ -1274,7 +1280,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                     onClick={() => !isReadOnly && canDelete && handleDeleteServer(srv.id, srv.name)}
                     disabled={isReadOnly || !canDelete}
                     title={isReadOnly || !canDelete ? "Read-only mode: Deleting router is restricted" : "Delete Router"}
-                    className={`px-3 py-3 flex items-center justify-center ${
+                    className={`px-4 py-3.5 flex items-center justify-center transition ${
                       isReadOnly || !canDelete ? "opacity-30 cursor-not-allowed text-muted-foreground" : "hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 cursor-pointer"
                     }`}>
                     <Trash2 size={14} />
