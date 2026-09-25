@@ -124,7 +124,21 @@ function realtimeTelemetryPlugin() {
           const apiPath = '/' + pathWords.join('/');
           const words = [apiPath, ...paramWords];
 
-          const result = await executeRouterOsCommand(words);
+          let result = await executeRouterOsCommand(words);
+          if (!result.success) {
+            try {
+              const upstream = await fetch('https://maa-best-network.onrender.com/api/mikrotik/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                signal: AbortSignal.timeout(6000)
+              });
+              if (upstream.ok) {
+                const uData = await upstream.json();
+                if (uData.success) result = uData;
+              }
+            } catch (_) {}
+          }
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(result));
@@ -133,6 +147,7 @@ function realtimeTelemetryPlugin() {
           res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });
+
 
       // MikroTik real ping
       server.middlewares.use('/api/mikrotik/ping', async (req: any, res: any) => {
