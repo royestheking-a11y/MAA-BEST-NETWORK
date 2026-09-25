@@ -42,6 +42,9 @@ export interface MikrotikServer {
   memoryUsed?: number;
   memoryTotal?: number;
   uptime: string;
+  hardwareUptime?: string;
+  connectedSince?: string;
+  addedAt?: string;
   sessions?: number;
   activePppoe?: number;
   activeHotspot?: number;
@@ -229,6 +232,9 @@ export const INITIAL_MIKROTIK: MikrotikServer[] = [
     memoryUsed: 3757,
     memoryTotal: 32064,
     uptime: "43w 5d 4h 55m",
+    hardwareUptime: "307d 06h 20m 26s",
+    connectedSince: "2026-09-24T17:30:00+06:00",
+    addedAt: "24 Sep 2026, 05:30 PM",
     activePppoe: 194,
     activeHotspot: 0,
     activeStatic: 0,

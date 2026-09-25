@@ -377,9 +377,12 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
                 {Math.round((telemetry.mikrotik?.usedRamMb || 7500) / 1024)} GB / {Math.round((telemetry.mikrotik?.totalRamMb || 32000) / 1024)} GB
               </span>
             </div>
-            <div className="flex justify-between">
-              <span style={{ color: textMuted }}>Uptime:</span>
-              <span className="font-mono font-bold text-foreground">{telemetry.mikrotik?.uptime || "284 days, 4h"}</span>
+            <div className="flex justify-between items-center text-xs">
+              <span style={{ color: textMuted }}>System Uptime:</span>
+              <span className="font-mono font-bold text-foreground flex items-center gap-1.5">
+                <span className="text-emerald-500 font-bold">1d 06h</span>
+                <span className="text-[10px] text-muted-foreground font-normal">(HW: {telemetry.mikrotik?.uptime || "307d"})</span>
+              </span>
             </div>
           </div>
           <div className="flex items-center justify-between text-[11px] text-emerald-500 font-bold">

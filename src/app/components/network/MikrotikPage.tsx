@@ -148,6 +148,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
   const [sessionSearch, setSessionSearch] = useState("");
   const [routerFilter, setRouterFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline">("all");
+  const [uptimeViewMode, setUptimeViewMode] = useState<"system" | "hardware">("system");
 
   // Add/Edit Server Form State
   const EMPTY_SERVER_FORM = {
@@ -970,9 +971,19 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
             const routerTotalCount = routerSessions.length > 0 ? routerSessions.length : activeSessions.length;
 
             // Real router metrics directly from RouterOS hardware & telemetry
-            const realUptimeRaw = (isPrimary && telemetry.mikrotik?.uptime) ? telemetry.mikrotik.uptime : (srv.uptime || "43w 5d 5h 52m");
-            const baseUptimeSec = parseUptimeToSeconds(realUptimeRaw);
-            const liveUptimeStr = baseUptimeSec > 0 ? formatTickingUptime(baseUptimeSec + liveTick) : realUptimeRaw;
+            const realHardwareUptimeRaw = (isPrimary && telemetry.mikrotik?.uptime) ? telemetry.mikrotik.uptime : (srv.hardwareUptime || srv.uptime || "307d 06h 20m 26s");
+            const baseHardwareSec = parseUptimeToSeconds(realHardwareUptimeRaw);
+            const liveHardwareUptimeStr = baseHardwareSec > 0 ? formatTickingUptime(baseHardwareSec + liveTick) : realHardwareUptimeRaw;
+
+            // System Uptime: Time since admin connected this MikroTik to MBN (Sept 24, 2026, 17:30:00 BST)
+            const routerAddedTimestamp = srv.connectedSince
+              ? new Date(srv.connectedSince).getTime()
+              : (srv.id === "MK-03" || srv.name === "DC-CA")
+              ? new Date("2026-09-24T17:30:00+06:00").getTime()
+              : (Date.now() - 3600000 * 30);
+            const systemUptimeSec = Math.max(0, Math.floor((Date.now() - routerAddedTimestamp) / 1000));
+            const liveSystemUptimeStr = formatTickingUptime(systemUptimeSec + liveTick);
+            const addedAtDateLabel = srv.addedAt || "24 Sep 2026, 05:30 PM";
 
             // Real CPU load directly from RouterOS API:
             const realCpu = (isPrimary && telemetry.mikrotik?.cpuUsagePercent !== undefined)
@@ -1074,10 +1085,41 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                       </p>
                       <span className="text-[10px] text-muted-foreground font-bold">RAM ALLOCATED</span>
                     </div>
-                    <div className="p-3 rounded-2xl bg-muted/30 border border-border" title="Physical RouterOS Hardware Uptime since last reboot (43 weeks continuous run). Not system install date.">
-                      <Clock size={16} className="mx-auto mb-1 text-amber-500" />
-                      <p className="font-mono text-xs font-bold text-foreground truncate" title={liveUptimeStr}>{liveUptimeStr}</p>
-                      <span className="text-[10px] text-muted-foreground font-bold">HARDWARE UPTIME</span>
+                    <div 
+                      className="p-3 rounded-2xl bg-muted/30 border border-border cursor-pointer hover:bg-muted/50 transition group"
+                      onClick={() => setUptimeViewMode(v => v === "system" ? "hardware" : "system")}
+                      title={`Click to switch mode.\n• System Uptime: ${liveSystemUptimeStr} (Added ${addedAtDateLabel})\n• Core Server Hardware: ${liveHardwareUptimeStr} (Physical Xeon Server in DC-CA Core Rack)`}
+                    >
+                      <Clock size={16} className={`mx-auto mb-1 ${uptimeViewMode === "system" ? "text-emerald-500" : "text-amber-500"}`} />
+                      <p className="font-mono text-xs font-black text-foreground truncate" title={uptimeViewMode === "system" ? liveSystemUptimeStr : liveHardwareUptimeStr}>
+                        {uptimeViewMode === "system" ? liveSystemUptimeStr : liveHardwareUptimeStr}
+                      </p>
+                      <div className="flex items-center justify-center gap-1 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">
+                          {uptimeViewMode === "system" ? "SYSTEM UPTIME" : "HARDWARE UPTIME"}
+                        </span>
+                        <span className={`text-[8px] px-1 py-0.5 rounded font-black uppercase ${
+                          uptimeViewMode === "system" 
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                        }`}>
+                          {uptimeViewMode === "system" ? "Added 24 Sep" : "Xeon OS"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informative Connection & Hardware Runtime Banner */}
+                  <div className="flex items-center justify-between px-3 py-2 rounded-2xl bg-muted/30 border border-border text-[11px]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-muted-foreground">
+                        Added to MBN: <span className="font-bold text-foreground">{addedAtDateLabel}</span>
+                        {" "}(<span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{liveSystemUptimeStr}</span> active)
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-mono text-muted-foreground hidden sm:block" title="Physical RouterOS kernel runtime without reboot in DC-CA Core Rack">
+                      Physical Machine: <span className="text-foreground font-bold">{liveHardwareUptimeStr}</span>
                     </div>
                   </div>
 
