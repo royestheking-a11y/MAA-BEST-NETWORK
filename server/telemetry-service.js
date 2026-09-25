@@ -18,40 +18,48 @@ const OLT2_ID = '716faeb5-9680-48ac-8375-104101d4d23b';
 let netxToken = null;
 let tokenExpiresAt = 0;
 let loginCooldownUntil = 0;
+let pendingLoginPromise = null;
 
 async function getNetxAuthToken() {
   if (netxToken && Date.now() < tokenExpiresAt) {
     return netxToken;
   }
-  // Rate limit protection: don't try to login more than once every 20 seconds
+  if (pendingLoginPromise) {
+    return pendingLoginPromise;
+  }
   if (Date.now() < loginCooldownUntil) {
-    return netxToken; // Return stale token or null
+    return netxToken;
   }
   loginCooldownUntil = Date.now() + 20000;
-  try {
-    const res = await fetch(`${NETX_API_BASE}/auth/login/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'MBN-Telemetry-Gateway/2.0',
-        'Origin': 'https://netx.ispdhaka.com'
-      },
-      body: JSON.stringify(NETX_CREDENTIALS)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      netxToken = data.access;
-      tokenExpiresAt = Date.now() + 50 * 60 * 1000; // 50 mins
-      console.log('[NetX Auth] Login successful, token cached for 50 minutes');
-      return netxToken;
-    } else {
-      const errBody = await res.text();
-      console.error(`[NetX Auth] Login failed: HTTP ${res.status} - ${errBody}`);
+  pendingLoginPromise = (async () => {
+    try {
+      const res = await fetch(`${NETX_API_BASE}/auth/login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'MBN-Telemetry-Gateway/2.0',
+          'Origin': 'https://netx.ispdhaka.com'
+        },
+        body: JSON.stringify(NETX_CREDENTIALS)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        netxToken = data.access;
+        tokenExpiresAt = Date.now() + 50 * 60 * 1000; // 50 mins
+        console.log('[NetX Auth] Login successful, token cached for 50 minutes');
+        return netxToken;
+      } else {
+        const errBody = await res.text();
+        console.error(`[NetX Auth] Login failed: HTTP ${res.status} - ${errBody}`);
+      }
+    } catch (err) {
+      console.error('[NetX Auth] Login error:', err.message);
+    } finally {
+      pendingLoginPromise = null;
     }
-  } catch (err) {
-    console.error('[NetX Auth] Login error:', err.message);
-  }
-  return null;
+    return null;
+  })();
+  return pendingLoginPromise;
 }
 
 // ─── Cached Data ─────────────────────────────────────────────────────────────
@@ -405,7 +413,7 @@ export function fetchMikrotikLiveStatus(host = "103.12.173.136", port = 8728, us
               totalRxGb: Math.round((rxBytes / 1e9) * 10) / 10,
               totalTxGb: Math.round((txBytes / 1e9) * 10) / 10,
             };
-          }).filter(i => i.status === "up" || i.totalRxGb > 0);
+          }).filter(i => !i.name.startsWith("<pppoe-") && (i.status === "up" || i.totalRxGb > 0));
           socket.destroy(); resolve(output); return;
         }
       }
@@ -555,8 +563,178 @@ export function fetchDeduplicatedMbnUsers(host = "103.12.173.136", port = 8728, 
   });
 }
 
+// ─── RouterOS Connection Defaults ────────────────────────────────────────────
+const MK_DEF_HOST = '103.12.173.136';
+const MK_DEF_PORT = 8728;
+const MK_DEF_USER = 'billing@mbn';
+const MK_DEF_PASS = 'Billing@mBn234#9530$';
+
+// ─── Generic RouterOS API Command Executor ────────────────────────────────────
+export function executeRouterOsCommand(commandWords, host = MK_DEF_HOST, port = MK_DEF_PORT, user = MK_DEF_USER, pass = MK_DEF_PASS) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(8000);
+    let stage = 0;
+    let rxBuf = Buffer.alloc(0);
+    const results = [];
+    let retVal = null;
+
+    socket.connect(port, host, () => {
+      socket.write(Buffer.concat([
+        encodeWord('/login'),
+        encodeWord(`=name=${user}`),
+        encodeWord(`=password=${pass}`),
+        Buffer.from([0])
+      ]));
+    });
+
+    socket.on('data', (chunk) => {
+      rxBuf = Buffer.concat([rxBuf, chunk]);
+      const sentences = decodeSentences(rxBuf);
+      for (const s of sentences) {
+        if (s[0] === '!done' && stage === 0) {
+          stage = 1; rxBuf = Buffer.alloc(0);
+          const words = commandWords.map(w => encodeWord(w));
+          words.push(Buffer.from([0]));
+          socket.write(Buffer.concat(words));
+          return;
+        } else if (stage === 1 && s[0] === '!re') {
+          const entry = {};
+          for (const item of s.slice(1)) {
+            const eq = item.indexOf('=', 1);
+            if (eq > 1) entry[item.slice(1, eq)] = item.slice(eq + 1);
+          }
+          results.push(entry);
+        } else if (stage === 1 && (s[0] === '!done' || s[0] === '!trap')) {
+          if (s[0] === '!done') {
+            for (const item of s.slice(1)) {
+              if (item.startsWith('=ret=')) retVal = item.slice(5);
+            }
+          }
+          const errMsg = s[0] === '!trap'
+            ? (s.slice(1).find(i => i.startsWith('=message=')) || '=message=RouterOS Error').slice(9)
+            : null;
+          socket.destroy();
+          resolve({ success: s[0] === '!done', results, retVal, error: errMsg });
+          return;
+        }
+      }
+    });
+    socket.on('error', (err) => { socket.destroy(); resolve({ success: false, error: err.message, results: [], retVal: null }); });
+    socket.on('timeout', () => { socket.destroy(); resolve({ success: false, error: 'Timed out', results: [], retVal: null }); });
+  });
+}
+
+// ─── Disconnect a PPPoE Session by Username ───────────────────────────────────
+export async function disconnectPppoeUser(username) {
+  const findResult = await executeRouterOsCommand(['/ppp/active/print', `?name=${username}`]);
+  if (!findResult.success || findResult.results.length === 0) {
+    return { success: false, error: `No active session found for "${username}"` };
+  }
+  const sessionId = findResult.results[0]['.id'];
+  if (!sessionId) return { success: false, error: 'Session ID not found' };
+  const removeResult = await executeRouterOsCommand(['/ppp/active/remove', `=.id=${sessionId}`]);
+  return { success: removeResult.success, sessionId, username, error: removeResult.error };
+}
+
+// ─── Enable / Disable a PPPoE Secret ─────────────────────────────────────────
+export async function setUserDisabledState(username, disabled) {
+  let findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${username}`]);
+  if (!findResult.success || findResult.results.length === 0) {
+    const alt = username.toLowerCase().startsWith('mbn@') ? username : 'mbn@' + username.replace(/^mbn/i, '');
+    findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${alt}`]);
+    if (!findResult.success || findResult.results.length === 0) {
+      return { success: false, error: `PPPoE secret not found for "${username}"` };
+    }
+  }
+  const secretId = findResult.results[0]['.id'];
+  if (!secretId) return { success: false, error: 'Secret ID not found' };
+  const setResult = await executeRouterOsCommand(['/ppp/secret/set', `=.id=${secretId}`, `=disabled=${disabled ? 'yes' : 'no'}`]);
+  return { success: setResult.success, username, disabled, error: setResult.error };
+}
+
+// ─── Real Ping from MikroTik Router ──────────────────────────────────────────
+export function mikrotikPing(target, count = 4) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(12000);
+    let stage = 0;
+    let rxBuf = Buffer.alloc(0);
+    const pingResults = [];
+
+    socket.connect(MK_DEF_PORT, MK_DEF_HOST, () => {
+      socket.write(Buffer.concat([
+        encodeWord('/login'),
+        encodeWord(`=name=${MK_DEF_USER}`),
+        encodeWord(`=password=${MK_DEF_PASS}`),
+        Buffer.from([0])
+      ]));
+    });
+
+    socket.on('data', (chunk) => {
+      rxBuf = Buffer.concat([rxBuf, chunk]);
+      const sentences = decodeSentences(rxBuf);
+      for (const s of sentences) {
+        if (s[0] === '!done' && stage === 0) {
+          stage = 1; rxBuf = Buffer.alloc(0);
+          socket.write(Buffer.concat([
+            encodeWord('/ping'),
+            encodeWord(`=address=${target}`),
+            encodeWord(`=count=${count}`),
+            Buffer.from([0])
+          ]));
+          return;
+        } else if (stage === 1 && s[0] === '!re') {
+          const entry = {};
+          for (const item of s.slice(1)) {
+            const eq = item.indexOf('=', 1);
+            if (eq > 1) entry[item.slice(1, eq)] = item.slice(eq + 1);
+          }
+          pingResults.push(entry);
+        } else if (stage === 1 && (s[0] === '!done' || s[0] === '!trap')) {
+          socket.destroy();
+          if (s[0] === '!trap') {
+            const e = (s.slice(1).find(i => i.startsWith('=message=')) || '=message=Ping failed').slice(9);
+            resolve({ success: false, error: e, target, results: [] });
+            return;
+          }
+          const ok = pingResults.filter(p => p.status === 'reply' || (p.time && p.time !== 'timeout'));
+          const times = ok.map(p => parseFloat((p.time || '0ms').replace('ms', ''))).filter(t => !isNaN(t) && t > 0);
+          resolve({
+            success: true, target, count,
+            sent: pingResults.length,
+            received: ok.length,
+            lost: pingResults.length - ok.length,
+            minMs: times.length ? Math.min(...times).toFixed(2) : 'N/A',
+            maxMs: times.length ? Math.max(...times).toFixed(2) : 'N/A',
+            avgMs: times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2) : 'N/A',
+            results: pingResults
+          });
+          return;
+        }
+      }
+    });
+    socket.on('error', (err) => { socket.destroy(); resolve({ success: false, error: err.message, target, results: [] }); });
+    socket.on('timeout', () => { socket.destroy(); resolve({ success: false, error: 'RouterOS ping timed out', target, results: [] }); });
+  });
+}
+
+// ─── Get Extended System Details (queues, firewall) ───────────────────────────
+export async function getMikrotikDetails() {
+  const [queues, filterCount, natCount] = await Promise.all([
+    executeRouterOsCommand(['/queue/simple/print', '=count-only=']),
+    executeRouterOsCommand(['/ip/firewall/filter/print', '=count-only=']),
+    executeRouterOsCommand(['/ip/firewall/nat/print', '=count-only='])
+  ]);
+  return {
+    totalQueues: parseInt(queues.retVal || '0', 10),
+    firewallFilterRules: parseInt(filterCount.retVal || '0', 10),
+    firewallNatRules: parseInt(natCount.retVal || '0', 10)
+  };
+}
 
 // ─── Main Refresh Worker ─────────────────────────────────────────────────────
+
 
 export async function refreshLiveHardwareTelemetry() {
   const [p1, p2, mStatus] = await Promise.all([

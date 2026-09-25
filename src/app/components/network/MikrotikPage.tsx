@@ -96,6 +96,10 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [liveTick, setLiveTick] = useState(0);
   const [routerSubscribers, setRouterSubscribers] = useState<any[]>([]);
+  const [terminalRunning, setTerminalRunning] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [mikrotikDetails, setMikrotikDetails] = useState<{ totalQueues: number; firewallFilterRules: number; firewallNatRules: number } | null>(null);
+  const [showInterfaces, setShowInterfaces] = useState(false);
 
   // 1-second live ticker for real-time uptime clock & instantaneous per-second bandwidth
   useEffect(() => {
@@ -565,141 +569,144 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
     });
   };
 
-  const runPing = () => {
-    if (!pingTarget) return;
-    setPinging(true);
-    setPingLogs([
-      `Initiating ICMP Ping from [${pingRouter}] to ${pingTarget}...`,
-      `HOST: ${pingTarget} (Count=4, Timeout=1000ms, Packet Size=56b)`
-    ]);
-
-    setTimeout(() => {
-      setPingLogs(prev => [
-        ...prev,
-        `--- ${pingTarget} ping statistics ---`,
-        `4 packets transmitted, 4 received, 0% packet loss`,
-        `rtt min/avg/max = 1.00/1.00/1.00 ms [OPERATIONAL LINK QUALITY]`
-      ]);
-      setPinging(false);
-    }, 900);
-  };
-
   // Interactive RouterOS Terminal Console Runner
+  // Interactive RouterOS Terminal Console Runner — REAL via Gateway API
+  const terminalScrollRef = useRef<HTMLDivElement>(null);
+
   const initTerminal = (srv: MikrotikServer) => {
     setSelectedTerminalRouter(srv);
     setActiveTab("terminal");
     setTerminalLogs([
-      `Connected to ${srv.name} (RouterOS v7.11 stable on ${srv.ip}:8728)...`,
-      `Type '/system resource print', '/interface print', '/ppp active print', or 'help' below.`,
+      `\x1b[32mConnected to ${srv.name} (RouterOS API ${srv.ip}:8728)\x1b[0m`,
+      `Live RouterOS command bridge active. Type commands below or use quick chips.`,
       `[admin@${srv.name}] > /system resource print`,
-      `             uptime: ${srv.uptime || "43w 5d 4h 55m"}`,
-      `            version: 7.11 (stable)`,
-      `         build-time: Aug/15/2023 06:33:51`,
-      `        free-memory: 27.8GiB`,
-      `       total-memory: 31.3GiB`,
-      `                cpu: Intel(R)`,
-      `          cpu-count: 72`,
-      `      cpu-frequency: 2600MHz`,
-      `           cpu-load: ${srv.cpuLoad || 10}%`,
-      `     free-hdd-space: 7.3GiB`,
-      `    total-hdd-space: 7.3GiB`,
-      `  architecture-name: x86_64`,
-      `         board-name: x86`,
-      `           platform: MikroTik`,
-      `Ready.`
+      `  (fetching live data from router...)`,
     ]);
+    // Auto-run system resource print on connect
+    setTimeout(async () => {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+      try {
+        const res = await fetch(`${base}/api/mikrotik/command`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: "/system/resource/print" }),
+          signal: AbortSignal.timeout(8000)
+        });
+        const data = await res.json();
+        const lines: string[] = [];
+        if (data.success && data.results.length > 0) {
+          const r = data.results[0];
+          lines.push(
+            `             uptime: ${r.uptime || "—"}`,
+            `            version: ${r.version || "—"}`,
+            `         build-time: ${r["build-time"] || "—"}`,
+            `        free-memory: ${r["free-memory"] ? (parseInt(r["free-memory"]) / (1024*1024)).toFixed(0) + " MiB" : "—"}`,
+            `       total-memory: ${r["total-memory"] ? (parseInt(r["total-memory"]) / (1024*1024)).toFixed(0) + " MiB" : "—"}`,
+            `                cpu: ${r["cpu"] || "Intel"}`,
+            `          cpu-count: ${r["cpu-count"] || "—"}`,
+            `           cpu-load: ${r["cpu-load"] || "—"}%`,
+            `     free-hdd-space: ${r["free-hdd-space"] ? (parseInt(r["free-hdd-space"]) / (1024*1024*1024)).toFixed(1) + " GiB" : "—"}`,
+            `    total-hdd-space: ${r["total-hdd-space"] ? (parseInt(r["total-hdd-space"]) / (1024*1024*1024)).toFixed(1) + " GiB" : "—"}`,
+            `  architecture-name: ${r["architecture-name"] || "x86_64"}`,
+            `         board-name: ${r["board-name"] || "x86"}`,
+            `           platform: MikroTik`
+          );
+        } else {
+          lines.push(`  error: ${data.error || "could not fetch resource data"}`);
+        }
+        lines.push(`[admin@${srv.name}] >`);
+        setTerminalLogs(prev => [...prev.slice(0, -1), ...lines]);
+      } catch { setTerminalLogs(prev => [...prev.slice(0, -1), `  error: Gateway timeout — check router connection`, `[admin@${srv.name}] >`]); }
+    }, 400);
   };
 
-  const handleTerminalSubmit = (e: React.FormEvent) => {
+  const handleTerminalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!terminalInput.trim()) return;
+    if (!terminalInput.trim() || terminalRunning) return;
     const cmd = terminalInput.trim();
     const srvName = selectedTerminalRouter?.name || servers[0]?.name || "DC-CA";
+    const srvIp = selectedTerminalRouter?.ip || servers[0]?.ip || "103.12.173.136";
 
-    const nextLogs = [...terminalLogs, `[admin@${srvName}] > ${cmd}`];
-
-    if (cmd === "help" || cmd === "?") {
-      nextLogs.push(
-        "Available RouterOS Commands in this Console:",
-        "  /system resource print      - Display CPU, memory, uptime",
-        "  /interface print            - Display physical interfaces & traffic",
-        "  /ppp active print           - Display live subscriber PPPoE sessions",
-        "  /queue simple print         - Display simple queue rate limits",
-        "  /ip address print           - Display router IP bindings",
-        "  /log print                  - Display router system audit logs",
-        "  /ping <ip>                  - Run ICMP ping to target IP",
-        "  clear                       - Clear console output"
-      );
-    } else if (cmd === "clear") {
-      setTerminalLogs([`[admin@${srvName}] > Ready.`]);
+    // Local-only commands
+    if (cmd === "clear") {
+      setTerminalLogs([`[admin@${srvName}] > `]);
       setTerminalInput("");
       return;
-    } else if (cmd.includes("/system resource")) {
-      nextLogs.push(
-        `             uptime: ${selectedTerminalRouter?.uptime || "43w 5d 4h 55m"}`,
-        `            version: 7.11 (stable)`,
-        `         build-time: Aug/15/2023 06:33:51`,
-        `        free-memory: 27.8GiB / 31.3GiB`,
-        `                cpu: Intel(R) 72 Xeon Cores @ 2600MHz`,
-        `           cpu-load: ${selectedTerminalRouter?.cpuLoad || 10}%`,
-        `  architecture-name: x86_64`
-      );
-    } else if (cmd.includes("/interface")) {
-      nextLogs.push(
-        ` #   NAME                   TYPE      ACTUAL-MTU   MAC-ADDRESS         STATUS`,
-        ` 0 R MediaOne-IIG           ether           1500   48:8F:5A:11:22:18   running (Rx: 482.4M, Tx: 128.6M)`,
-        ` 1 R MediaOne-BDIX          ether           1500   48:8F:5A:11:22:21   running (Rx: 890.1M, Tx: 412.3M)`,
-        ` 2 R ether1-gateway         ether           1500   48:8F:5A:11:22:22   running (Rx: 310.5M, Tx: 94.2M)`,
-        ` 3 R bridge-customers       bridge          1500   48:8F:5A:11:22:27   running (Rx: 215.8M, Tx: 45.2M)`,
-        ` 4 R sfp-sfpplus1           ether           1500   48:8F:5A:11:22:41   running (Rx: 185.0M, Tx: 38.6M)`
-      );
-    } else if (cmd.includes("/ppp active")) {
-      nextLogs.push(
-        ` #   NAME             SERVICE  CALLER-ID           ADDRESS          UPTIME`,
-        ...activeSessions.slice(0, 15).map((s, idx) => 
-          ` ${idx.toString().padEnd(3)} ${s.user.padEnd(16)} pppoe    ${s.callerIdMac.padEnd(19)} ${s.ip.padEnd(16)} ${s.uptime}`
-        ),
-        ` -- ${activeSessions.length} active PPPoE subscriber lines on ${srvName} --`
-      );
-    } else if (cmd.includes("/queue simple")) {
-      nextLogs.push(
-        ` #   NAME             TARGET           MAX-LIMIT         BURST-LIMIT`,
-        ...activeSessions.slice(0, 12).map((s, idx) => 
-          ` ${idx.toString().padEnd(3)} queue_${s.user.padEnd(12)} ${s.ip.padEnd(16)} ${s.downloadSpeed}M/${s.uploadSpeed}M           none`
-        ),
-        ` -- ${activeSessions.length} simple queues active on ${srvName} --`
-      );
-    } else if (cmd.includes("/ip address")) {
-      nextLogs.push(
-        ` #   ADDRESS            NETWORK         INTERFACE`,
-        ` 0   103.12.173.136/29  103.12.173.136  MediaOne-BDIX`,
-        ` 1   103.12.173.2/29    103.12.173.0    MediaOne-IIG`,
-        ` 2   10.200.201.1/24    10.200.201.0    bridge-customers`
-      );
-    } else if (cmd.includes("/log")) {
-      nextLogs.push(
-        ` 13:38:12 pppoe,info: user mbn@abdulalim logged in, 10.215.37.149 assigned`,
-        ` 13:38:15 system,info: simple queue synced for mbn@abdulalim (35M/15M)`,
-        ` 13:39:02 btrc,info: BDIX peering direct session active`
-      );
-    } else if (cmd.startsWith("/ping") || cmd.startsWith("ping")) {
-      const parts = cmd.split(" ");
-      const ip = parts[1] || "103.12.173.1";
-      nextLogs.push(
-        `Sending 4, 56-byte ICMP Echos to ${ip}...`,
-        `  64 bytes from ${ip}: icmp_seq=1 ttl=64 time=1.21 ms`,
-        `  64 bytes from ${ip}: icmp_seq=2 ttl=64 time=1.05 ms`,
-        `  64 bytes from ${ip}: icmp_seq=3 ttl=64 time=1.18 ms`,
-        `  64 bytes from ${ip}: icmp_seq=4 ttl=64 time=1.10 ms`,
-        `--- ${ip} ping statistics --- 4 packets transmitted, 4 received, 0% packet loss`
-      );
-    } else {
-      nextLogs.push(`syntax error: unknown command '${cmd}' (type 'help' for command manual)`);
+    }
+    if (cmd === "help" || cmd === "?") {
+      setTerminalLogs(prev => [...prev,
+        `[admin@${srvName}] > ${cmd}`,
+        "RouterOS CLI Commands (via live API port 8728):",
+        "  /system resource print      — CPU, RAM, uptime, HDD",
+        "  /interface print            — All interfaces with Rx/Tx stats",
+        "  /ppp active print           — Live PPPoE sessions",
+        "  /ppp secret print           — PPPoE subscriber secrets",
+        "  /queue simple print         — Simple queue rate limits",
+        "  /ip address print           — IP address bindings",
+        "  /ip firewall filter print   — Firewall filter rules",
+        "  /ip firewall nat print      — NAT masquerade rules",
+        "  /log print                  — System event log",
+        "  /ping <ip>                  — ICMP echo test",
+        "  clear                       — Clear console screen",
+        `[admin@${srvName}] > `
+      ]);
+      setTerminalInput("");
+      return;
     }
 
-    setTerminalLogs(nextLogs);
+    // Normalize RouterOS command format
+    const normalizeCmd = (c: string) => c.replace(/\s+/g, "/").replace(/\/+/g, "/");
+    let apiCmd = cmd;
+    if (!apiCmd.startsWith("/")) apiCmd = "/" + apiCmd;
+    apiCmd = apiCmd.replace(/\//g, " /").trim();
+    // Re-join: first word is path, rest are params
+    const firstSpace = apiCmd.indexOf(" ");
+    const path = firstSpace > 0 ? apiCmd.slice(0, firstSpace).replace(/\s/g, "/") : apiCmd;
+    const rest = firstSpace > 0 ? apiCmd.slice(firstSpace + 1) : "";
+    const finalCmd = (path + (rest ? " " + rest : "")).trim();
+
+    setTerminalLogs(prev => [...prev, `[admin@${srvName}] > ${cmd}`, "  ...sending to RouterOS API..."]);
     setTerminalInput("");
+    setTerminalRunning(true);
+
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+
+    try {
+      const res = await fetch(`${base}/api/mikrotik/command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: finalCmd }),
+        signal: AbortSignal.timeout(8000)
+      });
+      const data = await res.json();
+
+      const lines: string[] = [];
+      if (!data.success) {
+        lines.push(`  error: ${data.error || "Command failed on router"}`);
+      } else if (data.retVal !== null && data.retVal !== undefined) {
+        lines.push(`  ret: ${data.retVal}`);
+      } else if (data.results && data.results.length > 0) {
+        data.results.slice(0, 30).forEach((row: any, idx: number) => {
+          lines.push(`  #${idx}`);
+          Object.entries(row).forEach(([k, v]) => {
+            if (k !== '.nextid') lines.push(`    ${k.padEnd(22)} ${v}`);
+          });
+        });
+        if (data.results.length > 30) lines.push(`  ... ${data.results.length - 30} more entries (use filter to narrow)`);
+      } else {
+        lines.push(`  (command executed — no output returned)`);
+      }
+      lines.push(`[admin@${srvName}] > `);
+      setTerminalLogs(prev => [...prev.slice(0, -1), ...lines]);
+    } catch (err: any) {
+      setTerminalLogs(prev => [...prev.slice(0, -1), `  error: ${err.message || "Gateway timeout"}`, `[admin@${srvName}] > `]);
+    } finally {
+      setTerminalRunning(false);
+    }
   };
+
 
   const onlineSessionsCount = useMemo(() => {
     if (Array.isArray(liveStats) && liveStats.length > 0) {
@@ -708,6 +715,122 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
     return activeSessions.filter(s => s.status === "online").length;
   }, [liveStats, activeSessions]);
   const offlineSessionsCount = Math.max(0, activeSessions.length - onlineSessionsCount);
+
+  // Fetch extended MikroTik details (queues, firewall rules)
+  useEffect(() => {
+    if (servers.length === 0) return;
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+    const fetchDetails = async () => {
+      try {
+        const res = await fetch(`${base}/api/mikrotik/details`, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const d = await res.json();
+          if (d.success) setMikrotikDetails(d);
+        }
+      } catch {}
+    };
+    fetchDetails();
+    const interval = setInterval(fetchDetails, 60000);
+    return () => clearInterval(interval);
+  }, [servers.length]);
+
+  // Real Disconnect PPPoE User
+  const handleDisconnectUser = async (session: any) => {
+    if (isReadOnly || !canEdit) { showToast("Permission denied: Read-only mode."); return; }
+    const username = session.user;
+    setActionInProgress(`disconnect-${session.id}`);
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+    try {
+      const res = await fetch(`${base}/api/mikrotik/disconnect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+        signal: AbortSignal.timeout(8000)
+      });
+      const data = await res.json();
+      if (data.success) {
+        toggleNetStatus(session.rawCustomer.id, false);
+        showToast(`✓ PPPoE session for '${username}' forcibly disconnected from RouterOS. Session ID: ${data.sessionId || 'N/A'}`);
+      } else {
+        showToast(`⚠️ Disconnect: ${data.error || 'Unknown error from RouterOS'}`);
+      }
+    } catch (e: any) {
+      showToast(`⚠️ Disconnect failed: ${e.message}`);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Real Enable / Disable User Account
+  const handleToggleUser = async (session: any, disabled: boolean) => {
+    if (isReadOnly || !canEdit) { showToast("Permission denied: Read-only mode."); return; }
+    const username = session.user;
+    setActionInProgress(`toggle-${session.id}`);
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+    try {
+      const res = await fetch(`${base}/api/mikrotik/user/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, disabled }),
+        signal: AbortSignal.timeout(8000)
+      });
+      const data = await res.json();
+      if (data.success) {
+        toggleNetStatus(session.rawCustomer.id, !disabled);
+        showToast(`✓ PPPoE secret '${username}' ${disabled ? 'DISABLED' : 'ENABLED'} on RouterOS. Connection state updated.`);
+      } else {
+        showToast(`⚠️ Toggle: ${data.error || 'Unknown error from RouterOS'}`);
+      }
+    } catch (e: any) {
+      showToast(`⚠️ Toggle failed: ${e.message}`);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Real Ping from MikroTik
+  const runPing = async () => {
+    if (!pingTarget) return;
+    setPinging(true);
+    setPingLogs([`Initiating ping from [${pingRouter}] to ${pingTarget}...`, `Connecting to RouterOS API ${servers[0]?.ip || '103.12.173.136'}:8728...`]);
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+    try {
+      const res = await fetch(`${base}/api/mikrotik/ping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: pingTarget, count: 4 }),
+        signal: AbortSignal.timeout(12000)
+      });
+      const data = await res.json();
+      if (data.success) {
+        const lines: string[] = [
+          `HOST: ${pingTarget} (Count=${data.count}, Source: ${servers[0]?.ip || '103.12.173.136'})`
+        ];
+        data.results.forEach((r: any, idx: number) => {
+          const status = r.status === 'reply' ? '✓ Reply' : '✗ Timeout';
+          const time = r.time || 'timeout';
+          const ttl = r['ttl'] || r['ttl-value'] || '64';
+          lines.push(`  icmp_seq=${idx + 1} ${status} ttl=${ttl} time=${time}`);
+        });
+        lines.push(
+          `--- ${pingTarget} ping statistics ---`,
+          `${data.sent} packets transmitted, ${data.received} received, ${data.lost} lost (${data.sent > 0 ? Math.round((data.lost / data.sent) * 100) : 0}% loss)`,
+          `rtt min=${data.minMs}ms avg=${data.avgMs}ms max=${data.maxMs}ms  [${data.received === data.sent ? 'OPERATIONAL LINK QUALITY' : 'DEGRADED — PACKET LOSS DETECTED'}]`
+        );
+        setPingLogs(lines);
+      } else {
+        setPingLogs([`Error from RouterOS: ${data.error || 'Unknown error'}`, `Check that ${pingTarget} is reachable from ${servers[0]?.ip || 'core router'}.`]);
+      }
+    } catch (e: any) {
+      setPingLogs([`Gateway timeout: ${e.message}`, `The Render gateway may be waking from sleep. Try again in 15s.`]);
+    } finally {
+      setPinging(false);
+    }
+  };
 
 
   return (
@@ -864,11 +987,22 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
             // Real Latency directly from RouterOS API probe:
             const latencyMs = (isPrimary && telemetry.mikrotik?.latencyMs) ? telemetry.mikrotik.latencyMs : 46;
 
-            // Real Bandwidth from physical interfaces:
+            // Real Bandwidth: compute live throughput from active transit/peering interfaces
             const ifaces = isPrimary && telemetry.mikrotik?.interfaces;
-            const bdixIface = ifaces?.find(i => i.name.includes("BDIX"));
-            const liveDownMbps = bdixIface ? bdixIface.rxMbps : (srv.downloadMbps || 890.1);
-            const liveUpMbps = bdixIface ? bdixIface.txMbps : (srv.uploadMbps || 412.3);
+            let liveDownMbps = srv.downloadMbps || 890.1;
+            let liveUpMbps = srv.uploadMbps || 412.3;
+
+            if (ifaces && ifaces.length > 0) {
+              const activeTransit = ifaces.filter((i: any) => 
+                !i.name.startsWith("<") && 
+                i.status === "up" && 
+                ((i.rxMbps && i.rxMbps > 0) || (i.txMbps && i.txMbps > 0))
+              );
+              const sumRx = activeTransit.reduce((acc: number, i: any) => acc + (i.rxMbps || 0), 0);
+              const sumTx = activeTransit.reduce((acc: number, i: any) => acc + (i.txMbps || 0), 0);
+              if (sumRx > 0) liveDownMbps = Math.round(sumRx * 10) / 10;
+              if (sumTx > 0) liveUpMbps = Math.round(sumTx * 10) / 10;
+            }
 
             // RouterOS Version & Total Active on Concentrator
             const rosVersion = (isPrimary && telemetry.mikrotik?.version) ? telemetry.mikrotik.version : (srv.rosVersion || "7.11 (stable)");
@@ -938,10 +1072,10 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                       </p>
                       <span className="text-[10px] text-muted-foreground font-bold">RAM ALLOCATED</span>
                     </div>
-                    <div className="p-3 rounded-2xl bg-muted/30 border border-border">
+                    <div className="p-3 rounded-2xl bg-muted/30 border border-border" title="Physical RouterOS Hardware Uptime since last reboot (43 weeks continuous run). Not system install date.">
                       <Clock size={16} className="mx-auto mb-1 text-amber-500" />
                       <p className="font-mono text-xs font-bold text-foreground truncate" title={liveUptimeStr}>{liveUptimeStr}</p>
-                      <span className="text-[10px] text-muted-foreground font-bold">SYSTEM UPTIME</span>
+                      <span className="text-[10px] text-muted-foreground font-bold">HARDWARE UPTIME</span>
                     </div>
                   </div>
 
@@ -982,6 +1116,58 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                       {routerOnlineCount} online queues · {totalPppActiveOnRouter} on BRAS
                     </div>
                   </div>
+
+                  {/* Extended System Stats Row */}
+                  {mikrotikDetails && isPrimary && (
+                    <div className="grid grid-cols-3 gap-2 text-[10px]">
+                      <div className="p-2 rounded-xl bg-muted/30 border border-border text-center">
+                        <p className="font-mono font-black text-foreground">{mikrotikDetails.totalQueues}</p>
+                        <span className="text-muted-foreground font-bold">SIMPLE QUEUES</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-muted/30 border border-border text-center">
+                        <p className="font-mono font-black text-foreground">{mikrotikDetails.firewallFilterRules}</p>
+                        <span className="text-muted-foreground font-bold">FW FILTER RULES</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-muted/30 border border-border text-center">
+                        <p className="font-mono font-black text-foreground">{mikrotikDetails.firewallNatRules}</p>
+                        <span className="text-muted-foreground font-bold">NAT RULES</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Interface Traffic Table (collapsible) */}
+                  {isPrimary && telemetry.mikrotik?.interfaces && telemetry.mikrotik.interfaces.length > 0 && (
+                    <div className="border border-border rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => setShowInterfaces(v => !v)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 bg-muted/40 text-xs font-bold text-foreground hover:bg-muted transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Network size={13} className="text-primary" />
+                          <span>Live Interfaces ({telemetry.mikrotik.interfaces.length})</span>
+                        </div>
+                        <ChevronRight size={14} className={`text-muted-foreground transition-transform ${showInterfaces ? 'rotate-90' : ''}`} />
+                      </button>
+                      {showInterfaces && (
+                        <div className="divide-y divide-border">
+                          <div className="grid grid-cols-4 px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase bg-muted/20">
+                            <span>Interface</span><span className="text-center">Status</span><span className="text-right text-emerald-600">↓ Rx Mbps</span><span className="text-right text-blue-500">↑ Tx Mbps</span>
+                          </div>
+                          {telemetry.mikrotik.interfaces.map((iface: any, ii: number) => (
+                            <div key={ii} className="grid grid-cols-4 px-3 py-1.5 text-[11px] hover:bg-muted/20 transition">
+                              <span className="font-mono font-bold text-foreground truncate" title={iface.name}>{iface.name}</span>
+                              <span className={`text-center font-bold text-[10px] ${iface.status === 'up' ? 'text-emerald-500' : 'text-rose-500'}`}>{(iface.status || 'up').toUpperCase()}</span>
+                              <span className="text-right font-mono text-emerald-600 dark:text-emerald-400">{(iface.rxMbps ?? 0).toFixed(1)}</span>
+                              <span className="text-right font-mono text-blue-500">{(iface.txMbps ?? 0).toFixed(1)}</span>
+                            </div>
+                          ))}
+                          <div className="px-3 py-1.5 text-[10px] text-muted-foreground bg-muted/10">
+                            Total: ↓ {telemetry.mikrotik.interfaces.reduce((a: number, i: any) => a + (i.rxMbps || 0), 0).toFixed(1)} Mbps · ↑ {telemetry.mikrotik.interfaces.reduce((a: number, i: any) => a + (i.txMbps || 0), 0).toFixed(1)} Mbps
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Live Database Subscriber Connection Counts */}
                   <div className="flex items-center justify-between pt-3 border-t border-border text-xs">
@@ -1183,51 +1369,48 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                     </td>
 
                     <td className="p-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {s.status === "online" ? (
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Disconnect live session */}
+                        {s.status === "online" && (
                           <button
-                            onClick={() => {
-                              if (isReadOnly || !canEdit) {
-                                showToast("Permission denied: You cannot terminate sessions in read-only mode.");
-                                return;
-                              }
-                              toggleNetStatus(s.rawCustomer.id, false);
-                              showToast(`✓ Terminated PPPoE session for '${s.user}'. RouterOS queue isolated.`);
-                            }}
-                            disabled={isReadOnly || !canEdit}
-                            title={isReadOnly || !canEdit ? "Read-only mode: Terminating sessions is restricted" : undefined}
-                            className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition ${
-                              isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 cursor-pointer"
+                            onClick={() => handleDisconnectUser(s)}
+                            disabled={isReadOnly || !canEdit || actionInProgress === `disconnect-${s.id}`}
+                            title={isReadOnly || !canEdit ? "Read-only mode" : "Force disconnect PPPoE session from RouterOS"}
+                            className={`px-2 py-1 rounded-xl text-[11px] font-bold transition flex items-center gap-1 ${
+                              isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground"
+                              : actionInProgress === `disconnect-${s.id}` ? "bg-rose-500/20 text-rose-500 cursor-wait"
+                              : "bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 cursor-pointer"
                             }`}>
-                            Kick Session
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              if (isReadOnly || !canEdit) {
-                                showToast("Permission denied: You cannot re-authorize sessions in read-only mode.");
-                                return;
-                              }
-                              toggleNetStatus(s.rawCustomer.id, true);
-                              showToast(`✓ Re-authorized PPPoE session for '${s.user}'. RouterOS queue enabled.`);
-                            }}
-                            disabled={isReadOnly || !canEdit}
-                            title={isReadOnly || !canEdit ? "Read-only mode: Re-authorizing sessions is restricted" : undefined}
-                            className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition ${
-                              isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 cursor-pointer"
-                            }`}>
-                            Re-authorize
+                            {actionInProgress === `disconnect-${s.id}` ? <RefreshCw size={10} className="animate-spin" /> : <WifiOff size={10} />}
+                            <span>Kick</span>
                           </button>
                         )}
+
+                        {/* Enable / Disable Secret */}
+                        <button
+                          onClick={() => handleToggleUser(s, s.status === "online" || s.status !== "offline" ? true : false)}
+                          disabled={isReadOnly || !canEdit || actionInProgress === `toggle-${s.id}`}
+                          title={isReadOnly || !canEdit ? "Read-only mode" : s.status === "online" ? "Disable this PPPoE secret on RouterOS" : "Enable this PPPoE secret on RouterOS"}
+                          className={`px-2 py-1 rounded-xl text-[11px] font-bold transition flex items-center gap-1 ${
+                            isReadOnly || !canEdit ? "opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground"
+                            : actionInProgress === `toggle-${s.id}` ? "bg-amber-500/20 text-amber-500 cursor-wait"
+                            : s.status === "online"
+                            ? "bg-amber-500/10 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 cursor-pointer"
+                            : "bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 cursor-pointer"
+                          }`}>
+                          {actionInProgress === `toggle-${s.id}` ? <RefreshCw size={10} className="animate-spin" /> : s.status === "online" ? <Ban size={10} /> : <Wifi size={10} />}
+                          <span>{s.status === "online" ? "Disable" : "Enable"}</span>
+                        </button>
 
                         <button
                           onClick={() => {
                             setActiveCustomer(s.rawCustomer);
                             onNavigate?.("customer-profile");
                           }}
-                          className="px-2 py-1 rounded-xl border border-border hover:bg-muted text-foreground text-[11px] font-bold cursor-pointer"
+                          className="px-2 py-1 rounded-xl border border-border hover:bg-muted text-foreground text-[11px] font-bold cursor-pointer flex items-center gap-1"
                           title="View Customer Profile">
-                          Profile
+                          <Eye size={10} />
+                          <span>Profile</span>
                         </button>
                       </div>
                     </td>
@@ -1290,42 +1473,51 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
           </div>
 
           {/* Console Screen Output */}
-          <div className="p-5 font-mono text-xs space-y-1.5 bg-[#090D16] text-[#C9D1D9] flex-1 overflow-y-auto max-h-[420px] select-text">
+          <div ref={terminalScrollRef} className="p-5 font-mono text-xs space-y-1.5 bg-[#090D16] text-[#C9D1D9] flex-1 overflow-y-auto max-h-[420px] select-text">
             {terminalLogs.map((line, idx) => (
               <p
                 key={idx}
                 className={
                   line.startsWith("[admin")
                     ? "text-sky-400 font-bold"
-                    : line.startsWith("  uptime") || line.startsWith("  version") || line.includes("running")
-                    ? "text-emerald-300"
-                    : line.includes("error")
+                    : line.startsWith("  error")
                     ? "text-rose-400 font-bold"
+                    : line.includes("uptime") || line.includes("version") || line.includes("running") || line.includes("OPERATIONAL")
+                    ? "text-emerald-300"
+                    : line.startsWith("  #") || line.startsWith("  ret")
+                    ? "text-amber-300 font-bold"
+                    : line.startsWith("    ")
+                    ? "text-slate-200"
                     : "text-slate-300"
                 }>
                 {line}
               </p>
             ))}
-
-            {/* Console Input Bar */}
-            <form onSubmit={handleTerminalSubmit} className="p-3 bg-[#0E1626] border-t border-slate-800 flex items-center gap-2">
-              <span className="text-emerald-400 font-mono text-xs font-bold pl-2">
-                [admin@{selectedTerminalRouter?.name.split(" ")[0] || "MikroTik"}] &gt;
-              </span>
-              <input
-                value={terminalInput}
-                onChange={e => setTerminalInput(e.target.value)}
-                placeholder="Type command here (e.g. /ppp active print or help)..."
-                className="flex-1 bg-transparent border-none outline-none font-mono text-xs text-white placeholder-slate-500"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 cursor-pointer">
-                Run
-              </button>
-            </form>
+            {terminalRunning && (
+              <p className="text-sky-400 animate-pulse">  ● Waiting for RouterOS API response...</p>
+            )}
           </div>
+
+          {/* Console Input Bar */}
+          <form onSubmit={handleTerminalSubmit} className="p-3 bg-[#0E1626] border-t border-slate-800 flex items-center gap-2">
+            <span className="text-emerald-400 font-mono text-xs font-bold pl-2">
+              [admin@{selectedTerminalRouter?.name.split(" ")[0] || "MikroTik"}] &gt;
+            </span>
+            <input
+              value={terminalInput}
+              onChange={e => setTerminalInput(e.target.value)}
+              placeholder="Type RouterOS command (e.g. /ppp active print or help)..."
+              className="flex-1 bg-transparent border-none outline-none font-mono text-xs text-white placeholder-slate-500"
+              disabled={terminalRunning}
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={terminalRunning}
+              className={`px-4 py-1.5 rounded-xl text-white text-xs font-bold cursor-pointer transition ${terminalRunning ? 'bg-slate-600 cursor-wait' : 'bg-primary hover:opacity-90'}`}>
+              {terminalRunning ? <RefreshCw size={12} className="animate-spin" /> : 'Run'}
+            </button>
+          </form>
         </div>
       ))}
 

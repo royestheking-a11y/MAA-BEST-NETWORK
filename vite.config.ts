@@ -85,6 +85,162 @@ function realtimeTelemetryPlugin() {
           res.end(JSON.stringify({ error: e.message }));
         }
       });
+
+      // Helper to parse JSON body in Vite middleware
+      const readBody = (req: any): Promise<any> => new Promise((resolve) => {
+        let data = '';
+        req.on('data', (chunk: any) => { data += chunk; });
+        req.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve({}); } });
+      });
+
+      // MikroTik real command execution
+      server.middlewares.use('/api/mikrotik/command', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { executeRouterOsCommand } = await import('./server/telemetry-service.js');
+          const command = body.command || '';
+          if (!command) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'command required' }));
+            return;
+          }
+          const parts = command.trim().split(/\s+/);
+          const words: string[] = [];
+          parts.forEach((p: string, i: number) => {
+            if (i === 0) { words.push(p); return; }
+            if (p.startsWith('?') || p.startsWith('=') || p.startsWith('.')) {
+              words.push(p);
+            } else {
+              words.push(`=${p}`);
+            }
+          });
+          const result = await executeRouterOsCommand(words);
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik real ping
+      server.middlewares.use('/api/mikrotik/ping', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { mikrotikPing } = await import('./server/telemetry-service.js');
+          const target = body.target || '8.8.8.8';
+          const count = Math.min(10, Math.max(1, parseInt(body.count || '4', 10)));
+          const result = await mikrotikPing(target, count);
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik disconnect subscriber
+      server.middlewares.use('/api/mikrotik/disconnect', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { disconnectPppoeUser } = await import('./server/telemetry-service.js');
+          if (!body.username) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'username required' }));
+            return;
+          }
+          const result = await disconnectPppoeUser(body.username);
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik toggle user disabled
+      server.middlewares.use('/api/mikrotik/user/toggle', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { setUserDisabledState } = await import('./server/telemetry-service.js');
+          if (!body.username || body.disabled === undefined) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'username and disabled boolean required' }));
+            return;
+          }
+          const result = await setUserDisabledState(body.username, !!body.disabled);
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik extended details
+      server.middlewares.use('/api/mikrotik/details', async (_req: any, res: any) => {
+        try {
+          const { getMikrotikDetails } = await import('./server/telemetry-service.js');
+          const result = await getMikrotikDetails();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik subscribers list
+      server.middlewares.use('/api/mikrotik/users', async (_req: any, res: any) => {
+        try {
+          const { fetchDeduplicatedMbnUsers, getCachedMbnUsers } = await import('./server/telemetry-service.js');
+          const cached = getCachedMbnUsers();
+          if (cached.data && (Date.now() - cached.lastFetch < 15000)) {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, cached: true, ...cached.data }));
+            return;
+          }
+          const fresh = await fetchDeduplicatedMbnUsers();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, cached: false, ...fresh }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik force sync
+      server.middlewares.use('/api/mikrotik/sync', async (_req: any, res: any) => {
+        try {
+          const { fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, refreshLiveHardwareTelemetry } = await import('./server/telemetry-service.js');
+          const [status, mbnUsers] = await Promise.all([
+            fetchMikrotikLiveStatus(),
+            fetchDeduplicatedMbnUsers()
+          ]);
+          await refreshLiveHardwareTelemetry();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({
+            success: true,
+            message: 'MikroTik hardware and deduplicated MBN subscriber pool synced',
+            data: status,
+            subscribers: mbnUsers
+          }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
     }
   }
 }

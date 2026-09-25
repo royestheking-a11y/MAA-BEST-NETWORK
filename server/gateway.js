@@ -1,5 +1,5 @@
 import http from 'http';
-import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, getCachedMbnUsers } from './telemetry-service.js';
+import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, getCachedMbnUsers, executeRouterOsCommand, disconnectPppoeUser, setUserDisabledState, mikrotikPing, getMikrotikDetails } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
 
@@ -28,6 +28,13 @@ const server = http.createServer(async (req, res) => {
     res.end();
     return;
   }
+
+  // Helper: read JSON POST body
+  const readBody = () => new Promise((resolve) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve({}); } });
+  });
 
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -176,6 +183,81 @@ const server = http.createServer(async (req, res) => {
       data: status,
       subscribers: mbnUsers
     }));
+    return;
+  }
+
+  // 12. Real RouterOS Command Execution (for live CLI terminal)
+  if (url.pathname === '/api/mikrotik/command' && req.method === 'POST') {
+    const body = await readBody();
+    const { command } = body;
+    if (!command || typeof command !== 'string') {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'command field required' }));
+      return;
+    }
+    // Parse command string into RouterOS API words
+    const parts = command.trim().split(/\s+/);
+    const words = [];
+    parts.forEach((p, i) => {
+      if (i === 0) { words.push(p); return; }
+      if (p.startsWith('?') || p.startsWith('=') || p.startsWith('.')) {
+        words.push(p);
+      } else {
+        words.push(`=${p}`);
+      }
+    });
+    const result = await executeRouterOsCommand(words);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  // 13. Real Ping from MikroTik
+  if (url.pathname === '/api/mikrotik/ping' && req.method === 'POST') {
+    const body = await readBody();
+    const target = body.target || '8.8.8.8';
+    const count = Math.min(10, Math.max(1, parseInt(body.count || '4', 10)));
+    const result = await mikrotikPing(target, count);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  // 14. Disconnect PPPoE User (kill active session)
+  if (url.pathname === '/api/mikrotik/disconnect' && req.method === 'POST') {
+    const body = await readBody();
+    const { username } = body;
+    if (!username) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'username required' }));
+      return;
+    }
+    const result = await disconnectPppoeUser(username);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  // 15. Enable / Disable PPPoE Secret
+  if (url.pathname === '/api/mikrotik/user/toggle' && req.method === 'POST') {
+    const body = await readBody();
+    const { username, disabled } = body;
+    if (!username || disabled === undefined) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'username and disabled (boolean) required' }));
+      return;
+    }
+    const result = await setUserDisabledState(username, !!disabled);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  // 16. Extended MikroTik System Details
+  if (url.pathname === '/api/mikrotik/details') {
+    const details = await getMikrotikDetails();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, ...details }));
     return;
   }
 

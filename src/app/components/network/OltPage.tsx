@@ -282,6 +282,40 @@ export function OltPage({ onNavigate }: OltPageProps) {
     }
   }, [customers, liveStats, buildOnuList]);
 
+  // Dynamically update OLT card statistics directly from live onuList (194 total: 97 OLT1 / 97 OLT2)
+  useEffect(() => {
+    if (onuList.length === 0) return;
+    const olt1Onus = onuList.filter(o => o.oltServer === "OLT1");
+    const olt2Onus = onuList.filter(o => o.oltServer === "OLT2");
+
+    const olt1Active = olt1Onus.filter(o => o.status === "online").length;
+    const olt1Total = olt1Onus.length;
+    const olt2Active = olt2Onus.filter(o => o.status === "online").length;
+    const olt2Total = olt2Onus.length;
+
+    setOlts(prev => prev.map(o => {
+      if (o.id === "OLT-01" || o.name === "OLT1") {
+        return {
+          ...o,
+          activeOnu: olt1Active,
+          totalOnu: olt1Total,
+          offlineOnu: Math.max(0, olt1Total - olt1Active),
+          status: (telemetry?.olt1?.status as any) || "online",
+        };
+      }
+      if (o.id === "OLT-02" || o.name === "OLT2") {
+        return {
+          ...o,
+          activeOnu: olt2Active,
+          totalOnu: olt2Total,
+          offlineOnu: Math.max(0, olt2Total - olt2Active),
+          status: (telemetry?.olt2?.status as any) || "online",
+        };
+      }
+      return o;
+    }));
+  }, [onuList, telemetry?.olt1?.status, telemetry?.olt2?.status]);
+
   // ── Multi-Dimension Filter States ──
   const [onuSearch, setOnuSearch] = useState("");
   const [oltFilter, setOltFilter] = useState<"all" | "OLT1" | "OLT2">("all");
