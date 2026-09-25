@@ -650,6 +650,11 @@ export async function setUserDisabledState(username, disabled) {
   const secretId = findResult.results[0]['.id'];
   if (!secretId) return { success: false, error: 'Secret ID not found' };
   const setResult = await executeRouterOsCommand(['/ppp/secret/set', `=.id=${secretId}`, `=disabled=${disabled ? 'yes' : 'no'}`]);
+  if (setResult.success && disabled) {
+    try {
+      await disconnectPppoeUser(username);
+    } catch (_) {}
+  }
   return { success: setResult.success, username, disabled, error: setResult.error };
 }
 

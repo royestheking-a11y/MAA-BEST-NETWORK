@@ -187,6 +187,7 @@ interface CustomerContextType {
   ) => PlanUpgradeRequest;
   approveUpgradeRequest: (requestId: string) => { success: boolean; request?: PlanUpgradeRequest };
   rejectUpgradeRequest: (requestId: string, reason?: string) => { success: boolean; request?: PlanUpgradeRequest };
+  runBillingCutoffEngine: () => number;
 }
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
@@ -670,8 +671,27 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-const toggleNetStatus = (id: string, enable: boolean) => {
+  const syncMikrotikUserState = async (pppUser?: string, disabled?: boolean) => {
+    if (!pppUser) return;
+    try {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+      await fetch(`${base}/api/mikrotik/user/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: pppUser, disabled: !!disabled }),
+      });
+    } catch (err) {
+      console.warn("[MikroTik API Auto-Sync Notice]:", err);
+    }
+  };
+
+  const toggleNetStatus = (id: string, enable: boolean) => {
     const targetCust = customers.find(c => c.id === id);
+    if (targetCust?.pppUser) {
+      syncMikrotikUserState(targetCust.pppUser, !enable);
+    }
+
     setCustomers(prev => {
       const updated = prev.map(c =>
         c.id === id
@@ -679,6 +699,8 @@ const toggleNetStatus = (id: string, enable: boolean) => {
               ...c,
               netStatus: enable ? "online" as const : "offline" as const,
               status: enable ? "active" as CustomerStatus : "suspended" as CustomerStatus,
+              disabledInMikrotik: !enable,
+              disabledInSystem: !enable,
               disconnectedAt: enable ? undefined : new Date().toISOString(),
               logoutTime: enable
                 ? null
@@ -707,6 +729,77 @@ const toggleNetStatus = (id: string, enable: boolean) => {
       metadata: { action: enable ? "enable" : "disable", ip: targetCust?.ipAddress, pppUser: targetCust?.pppUser }
     });
   };
+
+  const runBillingCutoffEngine = useCallback(() => {
+    let cutoffCount = 0;
+    const now = new Date();
+
+    setCustomers(prev => {
+      let hasChanges = false;
+      const updated = prev.map(c => {
+        if (c.userType === "free" || c.userType === "unlimited") return c;
+
+        const rawDue = c.dueAmount !== undefined ? c.dueAmount : (c.due !== undefined ? c.due : 0);
+        const hasDue = rawDue > 0 || c.status === "due";
+        const isPastDate = c.endDate ? new Date(c.endDate) < now : false;
+        const isExpired = (c.daysRemaining !== undefined && c.daysRemaining <= 0) || isPastDate;
+
+        if (isExpired && hasDue && c.status !== "suspended") {
+          hasChanges = true;
+          cutoffCount++;
+          if (c.pppUser) {
+            syncMikrotikUserState(c.pppUser, true);
+          }
+          activityLogger.log({
+            type: "billing",
+            severity: "warning",
+            action: "Auto-Billing Cutoff Executed",
+            detail: `Line auto-suspended and PPPoE secret disabled on MikroTik for ${c.name} (${c.id}) due to overdue billing deadline.`,
+            targetId: c.id,
+            metadata: { pppUser: c.pppUser, daysRemaining: c.daysRemaining, dueAmount: rawDue }
+          });
+
+          return {
+            ...c,
+            status: "suspended" as CustomerStatus,
+            netStatus: "offline" as const,
+            disabledInMikrotik: true,
+            disabledInSystem: true,
+            disconnectedAt: c.disconnectedAt || new Date().toISOString(),
+            logoutTime: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) +
+              " " +
+              new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+        }
+        return c;
+      });
+
+      if (hasChanges) {
+        try {
+          localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+        updated.forEach(c => {
+          if (c.status === "suspended" && c.disabledInMikrotik) {
+            saveCustomerToFirestore(c);
+          }
+        });
+        return updated;
+      }
+      return prev;
+    });
+
+    return cutoffCount;
+  }, []);
+
+  // Periodic billing audit loop (every 60s)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      runBillingCutoffEngine();
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [runBillingCutoffEngine]);
 
   const processPayment = (
     customerId: string,
@@ -744,6 +837,19 @@ const toggleNetStatus = (id: string, enable: boolean) => {
 
     const targetCust = customers.find(c => c.id === customerId);
 
+    // Auto-reconnect subscriber on MikroTik RouterOS
+    if (targetCust?.pppUser) {
+      syncMikrotikUserState(targetCust.pppUser, false);
+      activityLogger.log({
+        type: "network",
+        severity: "success",
+        action: "Subscriber Line Auto-Reconnected on MikroTik",
+        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser}) upon payment confirmation.`,
+        targetId: customerId,
+        metadata: { pppUser: targetCust.pppUser, status: "active", netStatus: "online" }
+      });
+    }
+
     setCustomers(prev => {
       const updated = prev.map(c => {
         if (c.id !== customerId) return c;
@@ -765,8 +871,13 @@ const toggleNetStatus = (id: string, enable: boolean) => {
         return {
           ...c,
           dueAmount: 0,
+          due: 0,
           status: "active" as CustomerStatus,
           netStatus: "online" as const,
+          disabledInMikrotik: false,
+          disabledInSystem: false,
+          disconnectedAt: undefined,
+          logoutTime: null,
           billingDate: billingDay,
           startDate: startDate,
           endDate: endDate,
@@ -785,7 +896,7 @@ const toggleNetStatus = (id: string, enable: boolean) => {
       type: "payment",
       severity: "success",
       action: "Invoice Payment Received",
-      detail: `Collected ৳${validAmount.toLocaleString()} via ${method} (TrxID: ${trxId}) for ${targetCust?.name || customerId}.`,
+      detail: `Collected ৳${validAmount.toLocaleString()} via ${method} (TrxID: ${trxId}) for ${targetCust?.name || customerId}. Automatic reconnection activated.`,
       targetId: customerId,
       metadata: { amount: validAmount, method, trxId, invoiceId, validity: `${startDate} to ${endDate}` }
     });
@@ -1073,6 +1184,7 @@ const toggleNetStatus = (id: string, enable: boolean) => {
         submitUpgradeRequest,
         approveUpgradeRequest,
         rejectUpgradeRequest,
+        runBillingCutoffEngine,
       }}
     >
       {children}

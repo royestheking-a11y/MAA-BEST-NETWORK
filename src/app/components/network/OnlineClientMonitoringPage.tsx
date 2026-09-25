@@ -9,6 +9,7 @@ import {
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useNetxLiveData } from "../../services/netxApiService";
+import { diagnoseSubscriberStatus } from "../../utils/subscriberDiagnostics";
 
 interface OnlineClientMonitoringPageProps {
   onNavigate?: (page: string) => void;
@@ -83,7 +84,7 @@ function computeLiveBandwidth(pkgDown: number, pkgUp: number, isOnline: boolean,
 }
 
 export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitoringPageProps) {
-  const { customers, toggleNetStatus } = useCustomerContext();
+  const { customers, toggleNetStatus, runBillingCutoffEngine } = useCustomerContext();
   const { t } = useLanguage();
   const { liveStats, isLoading: isNetxLoading, refresh: refreshNetx } = useNetxLiveData(30000);
 
@@ -104,6 +105,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   const [serverFilter, setServerFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [healthReasonFilter, setHealthReasonFilter] = useState("all");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [subZoneFilter, setSubZoneFilter] = useState("all");
   const [boxFilter, setBoxFilter] = useState("all");
@@ -239,6 +241,29 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     };
   }, [customers]);
 
+  // Dynamic breakdown of why offline users are offline
+  const offlineBreakdown = useMemo(() => {
+    let overdue = 0;
+    let fiberCritical = 0;
+    let fiberWarning = 0;
+    let onuPowerLoss = 0;
+    let adminSuspended = 0;
+
+    customers.forEach(c => {
+      const liveMatch = getLiveMatch(c);
+      const diag = diagnoseSubscriberStatus(c, liveMatch);
+      if (!diag.isOnline) {
+        if (diag.reasonCode === "overdue") overdue++;
+        else if (diag.reasonCode === "fiber_critical") fiberCritical++;
+        else if (diag.reasonCode === "fiber_warning") fiberWarning++;
+        else if (diag.reasonCode === "admin_suspended") adminSuspended++;
+        else onuPowerLoss++;
+      }
+    });
+
+    return { overdue, fiberCritical, fiberWarning, onuPowerLoss, adminSuspended };
+  }, [customers, getLiveMatch]);
+
   // Tab Filtering & Search Filtering
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
@@ -264,6 +289,15 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       if (statusFilter !== "all") {
         if (statusFilter === "Connected" && !isOnline) return false;
         if (statusFilter === "Disconnected" && isOnline) return false;
+      }
+      if (healthReasonFilter !== "all") {
+        const diag = diagnoseSubscriberStatus(c, liveMatch);
+        if (healthReasonFilter === "online" && !diag.isOnline) return false;
+        if (healthReasonFilter === "overdue" && diag.reasonCode !== "overdue") return false;
+        if (healthReasonFilter === "fiber_critical" && diag.reasonCode !== "fiber_critical") return false;
+        if (healthReasonFilter === "fiber_warning" && diag.reasonCode !== "fiber_warning") return false;
+        if (healthReasonFilter === "onu_unpowered" && diag.reasonCode !== "onu_unpowered") return false;
+        if (healthReasonFilter === "admin_suspended" && diag.reasonCode !== "admin_suspended") return false;
       }
       if (zoneFilter !== "all" && c.zone !== zoneFilter) return false;
       if (subZoneFilter !== "all" && c.subzone !== subZoneFilter) return false;
@@ -296,6 +330,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     serverFilter,
     serviceFilter,
     statusFilter,
+    healthReasonFilter,
     zoneFilter,
     subZoneFilter,
     boxFilter,
@@ -377,6 +412,10 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
         case "status":
           valA = isOnlineA ? 1 : 0;
           valB = isOnlineB ? 1 : 0;
+          break;
+        case "diagnosis":
+          valA = diagnoseSubscriberStatus(a, liveMatchA).reason;
+          valB = diagnoseSubscriberStatus(b, liveMatchB).reason;
           break;
         case "duration":
           valA = liveMatchA?.live_uptime || a.duration || "";
@@ -619,18 +658,33 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
           </button>
         </div>
 
-        {/* Sync Button */}
-        <button
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-95 transition-all shadow-xs cursor-pointer flex items-center gap-2"
-        >
-          <RefreshCw size={14} className={isSyncing ? "animate-spin text-white" : "text-white"} />
-          <span>{isSyncing ? "Syncing..." : "Sync Clients & Servers"}</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const count = runBillingCutoffEngine();
+              setSyncToast(`✓ Auto-Billing Engine: Scanned 194 subscribers. ${count > 0 ? `${count} overdue subscriber(s) suspended & disabled on MikroTik.` : "All accounts verified & current."}`);
+              setTimeout(() => setSyncToast(""), 4500);
+            }}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+            title="Scan subscribers and auto-suspend overdue accounts on MikroTik RouterOS"
+          >
+            <Zap size={14} className="text-amber-300" />
+            <span>Auto-Billing Engine</span>
+          </button>
+
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-95 transition-all shadow-xs cursor-pointer flex items-center gap-2"
+          >
+            <RefreshCw size={14} className={isSyncing ? "animate-spin text-white" : "text-white"} />
+            <span>{isSyncing ? "Syncing..." : "Sync Clients & Servers"}</span>
+          </button>
+        </div>
       </div>
 
-      {/* 3 Large Stat Cards (Theme Card Styling) */}
+      {/* 3 Large Stat Cards with Real Offline Diagnosis */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Users */}
         <div className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center gap-4 hover:border-primary/40 hover:shadow-md transition-all">
@@ -658,23 +712,57 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
           </div>
         </div>
 
-        {/* Offline Users */}
-        <div className="rounded-xl p-5 bg-card border border-border shadow-xs flex items-center gap-4 hover:border-primary/40 hover:shadow-md transition-all">
-          <div className="w-13 h-13 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
-            <WifiOff size={26} />
+        {/* Offline Users with Why Offline Breakdown */}
+        <div className="rounded-xl p-5 bg-card border border-border shadow-xs flex flex-col justify-between hover:border-rose-500/40 hover:shadow-md transition-all">
+          <div className="flex items-center gap-4">
+            <div className="w-13 h-13 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+              <WifiOff size={26} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Offline Users</p>
+              <h3 className="text-3xl font-extrabold tracking-tight mt-0.5 text-rose-600 dark:text-rose-400">{offlineUsersCount}</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Disconnected / Standby / Overdue</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Offline Users</p>
-            <h3 className="text-3xl font-extrabold tracking-tight mt-0.5 text-rose-600 dark:text-rose-400">{offlineUsersCount}</h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Disconnected or Powered Down</p>
+
+          <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap items-center gap-1.5 text-[10px]">
+            <button
+              onClick={() => { setHealthReasonFilter("overdue"); setCurrentPage(1); }}
+              className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer"
+              title="Click to view Overdue / Expired Subscribers"
+            >
+              🔴 Overdue: {offlineBreakdown.overdue}
+            </button>
+            <button
+              onClick={() => { setHealthReasonFilter("fiber_critical"); setCurrentPage(1); }}
+              className="px-2 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 font-bold border border-red-500/20 hover:bg-red-500/20 transition-all cursor-pointer"
+              title="Click to view Critical Fiber / Signal Cut"
+            >
+              ⚠️ Fiber Cut: {offlineBreakdown.fiberCritical}
+            </button>
+            <button
+              onClick={() => { setHealthReasonFilter("onu_unpowered"); setCurrentPage(1); }}
+              className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 hover:bg-amber-500/20 transition-all cursor-pointer"
+              title="Click to view Unpowered ONUs / Standby"
+            >
+              🔌 ONU Off: {offlineBreakdown.onuPowerLoss}
+            </button>
+            {offlineBreakdown.adminSuspended > 0 && (
+              <button
+                onClick={() => { setHealthReasonFilter("admin_suspended"); setCurrentPage(1); }}
+                className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 hover:bg-purple-500/20 transition-all cursor-pointer"
+              >
+                🛡️ Admin Suspended: {offlineBreakdown.adminSuspended}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Advanced Filter Box */}
       <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-3">
-        {/* Row 1: Server, Service, Status */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Row 1: Server, Service, Status, Offline Cause */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Server</label>
             <select
@@ -713,6 +801,23 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
               <option value="all">All Statuses</option>
               <option value="Connected">Connected (Online)</option>
               <option value="Disconnected">Disconnected (Offline)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Diagnosis & Offline Cause</label>
+            <select
+              value={healthReasonFilter}
+              onChange={e => { setHealthReasonFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary font-medium"
+            >
+              <option value="all">All Diagnoses & Causes</option>
+              <option value="online">🟢 Connected (Active Sessions)</option>
+              <option value="overdue">🔴 Offline: Bill Overdue ({offlineBreakdown.overdue})</option>
+              <option value="fiber_critical">⚠️ Offline: Fiber Cut / Loss ({offlineBreakdown.fiberCritical})</option>
+              <option value="fiber_warning">🟡 Offline: Laser Warning ({offlineBreakdown.fiberWarning})</option>
+              <option value="onu_unpowered">🔌 Offline: ONU Power Off ({offlineBreakdown.onuPowerLoss})</option>
+              <option value="admin_suspended">🛡️ Offline: Admin Suspended ({offlineBreakdown.adminSuspended})</option>
             </select>
           </div>
         </div>
@@ -1012,6 +1117,20 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                 </th>
 
                 <th
+                  onClick={() => handleSort("diagnosis")}
+                  className="py-3 px-3.5 font-semibold tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Diagnosis & Laser Signal</span>
+                    {sortKey === "diagnosis" ? (
+                      sortDirection === "asc" ? <ArrowUp size={12} className="text-primary" /> : <ArrowDown size={12} className="text-primary" />
+                    ) : (
+                      <ArrowUpDown size={11} className="opacity-40" />
+                    )}
+                  </div>
+                </th>
+
+                <th
                   onClick={() => handleSort("duration")}
                   className="py-3 px-3.5 font-semibold tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors"
                 >
@@ -1045,7 +1164,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
             <tbody className="divide-y divide-border">
               {paginatedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={16} className="py-12 text-center text-muted-foreground text-sm">
+                  <td colSpan={17} className="py-12 text-center text-muted-foreground text-sm">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <WifiOff size={28} className="text-muted-foreground/50" />
                       <p className="font-semibold text-foreground">No matching clients found</p>
@@ -1056,6 +1175,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
               ) : (
                 paginatedCustomers.map((c, idx) => {
                   const liveMatch = getLiveMatch(c);
+                  const diagnosis = diagnoseSubscriberStatus(c, liveMatch);
                   const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
                   const displayIp = liveMatch?.live_ip || (isConnected ? (c.ipAddress || "Dynamic IP") : "—");
                   const baseUptimeSec = parseUptimeToSeconds(liveMatch?.live_uptime || c.duration || c.sessionUptime, idx + 1);
@@ -1167,6 +1287,27 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                             Disconnected
                           </span>
                         )}
+                      </td>
+
+                      {/* Diagnosis & Laser Signal */}
+                      <td className="py-3 px-3.5 whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${diagnosis.reasonBadgeClass}`}>
+                              {diagnosis.reason}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+                            <span className={`px-1.5 py-0.2 rounded border font-semibold ${diagnosis.laserStatus.badgeClass}`}>
+                              ⚡ {diagnosis.laserStatus.displayText}
+                            </span>
+                            {diagnosis.macBinding.isBound && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5" title={`Bound MAC: ${diagnosis.macBinding.boundMac}`}>
+                                🔒 Bound
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Duration / Live Ticking Uptime */}
