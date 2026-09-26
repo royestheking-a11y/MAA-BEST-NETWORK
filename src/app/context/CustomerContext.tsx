@@ -1357,8 +1357,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       if (!assignedMac && target) {
         assignedMac = (target.mac || target.callingStationId || "").trim().toLowerCase();
       }
-      if (!assignedMac) {
-        assignedMac = `4c:46:d1:${Math.floor(10 + Math.random() * 89).toString(16)}:${Math.floor(10 + Math.random() * 89).toString(16)}:${Math.floor(10 + Math.random() * 89).toString(16)}`;
+      if (!assignedMac || assignedMac === "—") {
+        return prev;
       }
 
       const updated = prev.map(c =>

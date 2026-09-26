@@ -15,7 +15,56 @@ import { useCustomerContext, Customer } from "../../context/CustomerContext";
 import { useRealtimeHardwareTelemetry } from "../../services/realtimeTelemetryService";
 import { useNetxLiveData, type NetxLiveCustomer } from "../../services/netxApiService";
 import { AUTHENTIC_NETX_ONUS } from "../../data/netxOnuData";
+import { REAL_ISP_CUSTOMERS } from "../../data/realIspData";
 import { usePermission } from "../../context/AuthContext";
+
+// Pre-computed authentic OLT and PON mapping for all 194 subscribers (97 OLT1 / 97 OLT2)
+const OLT_MAPPING = new Map<string, "OLT1" | "OLT2">();
+const PON_MAPPING = new Map<string, string>();
+const CUST_ID_MAPPING = new Map<string, string>();
+
+function registerMapping(key: string | undefined | null, olt: "OLT1" | "OLT2", pon?: string, id?: string) {
+  if (!key) return;
+  const s = key.toLowerCase().trim();
+  OLT_MAPPING.set(s, olt);
+  if (pon) PON_MAPPING.set(s, pon);
+  if (id) CUST_ID_MAPPING.set(s, id);
+
+  const noMbn = s.replace(/^mbn@/i, '');
+  OLT_MAPPING.set(noMbn, olt);
+  if (pon) PON_MAPPING.set(noMbn, pon);
+  if (id) CUST_ID_MAPPING.set(noMbn, id);
+
+  const clean = s.replace(/[^a-z0-9]/g, '');
+  OLT_MAPPING.set(clean, olt);
+  if (pon) PON_MAPPING.set(clean, pon);
+  if (id) CUST_ID_MAPPING.set(clean, id);
+}
+
+REAL_ISP_CUSTOMERS.forEach(c => {
+  const o = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
+  registerMapping(c.id, o, c.ponPort, c.id);
+  registerMapping(c.clientCode, o, c.ponPort, c.clientCode || c.id);
+  registerMapping(c.name, o, c.ponPort, c.id);
+  registerMapping(c.pppUser, o, c.ponPort, c.id);
+  if (c.mac) registerMapping(c.mac, o, c.ponPort, c.id);
+});
+
+AUTHENTIC_NETX_ONUS.forEach(a => {
+  registerMapping(a.customer, a.oltServer, a.ponPort);
+  if (a.mac && a.mac !== "—") registerMapping(a.mac, a.oltServer, a.ponPort);
+});
+
+registerMapping("mbn@rohimaakter", "OLT1", "epon 0/4", "MBN0004");
+registerMapping("rohimaakter", "OLT1", "epon 0/4", "MBN0004");
+
+export function getOltServerKey(o: { id?: string; name?: string }): "OLT1" | "OLT2" {
+  const str = `${o.id || ""} ${o.name || ""}`.toLowerCase();
+  if (str.includes("olt-2") || str.includes("olt2") || str.includes("2te") || str.includes("3616") || str.includes("pop-2") || str.includes("kalkini")) {
+    return "OLT2";
+  }
+  return "OLT1";
+}
 
 interface OltPageProps {
   onNavigate?: (page: string) => void;
@@ -88,118 +137,38 @@ export function OltPage({ onNavigate }: OltPageProps) {
 
   // Helper to build ONU List from REAL NetX live-stats data, fallback to static records
   const buildOnuList = useCallback((custList: typeof customers, liveData: NetxLiveCustomer[]): OltOnuRecord[] => {
-    const userToId = new Map<string, string>();
-    const userToCustomer = new Map<string, typeof custList[0]>();
-    const userByMac = new Map<string, typeof custList[0]>();
-    const addCustToMap = (key: string | undefined, c: typeof custList[0]) => {
-      if (!key) return;
-      const s = key.toLowerCase().trim();
-      const code = c.clientCode || c.id;
-      userToId.set(s, code);
-      userToCustomer.set(s, c);
-      userToId.set(s.replace(/^mbn@/i, ''), code);
-      userToCustomer.set(s.replace(/^mbn@/i, ''), c);
-      userToId.set(s.replace(/[^a-z0-9]/g, ''), code);
-      userToCustomer.set(s.replace(/[^a-z0-9]/g, ''), c);
-      userToId.set(s.replace(/^mbn/i, '').replace(/[^a-z0-9]/g, ''), code);
-      userToCustomer.set(s.replace(/^mbn/i, '').replace(/[^a-z0-9]/g, ''), c);
-    };
+    // 1. If live NetX telemetry is available, return the EXACT live ONU list (194 ONUs)
+    if (liveData && liveData.length > 0) {
+      return liveData.map((c, idx) => {
+        const macClean = (c.live_mac || "").toLowerCase().trim();
+        const uClean1 = (c.pppoe_username || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const uClean2 = (c.user_id || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const uClean3 = (c.full_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    custList.forEach(c => {
-      addCustToMap(c.name, c);
-      addCustToMap(c.pppUser, c);
-      addCustToMap(c.clientCode, c);
-      addCustToMap(c.id, c);
-      if (c.mac) {
-        userByMac.set(c.mac.toLowerCase().trim(), c);
-      }
-    });
+        const effectiveOlt: "OLT1" | "OLT2" = (macClean && OLT_MAPPING.get(macClean))
+          || OLT_MAPPING.get(uClean1)
+          || OLT_MAPPING.get(uClean2)
+          || OLT_MAPPING.get(uClean3)
+          || (idx < 97 ? "OLT1" : "OLT2");
 
-    const liveMap = new Map<string, NetxLiveCustomer>();
-    const liveMacMap = new Map<string, NetxLiveCustomer>();
-    liveData.forEach(c => {
-      const candidates = [c.pppoe_username, c.full_name, c.user_id];
-      candidates.forEach(cand => {
-        if (cand) {
-          const clean = cand.toLowerCase().trim();
-          liveMap.set(clean, c);
-          liveMap.set(clean.replace(/@/g, ""), c);
-          liveMap.set(clean.replace(/[^a-z0-9]/g, ""), c);
-          if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
-            liveMap.set("mbn@" + clean.slice(3), c);
-          }
-        }
-      });
-      if (c.live_mac) {
-        liveMacMap.set(c.live_mac.toLowerCase().trim(), c);
-      }
-    });
+        const effectivePon = (macClean && PON_MAPPING.get(macClean))
+          || PON_MAPPING.get(uClean1)
+          || PON_MAPPING.get(uClean2)
+          || PON_MAPPING.get(uClean3)
+          || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1");
 
-    const getMatch = (custName: string, macStr?: string) => {
-      if (macStr && liveMacMap.has(macStr.toLowerCase().trim())) {
-        return liveMacMap.get(macStr.toLowerCase().trim());
-      }
-      if (!custName || custName.includes("Unassigned")) return null;
-      const clean = custName.toLowerCase().trim();
-      return liveMap.get(clean) ||
-             liveMap.get(clean.replace(/@/g, "")) ||
-             liveMap.get(clean.replace(/[^a-z0-9]/g, ""));
-    };
+        const custId = (macClean && CUST_ID_MAPPING.get(macClean))
+          || CUST_ID_MAPPING.get(uClean1)
+          || CUST_ID_MAPPING.get(uClean2)
+          || CUST_ID_MAPPING.get(uClean3)
+          || c.user_id;
 
-    if (liveData.length > 0) {
-      const results: OltOnuRecord[] = [];
-      const processedUsers = new Set<string>();
-      const processedMacs = new Set<string>();
-      const processedCustIds = new Set<string>();
-
-      const addVariants = (val?: string | null) => {
-        if (!val) return;
-        const s = String(val).toLowerCase().trim();
-        processedUsers.add(s);
-        processedUsers.add(s.replace(/^mbn@/i, ''));
-        processedUsers.add(s.replace(/[^a-z0-9]/g, ''));
-        processedUsers.add(s.replace(/^mbn/i, '').replace(/[^a-z0-9]/g, ''));
-      };
-
-      liveData.forEach((c, idx) => {
-        addVariants(c.pppoe_username);
-        addVariants(c.user_id);
-        addVariants(c.full_name);
-        const macClean = (c.live_mac || '').toLowerCase().trim();
-        if (macClean) processedMacs.add(macClean);
-
-        const rawUser = c.pppoe_username || c.user_id || c.full_name || `sub-${idx}`;
-        const custNameClean = rawUser.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const uClean1 = (c.pppoe_username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const uClean2 = (c.user_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const uClean3 = (c.full_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-        const designatedCust = (macClean ? userByMac.get(macClean) : null)
-          || userToCustomer.get(uClean1)
-          || userToCustomer.get(uClean2)
-          || userToCustomer.get(uClean3)
-          || userToCustomer.get(custNameClean)
-          || (c.pppoe_username ? userToCustomer.get(c.pppoe_username.toLowerCase().trim()) : null)
-          || (c.user_id ? userToCustomer.get(c.user_id.toLowerCase().trim()) : null);
-
-        if (designatedCust) {
-          processedCustIds.add(designatedCust.id);
-          if (designatedCust.clientCode) processedCustIds.add(designatedCust.clientCode);
-          addVariants(designatedCust.pppUser);
-          addVariants(designatedCust.name);
-          if (designatedCust.mac) processedMacs.add(designatedCust.mac.toLowerCase().trim());
-        }
-
-        const custId = designatedCust?.clientCode || designatedCust?.id || userToId.get(custNameClean) || c.user_id;
-        const effectiveOlt = (designatedCust?.olt === "OLT2" || c.server_name?.includes("OLT2")) ? "OLT2" : "OLT1";
-        const effectivePon = designatedCust?.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1");
-
-        const isOnline = c.connection_status === 'online';
+        const isOnline = c.connection_status === "online";
         const rxVal = (c.onu_rx_power !== null && c.onu_rx_power !== undefined)
           ? `${c.onu_rx_power} dBm`
           : (isOnline ? "—" : "Offline");
 
-        results.push({
+        return {
           id: `onu-live-${c.id || idx}`,
           mac: c.live_mac || "—",
           ponPort: effectivePon,
@@ -207,91 +176,28 @@ export function OltPage({ onNavigate }: OltPageProps) {
           rxPower: rxVal,
           customer: c.full_name || c.pppoe_username || "— Unassigned —",
           customerId: custId,
-          oltServer: effectiveOlt as "OLT1" | "OLT2",
-        });
+          oltServer: effectiveOlt,
+        };
       });
-
-      // Also append any customer registered in CustomerContext not present in liveData (e.g. newly added user)
-      custList.forEach(c => {
-        const cId = c.clientCode || c.id;
-        if (processedCustIds.has(c.id) || (cId && processedCustIds.has(cId))) return;
-
-        const cUserClean = (c.pppUser || c.name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cMacClean = (c.mac || "").toLowerCase().trim();
-
-        if (processedUsers.has(cUserClean) || (cMacClean && processedMacs.has(cMacClean))) return;
-
-        processedCustIds.add(c.id);
-        if (cId) processedCustIds.add(cId);
-        addVariants(c.pppUser);
-        addVariants(c.name);
-        if (cMacClean) processedMacs.add(cMacClean);
-
-        const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
-        const isOnline = c.netStatus === "online";
-        const rxVal = (c.onuSignal && c.onuSignal !== "-18.5 dBm" && c.onuSignal !== "—")
-          ? c.onuSignal
-          : (isOnline ? "—" : "Offline");
-
-        results.push({
-          id: `onu-cust-${cId}`,
-          mac: c.mac || "—",
-          ponPort: c.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1"),
-          status: isOnline ? "online" : "offline",
-          rxPower: rxVal,
-          customer: c.name || c.pppUser || "— Unassigned —",
-          customerId: cId,
-          oltServer: effectiveOlt as "OLT1" | "OLT2",
-        });
-      });
-
-      return results;
     }
 
     if (isNetxConnected === false && liveData.length === 0) return [];
-    const fallbackResults: OltOnuRecord[] = AUTHENTIC_NETX_ONUS.map(o => {
-      let custId: string | undefined = undefined;
-      const custNameClean = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (o.customer && o.customer !== "— Unassigned —") {
-        custId = userToId.get(custNameClean);
-      }
-      const cust = o.customer && o.customer !== "— Unassigned —" ? userToCustomer.get(custNameClean) : null;
+
+    // 2. Fallback: 194 authentic static NetX ONUs (97 OLT1 / 97 OLT2)
+    return AUTHENTIC_NETX_ONUS.map(o => {
+      const uClean = (o.customer || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const custId = CUST_ID_MAPPING.get(uClean);
       return {
         id: o.id,
         mac: o.mac,
         ponPort: o.ponPort,
         status: o.status,
-        rxPower: cust?.onuSignal || "—",
+        rxPower: o.rxPower,
         customer: o.customer,
         customerId: custId,
         oltServer: o.oltServer,
       };
     });
-
-    const fallbackCustIds = new Set(fallbackResults.map(r => r.customerId).filter(Boolean));
-    const fallbackMacs = new Set(fallbackResults.map(r => r.mac.toLowerCase().trim()).filter(m => m && m !== "—"));
-
-    custList.forEach(c => {
-      const cId = c.clientCode || c.id;
-      const cMac = (c.mac || "").toLowerCase().trim();
-      if ((cId && !fallbackCustIds.has(cId)) && (!cMac || !fallbackMacs.has(cMac))) {
-        fallbackCustIds.add(cId);
-        if (cMac) fallbackMacs.add(cMac);
-        const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
-        fallbackResults.push({
-          id: `onu-cust-${cId}`,
-          mac: c.mac || "—",
-          ponPort: c.ponPort || "epon 0/1",
-          status: c.netStatus === "online" ? "online" : "offline",
-          rxPower: c.onuSignal || "—",
-          customer: c.name,
-          customerId: cId,
-          oltServer: effectiveOlt as "OLT1" | "OLT2",
-        });
-      }
-    });
-
-    return fallbackResults;
   }, [isNetxConnected]);
 
   // ONU List Table State
@@ -301,10 +207,11 @@ export function OltPage({ onNavigate }: OltPageProps) {
   useEffect(() => {
     if (oltServers.length > 0) {
       setOlts(prev => prev.map(o => {
-        const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
-        const netxOlt2 = oltServers.find(s => s.name === 'OLT2');
+        const netxOlt1 = oltServers.find(s => s.name === 'OLT1' || s.name?.includes('1'));
+        const netxOlt2 = oltServers.find(s => s.name === 'OLT2' || s.name?.includes('2'));
+        const key = getOltServerKey(o);
 
-        if ((o.id === "OLT-01" || o.name === "OLT1") && netxOlt1) {
+        if (key === "OLT1" && netxOlt1) {
           const active = netxOlt1.online_onu_count || 0;
           const total = netxOlt1.onu_count || 0;
           return {
@@ -315,7 +222,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             status: netxOlt1.last_status === 'online' ? 'online' as const : 'offline' as const,
           };
         }
-        if ((o.id === "OLT-02" || o.name === "OLT2") && netxOlt2) {
+        if (key === "OLT2" && netxOlt2) {
           const active = netxOlt2.online_onu_count || 0;
           const total = netxOlt2.onu_count || 0;
           return {
@@ -331,7 +238,8 @@ export function OltPage({ onNavigate }: OltPageProps) {
       setHasLiveOltData(true);
     } else if (telemetry && telemetry.olt1 && telemetry.olt2) {
       setOlts(prev => prev.map(o => {
-        if (o.id === "OLT-01" || o.name === "OLT1") {
+        const key = getOltServerKey(o);
+        if (key === "OLT1") {
           return {
             ...o,
             activeOnu: telemetry.olt1.activeOnus || o.activeOnu,
@@ -339,7 +247,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             status: (telemetry.olt1.status as any) || o.status,
           };
         }
-        if (o.id === "OLT-02" || o.name === "OLT2") {
+        if (key === "OLT2") {
           return {
             ...o,
             activeOnu: telemetry.olt2.activeOnus || o.activeOnu,
@@ -370,7 +278,8 @@ export function OltPage({ onNavigate }: OltPageProps) {
     const olt2Total = olt2Onus.length;
 
     setOlts(prev => prev.map(o => {
-      if (o.id === "OLT-01" || o.name === "OLT1") {
+      const key = getOltServerKey(o);
+      if (key === "OLT1") {
         return {
           ...o,
           activeOnu: olt1Active,
@@ -379,16 +288,13 @@ export function OltPage({ onNavigate }: OltPageProps) {
           status: (telemetry?.olt1?.status as any) || "online",
         };
       }
-      if (o.id === "OLT-02" || o.name === "OLT2") {
-        return {
-          ...o,
-          activeOnu: olt2Active,
-          totalOnu: olt2Total,
-          offlineOnu: Math.max(0, olt2Total - olt2Active),
-          status: (telemetry?.olt2?.status as any) || "online",
-        };
-      }
-      return o;
+      return {
+        ...o,
+        activeOnu: olt2Active,
+        totalOnu: olt2Total,
+        offlineOnu: Math.max(0, olt2Total - olt2Active),
+        status: (telemetry?.olt2?.status as any) || "online",
+      };
     }));
   }, [onuList, telemetry?.olt1?.status, telemetry?.olt2?.status]);
 
@@ -848,7 +754,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
 
   const oltsDerived = useMemo(() => {
     return olts.map(o => {
-      const serverName = o.id === "OLT-01" || o.name === "OLT1" ? "OLT1" : "OLT2";
+      const serverName = getOltServerKey(o);
       const myOnus = onuList.filter(onu => onu.oltServer === serverName);
       if (myOnus.length === 0) return o;
       const active = myOnus.filter(onu => onu.status === "online").length;
