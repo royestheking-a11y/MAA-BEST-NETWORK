@@ -211,7 +211,16 @@ export function OltPage({ onNavigate }: OltPageProps) {
             mac: c.mac || "—",
             ponPort: c.ponPort || "epon 0/1",
             status: c.netStatus === "online" ? "online" : "offline",
-            rxPower: c.onuSignal || "-19.2 dBm",
+            rxPower: (() => {
+              // Try to find live onu_rx_power from NetX data by MAC or PPPoE username
+              const macKey = (c.mac || "").toLowerCase().trim();
+              const livByMac = macKey ? liveMacMap.get(macKey) : null;
+              const custNameClean = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+              const livByName = liveMap.get(custNameClean);
+              const liv = livByMac || livByName;
+              if (liv && liv.onu_rx_power !== null && liv.onu_rx_power !== undefined) return `${liv.onu_rx_power} dBm`;
+              return c.onuSignal || "—";
+            })(),
             customer: c.name,
             customerId: cId,
             oltServer: effectiveOlt as "OLT1" | "OLT2",
@@ -256,7 +265,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
           mac: c.mac || "—",
           ponPort: c.ponPort || "epon 0/1",
           status: c.netStatus === "online" ? "online" : "offline",
-          rxPower: c.onuSignal || "-19.2 dBm",
+          rxPower: c.onuSignal || "—",
           customer: c.name,
           customerId: cId,
           oltServer: effectiveOlt as "OLT1" | "OLT2",
@@ -1906,15 +1915,21 @@ export function OltPage({ onNavigate }: OltPageProps) {
             <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
                 <span className="text-[10px] text-muted-foreground font-bold">LASER TX</span>
-                <p className="font-mono font-black text-foreground text-sm mt-0.5">+2.4 dBm</p>
+                <p className="font-mono font-black text-foreground text-sm mt-0.5">
+                  {opticalTelemetryModal.status === "online" ? "+2.4 dBm" : "—"}
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
                 <span className="text-[10px] text-muted-foreground font-bold">VOLTAGE</span>
-                <p className="font-mono font-black text-foreground text-sm mt-0.5">3.30 V</p>
+                <p className="font-mono font-black text-foreground text-sm mt-0.5">
+                  {opticalTelemetryModal.status === "online" ? "3.30 V" : "—"}
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
                 <span className="text-[10px] text-muted-foreground font-bold">LASER TEMP</span>
-                <p className="font-mono font-black text-foreground text-sm mt-0.5">38.5 °C</p>
+                <p className="font-mono font-black text-foreground text-sm mt-0.5">
+                  {opticalTelemetryModal.status === "online" ? "38.5 °C" : "—"}
+                </p>
               </div>
             </div>
 

@@ -480,6 +480,46 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     }
 
     saveCustomerToFirestore(newCustomer);
+
+    // ── Auto-Provision PPPoE Secret on MikroTik RouterOS ────────────────────
+    // Only provision real PPPoE/hotspot services (skip free/unlimited or static)
+    if (newCustomer.service === "pppoe" || newCustomer.service === "hotspot") {
+      const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+        ? "" : "https://maa-best-network.onrender.com";
+      const pppUser = newCustomer.pppUser || `mbn@${(newCustomer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+      const pppPass = newCustomer.pppPass || "123456";
+      const profile = newCustomer.profile || "default";
+      const comment = `${newCustomer.name} (${newId}) — Created via ISP Portal`;
+      fetch(`${gatewayBase}/api/mikrotik/user/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: pppUser, password: pppPass, profile, comment }),
+      })
+      .then(r => r.json())
+      .then(result => {
+        if (result.success) {
+          activityLogger.log({
+            type: "network",
+            severity: "success",
+            action: "MikroTik PPPoE Secret Provisioned",
+            detail: `RouterOS PPPoE secret "${pppUser}" created for ${newCustomer.name} (${newId}) with profile: ${profile}.`,
+            targetId: newId,
+          });
+        } else if (!result.alreadyExists) {
+          activityLogger.log({
+            type: "network",
+            severity: "warning",
+            action: "MikroTik PPPoE Provisioning Failed",
+            detail: `Could not create RouterOS PPPoE secret "${pppUser}" for ${newCustomer.name}: ${result.error}`,
+            targetId: newId,
+          });
+        }
+      })
+      .catch(err => {
+        console.warn("[MikroTik Provisioning] Failed to provision PPPoE secret:", err.message);
+      });
+    }
+
     activityLogger.log({
       type: "customer",
       severity: "success",
@@ -658,6 +698,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const deleteCustomer = (id: string) => {
     const target = customers.find(c => c.id === id);
     const targetName = target ? target.name : id;
+    const targetPppUser = target?.pppUser;
     setCustomers(prev => {
       const updated = prev.filter(c => c.id !== id);
       try {
@@ -668,6 +709,36 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
     deleteCustomerFromFirestore(id);
+
+    // ── Auto-Deprovision PPPoE Secret on MikroTik RouterOS ──────────────────
+    if (targetPppUser && (target?.service === "pppoe" || target?.service === "hotspot")) {
+      const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+        ? "" : "https://maa-best-network.onrender.com";
+      fetch(`${gatewayBase}/api/mikrotik/user/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: targetPppUser }),
+      })
+      .then(r => r.json())
+      .then(result => {
+        const severity = result.success || result.notFound ? "success" : "warning";
+        activityLogger.log({
+          type: "network",
+          severity,
+          action: "MikroTik PPPoE Secret Removed",
+          detail: result.success
+            ? `RouterOS PPPoE secret "${targetPppUser}" deleted for ${targetName} (${id}).`
+            : result.notFound
+              ? `PPPoE secret "${targetPppUser}" was not on MikroTik (already removed or never provisioned).`
+              : `Failed to delete RouterOS PPPoE secret "${targetPppUser}": ${result.error}`,
+          targetId: id,
+        });
+      })
+      .catch(err => {
+        console.warn("[MikroTik Deprovision] Failed to delete PPPoE secret:", err.message);
+      });
+    }
+
     activityLogger.log({
       type: "customer",
       severity: "warning",
