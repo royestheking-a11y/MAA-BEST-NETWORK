@@ -88,9 +88,32 @@ function realtimeTelemetryPlugin() {
 
       // Helper to parse JSON body in Vite middleware
       const readBody = (req: any): Promise<any> => new Promise((resolve) => {
+        if (req.body && typeof req.body === 'object') return resolve(req.body);
+        if (req.readableEnded) return resolve({});
         let data = '';
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            try { resolve(data ? JSON.parse(data) : {}); } catch { resolve({}); }
+          }
+        }, 1500);
+
         req.on('data', (chunk: any) => { data += chunk; });
-        req.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve({}); } });
+        req.on('end', () => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            try { resolve(JSON.parse(data)); } catch { resolve({}); }
+          }
+        });
+        req.on('error', () => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve({});
+          }
+        });
       });
 
       // MikroTik real command execution
@@ -204,6 +227,76 @@ function realtimeTelemetryPlugin() {
           res.end(JSON.stringify(result));
         } catch (e: any) {
           res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik create / auto-provision new subscriber
+      server.middlewares.use('/api/mikrotik/user/create', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { username, password, profile, comment } = body;
+          if (!username || !password) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'username and password are required' }));
+            return;
+          }
+          const { createPppoeSecret } = await import('./server/telemetry-service.js');
+          const result = await createPppoeSecret(username, password, profile || 'default', comment || '');
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // MikroTik delete / terminate subscriber secret
+      server.middlewares.use('/api/mikrotik/user/delete', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { username } = body;
+          if (!username) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'username required' }));
+            return;
+          }
+          const { deletePppoeSecret } = await import('./server/telemetry-service.js');
+          const result = await deletePppoeSecret(username);
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // NetX live ONU RX power for a MAC
+      server.middlewares.use('/api/netx/onu-power', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { mac } = body;
+          const { getCachedLiveStats } = await import('./server/telemetry-service.js');
+          const cached = getCachedLiveStats();
+          const all = cached.data || [];
+          const match = mac ? all.find((c: any) => (c.live_mac || '').toLowerCase() === mac.toLowerCase()) : null;
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({
+            success: !!match,
+            onu_rx_power: match ? match.onu_rx_power : null,
+            connection_status: match ? match.connection_status : null,
+            pppoe_username: match ? match.pppoe_username : null,
+          }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });

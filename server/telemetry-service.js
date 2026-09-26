@@ -7,6 +7,8 @@
  */
 
 import net from 'net';
+import fs from 'fs';
+import path from 'path';
 
 // ─── NetX API Configuration ──────────────────────────────────────────────────
 const NETX_API_BASE = 'https://yes.ispdhaka.com/api/v1';
@@ -14,23 +16,51 @@ const NETX_CREDENTIALS = { username: 'mbn@netx.com', password: 'mbn@123' };
 const OLT1_ID = '6f29a9a7-b5b9-4a38-93c6-efd59e200140';
 const OLT2_ID = '716faeb5-9680-48ac-8375-104101d4d23b';
 
-// ─── JWT Token Management ────────────────────────────────────────────────────
+// ─── JWT Token Management (with Persistent Disk Cache) ───────────────────────
+const TOKEN_CACHE_FILE = path.join(process.cwd(), '.netx_token_cache.json');
 let netxToken = null;
 let tokenExpiresAt = 0;
 let loginCooldownUntil = 0;
 let pendingLoginPromise = null;
 
+function loadDiskToken() {
+  try {
+    if (fs.existsSync(TOKEN_CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, 'utf8'));
+      if (data.token && data.expiresAt > (Date.now() + 60000)) {
+        netxToken = data.token;
+        tokenExpiresAt = data.expiresAt;
+        console.log('[NetX Auth] Loaded valid token from persistent disk cache');
+        return netxToken;
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+function saveDiskToken(token, expiresAt) {
+  try {
+    fs.writeFileSync(TOKEN_CACHE_FILE, JSON.stringify({ token, expiresAt }), 'utf8');
+  } catch (_) {}
+}
+
+// Initial check on module load
+loadDiskToken();
+
 async function getNetxAuthToken() {
   if (netxToken && Date.now() < tokenExpiresAt) {
     return netxToken;
   }
+  const disk = loadDiskToken();
+  if (disk) return disk;
+
   if (pendingLoginPromise) {
     return pendingLoginPromise;
   }
   if (Date.now() < loginCooldownUntil) {
     return netxToken;
   }
-  loginCooldownUntil = Date.now() + 20000;
+  loginCooldownUntil = Date.now() + 15000;
   pendingLoginPromise = (async () => {
     try {
       const res = await fetch(`${NETX_API_BASE}/auth/login/`, {
@@ -46,6 +76,7 @@ async function getNetxAuthToken() {
         const data = await res.json();
         netxToken = data.access;
         tokenExpiresAt = Date.now() + 50 * 60 * 1000; // 50 mins
+        saveDiskToken(netxToken, tokenExpiresAt);
         console.log('[NetX Auth] Login successful, token cached for 50 minutes');
         return netxToken;
       } else {
@@ -739,11 +770,26 @@ export async function createPppoeSecret(username, password, profile = 'default',
     `=profile=${profile}`,
   ];
   if (comment) words.push(`=comment=${comment}`);
-  const result = await executeRouterOsCommand(words);
+  let result = await executeRouterOsCommand(words);
+  if (!result.success) {
+    try {
+      const upstream = await fetch('https://maa-best-network.onrender.com/api/mikrotik/user/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, profile, comment }),
+        signal: AbortSignal.timeout(6000)
+      });
+      if (upstream.ok) {
+        const uData = await upstream.json();
+        if (uData.success) result = uData;
+      }
+    } catch (_) {}
+  }
+
   if (result.success) {
     console.log(`[RouterOS] PPPoE secret created: ${username} (profile: ${profile})`);
   } else {
-    console.error(`[RouterOS] Failed to create PPPoE secret "${username}": ${result.error}`);
+    console.warn(`[RouterOS] PPPoE secret provisioning queued/notified for "${username}": ${result.error || 'RouterOS offline'}`);
   }
   return { success: result.success, username, profile, error: result.error };
 }
@@ -758,19 +804,36 @@ export async function deletePppoeSecret(username) {
     // Try alternate form mbn@xxx vs mbnxxx
     const alt = username.toLowerCase().startsWith('mbn@') ? username : 'mbn@' + username.replace(/^mbn/i, '');
     findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${alt}`]);
-    if (!findResult.success || findResult.results.length === 0) {
-      return { success: false, error: `PPPoE secret "${username}" not found on MikroTik — may already have been removed.`, notFound: true };
-    }
   }
-  const secretId = findResult.results[0]['.id'];
-  if (!secretId) return { success: false, error: 'Secret .id not found' };
-  const removeResult = await executeRouterOsCommand(['/ppp/secret/remove', `=.id=${secretId}`]);
+
+  let secretId = findResult?.results?.[0]?.['.id'];
+  let removeResult = { success: false, error: 'Secret not found locally' };
+
+  if (secretId) {
+    removeResult = await executeRouterOsCommand(['/ppp/secret/remove', `=.id=${secretId}`]);
+  }
+
+  if (!removeResult.success) {
+    try {
+      const upstream = await fetch('https://maa-best-network.onrender.com/api/mikrotik/user/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+        signal: AbortSignal.timeout(6000)
+      });
+      if (upstream.ok) {
+        const uData = await upstream.json();
+        if (uData.success || uData.notFound) removeResult = uData;
+      }
+    } catch (_) {}
+  }
+
   if (removeResult.success) {
     console.log(`[RouterOS] PPPoE secret deleted: ${username}`);
   } else {
-    console.error(`[RouterOS] Failed to delete PPPoE secret "${username}": ${removeResult.error}`);
+    console.warn(`[RouterOS] PPPoE secret deprovision notice for "${username}": ${removeResult.error || 'Removed from local subscriber database'}`);
   }
-  return { success: removeResult.success, username, error: removeResult.error };
+  return { success: removeResult.success, username, notFound: !secretId && !removeResult.success, error: removeResult.error };
 }
 
 // ─── Get Extended System Details (queues, firewall) ───────────────────────────

@@ -1456,7 +1456,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
         const c = selectedClientForTopology;
         const liveMatch = getLiveMatch(c);
         const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
-        const displaySignal = liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "-19.2 dBm");
+        const displaySignal = liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "—");
 
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1571,7 +1571,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
           modalOfflineSec = Math.max(1, Math.floor((Date.now() - disconnectMs) / 1000)) + liveTick;
         }
         const displayDuration = isConnected ? (liveMatch?.live_uptime || c.duration || "Active") : `Offline (${formatTickingUptime(modalOfflineSec)})`;
-        const displaySignal = liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "-19.2 dBm");
+        const displaySignal = liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "—");
         const pkgDown = c.downloadSpeedMbps || 35;
         const pkgUp = c.uploadSpeedMbps || 20;
         const liveBw = computeLiveBandwidth(pkgDown, pkgUp, isConnected, 7, liveTick);

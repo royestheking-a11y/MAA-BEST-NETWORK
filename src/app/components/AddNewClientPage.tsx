@@ -310,7 +310,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       mikrotik: serverName || "MikroTik-MBN-Core",
       olt: selectedOlt,
       ponPort: selectedPonPort,
-      onuSignal: "-18.5 dBm",
+      onuSignal: "—",
       sessionUptime: "0m",
       monthlyUsageGB: 0,
       joinDate: joiningDate,

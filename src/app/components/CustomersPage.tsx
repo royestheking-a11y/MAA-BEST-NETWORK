@@ -6,7 +6,7 @@ import {
   X, Check, Clock, CheckCircle2, XCircle, Send, RefreshCw, Zap, FileText,
   Copy, Lock, Unlock, ExternalLink, Key, Smartphone, Sliders, Sparkles,
   Network, Server, Shield, Radio, CheckCheck, Save, ShieldAlert, ArrowRight,
-  Edit2, Edit3, Tag, UserCheck, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown
+  Edit2, Edit3, Tag, UserCheck, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, Trash2
 } from "lucide-react";
 import { useCustomerContext, Customer, CustomerStatus } from "../context/CustomerContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -122,6 +122,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     unbindMac,
     setUserType,
     bulkSetUserType,
+    deleteCustomer,
   } = useCustomerContext();
   const { t, bnNum, isBangla } = useLanguage();
   const { liveStats } = useNetxLiveData(30000);
@@ -219,6 +220,17 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     subzone: "Somitir Hat",
     status: "active" as CustomerStatus,
   });
+
+  const [deleteConfirmCust, setDeleteConfirmCust] = useState<Customer | null>(null);
+
+  const handleDeleteCustomer = (c: Customer) => {
+    deleteCustomer(c.id);
+    if (selectedCustomer?.id === c.id || selectedCustomer?.clientCode === c.clientCode) setSelectedCustomer(null);
+    if (editModalCustomer?.id === c.id || editModalCustomer?.clientCode === c.clientCode) setEditModalCustomer(null);
+    setDeleteConfirmCust(null);
+    setToast(`✓ Subscriber "${c.name}" (${c.clientCode || c.id}) deleted. Removed from billing and MikroTik.`);
+    setTimeout(() => setToast(""), 4000);
+  };
 
   const openEditSubscriberModal = (c: Customer) => {
     if (isReadOnly || !canEdit) {
@@ -1697,6 +1709,14 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                           className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${isReadOnly ? "opacity-30 cursor-not-allowed text-muted-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"}`}>
                           <CreditCard size={13} />
                         </button>
+
+                        <button
+                          disabled={isReadOnly}
+                          title={isReadOnly ? "View Only: Deletion restricted" : "Delete / Terminate Subscriber"}
+                          onClick={() => setDeleteConfirmCust(c)}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${isReadOnly ? "opacity-30 cursor-not-allowed text-muted-foreground" : "hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-500 hover:text-rose-700 cursor-pointer"}`}>
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1929,6 +1949,14 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                             isReadOnly ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground" : "bg-primary/10 text-primary hover:opacity-95 cursor-pointer"
                           }`}>
                           <CreditCard size={14} /> Record Payment
+                        </button>
+                        <button
+                          disabled={isReadOnly}
+                          onClick={() => setDeleteConfirmCust(selectedCustomer)}
+                          className={`p-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 col-span-2 border transition-all ${
+                            isReadOnly ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground border-border" : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border-rose-200 dark:border-rose-900 hover:bg-rose-100 cursor-pointer"
+                          }`}>
+                          <Trash2 size={14} /> Terminate & Delete Subscriber Account
                         </button>
                       </div>
                     </div>
@@ -3857,24 +3885,95 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               </div>
 
               {/* Modal Buttons */}
-              <div className="p-4 border-t flex gap-3 pt-3" style={{ borderColor: "var(--border)" }}>
+              <div className="p-4 border-t flex items-center justify-between gap-3 pt-3" style={{ borderColor: "var(--border)" }}>
                 <button
                   type="button"
-                  onClick={() => setEditModalCustomer(null)}
-                  className="w-1/2 py-2.5 rounded-xl font-bold text-xs border bg-card text-foreground hover:bg-muted cursor-pointer">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
                   disabled={isReadOnly}
-                  className={`w-1/2 py-2.5 rounded-xl font-bold text-xs text-white shadow-md flex items-center justify-center gap-1.5 transition-all ${
-                    isReadOnly ? "bg-muted-foreground opacity-50 cursor-not-allowed" : "bg-primary hover:opacity-95 cursor-pointer"
+                  onClick={() => {
+                    if (editModalCustomer) {
+                      setDeleteConfirmCust(editModalCustomer);
+                    }
+                  }}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition-all ${
+                    isReadOnly ? "opacity-30 cursor-not-allowed text-muted-foreground border-border" : "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 border-rose-200 dark:border-rose-900 cursor-pointer"
                   }`}>
-                  <Save size={14} />
-                  <span>{isReadOnly ? "View Only (Edit Disabled)" : "Save Subscriber Changes"}</span>
+                  <Trash2 size={13} /> Delete
                 </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditModalCustomer(null)}
+                    className="px-4 py-2.5 rounded-xl font-bold text-xs border bg-card text-foreground hover:bg-muted cursor-pointer">
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isReadOnly}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs text-white shadow-md flex items-center justify-center gap-1.5 transition-all ${
+                      isReadOnly ? "bg-muted-foreground opacity-50 cursor-not-allowed" : "bg-primary hover:opacity-95 cursor-pointer"
+                    }`}>
+                    <Save size={14} />
+                    <span>{isReadOnly ? "View Only (Edit Disabled)" : "Save Subscriber Changes"}</span>
+                  </button>
+                </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Confirm Delete Subscriber ──────────────────────────── */}
+      {deleteConfirmCust && (
+        <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-rose-500/30 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-500">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-foreground">Terminate & Delete Subscriber?</h3>
+                <p className="text-xs text-muted-foreground">Permanent action on ISP CRM & RouterOS</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-muted/40 border border-border text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subscriber Name:</span>
+                <strong className="text-foreground">{deleteConfirmCust.name}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Client ID:</span>
+                <strong className="font-mono text-primary">{deleteConfirmCust.clientCode || deleteConfirmCust.id}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">PPPoE Username:</span>
+                <strong className="font-mono text-foreground">{deleteConfirmCust.pppUser || "—"}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Package / Rate:</span>
+                <span className="text-foreground">{deleteConfirmCust.package} (৳{deleteConfirmCust.price || deleteConfirmCust.monthlyBill})</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-rose-600 dark:text-rose-400 font-medium leading-relaxed">
+              ⚠️ Warning: This will permanently remove the subscriber from Cloud Firestore, Billing records, and deprovision / remove the PPPoE secret on MikroTik RouterOS.
+            </p>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmCust(null)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs border border-border bg-card text-foreground hover:bg-muted cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteCustomer(deleteConfirmCust)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
+                <Trash2 size={14} />
+                <span>Confirm & Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

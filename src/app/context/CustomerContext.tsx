@@ -280,6 +280,69 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // ── Sync Live Telemetry from NetX API (Optical Power, Real IP, Real Online/Offline) ──
+  useEffect(() => {
+    let mounted = true;
+    const syncNetx = async () => {
+      try {
+        const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+          ? "" : "https://maa-best-network.onrender.com";
+        const res = await fetch(`${gatewayBase}/api/netx/live-stats`, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) return;
+        const json = await res.json();
+        const liveList = json.data;
+        if (!Array.isArray(liveList) || liveList.length === 0 || !mounted) return;
+
+        // Index live data
+        const liveMap = new Map<string, any>();
+        const macMap = new Map<string, any>();
+        liveList.forEach(ls => {
+          if (ls.pppoe_username) liveMap.set(ls.pppoe_username.toLowerCase(), ls);
+          if (ls.full_name) liveMap.set(ls.full_name.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
+          if (ls.user_id) liveMap.set(ls.user_id.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
+          if (ls.live_mac) macMap.set(ls.live_mac.toLowerCase().trim(), ls);
+        });
+
+        setCustomers(prev => {
+          let hasChange = false;
+          const updated = prev.map(c => {
+            const pppKey = (c.pppUser || "").toLowerCase();
+            const nameKey = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+            const macKey = (c.mac || "").toLowerCase().trim();
+            const match = liveMap.get(pppKey) || macMap.get(macKey) || liveMap.get(nameKey);
+            if (!match) return c;
+
+            const newNetStatus: "online" | "offline" = match.connection_status === "online" ? "online" : "offline";
+            const newSignal = (match.onu_rx_power !== null && match.onu_rx_power !== undefined)
+              ? `${match.onu_rx_power} dBm`
+              : (c.onuSignal?.includes("dBm") ? c.onuSignal : "—");
+            const newIp = match.live_ip || c.ipAddress;
+            const newMac = match.live_mac || c.mac;
+            const newUptime = match.live_uptime || c.sessionUptime;
+
+            if (c.netStatus !== newNetStatus || c.onuSignal !== newSignal || c.ipAddress !== newIp || c.mac !== newMac) {
+              hasChange = true;
+              return {
+                ...c,
+                netStatus: newNetStatus,
+                onuSignal: newSignal,
+                ipAddress: newIp,
+                mac: newMac,
+                sessionUptime: newUptime
+              };
+            }
+            return c;
+          });
+          return hasChange ? updated : prev;
+        });
+      } catch (_) {}
+    };
+
+    syncNetx();
+    const interval = setInterval(syncNetx, 25000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
   // ── Daily daysRemaining Recalculation ──
   useEffect(() => {
     const recalcDaysRemaining = () => {
@@ -696,11 +759,14 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteCustomer = (id: string) => {
-    const target = customers.find(c => c.id === id);
+    const target = customers.find(c => c.id === id || c.clientCode === id);
     const targetName = target ? target.name : id;
-    const targetPppUser = target?.pppUser;
+    const targetPppUser = target?.pppUser || (target?.name ? `mbn@${target.name.toLowerCase().replace(/[^a-z0-9]/g, "")}` : undefined);
+    const targetDocId = target?.id || id;
+    const targetClientCode = target?.clientCode;
+
     setCustomers(prev => {
-      const updated = prev.filter(c => c.id !== id);
+      const updated = prev.filter(c => c.id !== id && c.clientCode !== id && c.id !== targetDocId);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
@@ -708,10 +774,15 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
-    deleteCustomerFromFirestore(id);
+
+    // Delete document from Firestore
+    deleteCustomerFromFirestore(targetDocId);
+    if (targetClientCode && targetClientCode !== targetDocId) {
+      deleteCustomerFromFirestore(targetClientCode);
+    }
 
     // ── Auto-Deprovision PPPoE Secret on MikroTik RouterOS ──────────────────
-    if (targetPppUser && (target?.service === "pppoe" || target?.service === "hotspot")) {
+    if (targetPppUser) {
       const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
         ? "" : "https://maa-best-network.onrender.com";
       fetch(`${gatewayBase}/api/mikrotik/user/delete`, {

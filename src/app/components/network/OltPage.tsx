@@ -155,7 +155,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             ponPort: o.ponPort,
             status: liveMatch.connection_status === 'online' ? 'online' : 'offline',
             rxPower: (liveMatch.onu_rx_power !== null && liveMatch.onu_rx_power !== undefined)
-              ? `${liveMatch.onu_rx_power} dBm` : o.rxPower,
+              ? `${liveMatch.onu_rx_power} dBm` : '—',
             customer: o.customer,
             customerId: custId,
             oltServer: o.oltServer,
@@ -167,7 +167,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             mac: o.mac,
             ponPort: o.ponPort,
             status: o.customer.includes("Unassigned") ? 'unassigned' : 'offline',
-            rxPower: o.rxPower,
+            rxPower: '—',
             customer: o.customer,
             customerId: custId,
             oltServer: o.oltServer,
@@ -238,12 +238,13 @@ export function OltPage({ onNavigate }: OltPageProps) {
       if (o.customer && o.customer !== "— Unassigned —") {
         custId = userToId.get(custNameClean);
       }
+      const cust = o.customer && o.customer !== "— Unassigned —" ? userToCustomer.get(custNameClean) : null;
       return {
         id: o.id,
         mac: o.mac,
         ponPort: o.ponPort,
         status: o.status,
-        rxPower: o.rxPower,
+        rxPower: cust?.onuSignal || "—",
         customer: o.customer,
         customerId: custId,
         oltServer: o.oltServer,
@@ -1068,7 +1069,12 @@ export function OltPage({ onNavigate }: OltPageProps) {
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <button
-                          onClick={() => !isReadOnly && canEdit && setEditingOlt(olt)}
+                          onClick={() => {
+                            if (!isReadOnly && canEdit) {
+                              setEditingOlt(olt);
+                              setShowAddOlt(true);
+                            }
+                          }}
                           disabled={isReadOnly || !canEdit}
                           className={`p-1.5 rounded-lg transition ${
                             isReadOnly || !canEdit ? "opacity-30 cursor-not-allowed text-muted-foreground" : "hover:bg-muted hover:text-foreground cursor-pointer"
@@ -1979,15 +1985,19 @@ export function OltPage({ onNavigate }: OltPageProps) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {Array.from({ length: selectedOlt.ponPorts || 8 }).map((_, idx) => {
                 const portName = `epon 0/${idx + 1}`;
-                const count = onuList.filter(o => o.oltServer === (selectedOlt.id === "OLT-01" ? "OLT1" : "OLT2") && o.ponPort === portName).length;
-                const isOnline = count > 0;
+                const cleanPort = portName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const targetServer = (selectedOlt.id === "OLT-01" || selectedOlt.name === "OLT1") ? "OLT1" : "OLT2";
+                const portOnus = onuList.filter(o => o.oltServer === targetServer && (o.ponPort || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPort);
+                const count = portOnus.length;
+                const activeCount = portOnus.filter(o => o.status === "online").length;
+                const isOnline = activeCount > 0;
                 return (
                   <div key={idx} className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1.5 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-foreground">{portName}</span>
                       <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
                     </div>
-                    <p className="text-[11px] text-muted-foreground">ONUs: <strong className="text-foreground">{count} / 64</strong></p>
+                    <p className="text-[11px] text-muted-foreground">ONUs: <strong className="text-foreground">{count}</strong> <span className="text-[10px] text-emerald-600 font-bold">({activeCount} online)</span> / 64</p>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(count / 64) * 100}%` }} />
                     </div>

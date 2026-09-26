@@ -230,7 +230,9 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
 
       // Status & Signal - 100% matched to live RouterOS & OLT sessions
       const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
-      const opticalRx = liveMatch?.onu_rx_power || (c.onuSignal ? parseFloat(c.onuSignal) : -18.5 - ((i % 7) * 0.8));
+      const opticalRx = (liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null)
+        ? liveMatch.onu_rx_power
+        : (c.onuSignal && !isNaN(parseFloat(c.onuSignal)) ? parseFloat(c.onuSignal) : null);
 
       let onuStatus: OnuStatus = "online";
       let faultReason = undefined;
@@ -243,7 +245,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
           onuStatus = "los";
           faultReason = "Subscriber drop cable offline / No optical link detected.";
         }
-      } else if (opticalRx < -26.0) {
+      } else if (opticalRx !== null && opticalRx < -26.0) {
         onuStatus = "weak_signal";
         faultReason = `High optical attenuation (${opticalRx} dBm). Check fiber patch & dirty connector.`;
       }
@@ -270,7 +272,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
         lat,
         lng,
         dueAmount,
-        opticalPower: Number(opticalRx.toFixed(1)),
+        opticalPower: opticalRx !== null ? Number(opticalRx.toFixed(1)) : 0,
         txPower: 2.4,
         temperature: 36 + (i % 9),
         voltage: isOnline ? 3.3 : 0,
