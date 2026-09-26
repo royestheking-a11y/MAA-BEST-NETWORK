@@ -724,6 +724,55 @@ export function mikrotikPing(target, count = 4) {
   });
 }
 
+// ─── Create a new PPPoE Secret (provision new subscriber) ────────────────────
+export async function createPppoeSecret(username, password, profile = 'default', comment = '') {
+  // First check if user already exists
+  const findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${username}`]);
+  if (findResult.success && findResult.results.length > 0) {
+    return { success: false, error: `PPPoE secret "${username}" already exists on MikroTik. Use toggle to enable/disable.`, alreadyExists: true };
+  }
+  const words = [
+    '/ppp/secret/add',
+    `=name=${username}`,
+    `=password=${password}`,
+    `=service=pppoe`,
+    `=profile=${profile}`,
+  ];
+  if (comment) words.push(`=comment=${comment}`);
+  const result = await executeRouterOsCommand(words);
+  if (result.success) {
+    console.log(`[RouterOS] PPPoE secret created: ${username} (profile: ${profile})`);
+  } else {
+    console.error(`[RouterOS] Failed to create PPPoE secret "${username}": ${result.error}`);
+  }
+  return { success: result.success, username, profile, error: result.error };
+}
+
+// ─── Delete a PPPoE Secret (terminate subscriber) ────────────────────────────
+export async function deletePppoeSecret(username) {
+  // First disconnect any active session
+  try { await disconnectPppoeUser(username); } catch (_) {}
+  // Find the secret
+  let findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${username}`]);
+  if (!findResult.success || findResult.results.length === 0) {
+    // Try alternate form mbn@xxx vs mbnxxx
+    const alt = username.toLowerCase().startsWith('mbn@') ? username : 'mbn@' + username.replace(/^mbn/i, '');
+    findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${alt}`]);
+    if (!findResult.success || findResult.results.length === 0) {
+      return { success: false, error: `PPPoE secret "${username}" not found on MikroTik — may already have been removed.`, notFound: true };
+    }
+  }
+  const secretId = findResult.results[0]['.id'];
+  if (!secretId) return { success: false, error: 'Secret .id not found' };
+  const removeResult = await executeRouterOsCommand(['/ppp/secret/remove', `=.id=${secretId}`]);
+  if (removeResult.success) {
+    console.log(`[RouterOS] PPPoE secret deleted: ${username}`);
+  } else {
+    console.error(`[RouterOS] Failed to delete PPPoE secret "${username}": ${removeResult.error}`);
+  }
+  return { success: removeResult.success, username, error: removeResult.error };
+}
+
 // ─── Get Extended System Details (queues, firewall) ───────────────────────────
 export async function getMikrotikDetails() {
   const [queues, filterCount, natCount] = await Promise.all([
