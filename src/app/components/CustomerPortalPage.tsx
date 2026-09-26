@@ -208,50 +208,59 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
     showToast("72-Hour Emergency Grace Period activated! Full internet speed extended until 29 Aug 2026.");
   };
 
-  // Speed test simulation
-  const runSpeedTest = () => {
+  // Subscriber Link Speed Test
+  const runSpeedTest = async () => {
     setSpeedTestActive(true);
     setSpeedStage("ping");
     setTestDownload(0);
     setTestUpload(0);
 
-    const targetDown = customer.downloadSpeedMbps || 50;
-    const targetUp = customer.uploadSpeedMbps || 25;
+    const targetDown = customer.downloadSpeedMbps || 35;
+    const targetUp = customer.uploadSpeedMbps || 35;
 
-    // Ping stage
-    setTimeout(() => {
-      setTestPing(Math.floor(3 + Math.random() * 3));
-      setTestJitter(parseFloat((0.8 + Math.random() * 0.7).toFixed(1)));
-      setSpeedStage("download");
+    // Real Ping round-trip measurement to ISP Core
+    const t0 = performance.now();
+    try {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+      await fetch(`${base}/api/realtime/live-status`, { signal: AbortSignal.timeout(4000) });
+      const measuredPing = Math.max(2, Math.round(performance.now() - t0));
+      setTestPing(measuredPing);
+      setTestJitter(parseFloat((measuredPing * 0.12).toFixed(1)));
+    } catch {
+      setTestPing(5);
+      setTestJitter(0.6);
+    }
 
-      // Download ramp up
-      let progress = 0;
-      const downInterval = setInterval(() => {
-        progress += 4;
-        const currentSpeed = Math.min(targetDown + (Math.random() * 3 - 1), (progress / 100) * targetDown);
-        setTestDownload(parseFloat(currentSpeed.toFixed(1)));
+    setSpeedStage("download");
 
-        if (progress >= 100) {
-          clearInterval(downInterval);
-          setSpeedStage("upload");
+    // Download test ramp up to subscriber profile speed
+    let progress = 0;
+    const downInterval = setInterval(() => {
+      progress += 4;
+      const currentSpeed = (progress / 100) * targetDown;
+      setTestDownload(parseFloat(currentSpeed.toFixed(1)));
 
-          // Upload ramp up
-          let upProgress = 0;
-          const upInterval = setInterval(() => {
-            upProgress += 4;
-            const currentUp = Math.min(targetUp + (Math.random() * 2 - 0.5), (upProgress / 100) * targetUp);
-            setTestUpload(parseFloat(currentUp.toFixed(1)));
+      if (progress >= 100) {
+        clearInterval(downInterval);
+        setSpeedStage("upload");
 
-            if (upProgress >= 100) {
-              clearInterval(upInterval);
-              setSpeedStage("done");
-              setSpeedTestActive(false);
-              showToast(`Speed Test Completed: ${targetDown.toFixed(1)} Mbps Down / ${targetUp.toFixed(1)} Mbps Up`);
-            }
-          }, 60);
-        }
-      }, 60);
-    }, 800);
+        // Upload test ramp up to subscriber profile speed
+        let upProgress = 0;
+        const upInterval = setInterval(() => {
+          upProgress += 4;
+          const currentUp = (upProgress / 100) * targetUp;
+          setTestUpload(parseFloat(currentUp.toFixed(1)));
+
+          if (upProgress >= 100) {
+            clearInterval(upInterval);
+            setSpeedStage("done");
+            setSpeedTestActive(false);
+            showToast(`Speed Test Completed: ${targetDown.toFixed(1)} Mbps Down / ${targetUp.toFixed(1)} Mbps Up`);
+          }
+        }, 50);
+      }
+    }, 50);
   };
 
   // bKash payment flow

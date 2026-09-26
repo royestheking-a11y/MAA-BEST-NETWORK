@@ -374,19 +374,40 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
     return { total, good, warnings, issues };
   }, [onuDevices]);
 
-  // Ping Handler
-  const handlePingTest = (ip: string) => {
+  // Real ICMP Ping Handler from MikroTik RouterOS Core
+  const handlePingTest = async (ip: string) => {
+    if (!ip || ip === "—" || ip.startsWith("0.")) {
+      setPingResult("✗ Destination Host Unreachable (ONU Offline / Optical LOS)");
+      return;
+    }
     setIsPinging(true);
     setPingResult(null);
-    setTimeout(() => {
-      setIsPinging(false);
-      if (ip === "—" || !ip) {
-        setPingResult("Destination Host Unreachable (ONU Offline / Optical LOS)");
+
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+
+    try {
+      const res = await fetch(`${base}/api/mikrotik/ping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: ip, count: 4 }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.received > 0) {
+          setPingResult(`Reply from ${ip}: ${data.received}/${data.sent} packets, time=${data.avgMs}ms (${data.lost}% loss) via MikroTik DC-CA`);
+        } else {
+          setPingResult(`Request timed out. Destination Host Unreachable (100% packet loss) via MikroTik`);
+        }
       } else {
-        const ms = (Math.random() * 4 + 1.8).toFixed(1);
-        setPingResult(`Reply from ${ip}: bytes=32 time=${ms}ms TTL=64 (0% packet loss)`);
+        setPingResult(`Ping failed: ${data.error || "Host Unreachable"}`);
       }
-    }, 900);
+    } catch (e: any) {
+      setPingResult(`Ping gateway error: ${e.message}`);
+    } finally {
+      setIsPinging(false);
+    }
   };
 
   // Register Form Handler
@@ -397,8 +418,8 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
       return;
     }
 
-    const generatedSerial = newOnuSerial.trim() || `BDCOM2026${Math.floor(1000 + Math.random() * 9000)}`;
-    const generatedMac = newOnuMac.trim() || `50:65:F3:11:88:${Math.floor(10 + Math.random() * 89)}`;
+    const serial = newOnuSerial.trim() || "—";
+    const macAddr = newOnuMac.trim() || "—";
 
     addCustomer({
       name: newCustName.trim(),
@@ -407,16 +428,16 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
       netStatus: "online",
       olt: newOlt,
       ponPort: newPonPort,
-      deviceSerial: generatedSerial,
-      mac: generatedMac,
+      deviceSerial: serial,
+      mac: macAddr,
       deviceVendor: newVendor,
       deviceType: newModel,
       zone: newZone,
       subzone: newSubzone,
       box: newSplitter,
-      package: "Standard 20M",
-      price: 800,
-      monthlyBill: 800,
+      package: "35M",
+      price: 500,
+      monthlyBill: 500,
       onuSignal: "—",
     });
 
@@ -425,7 +446,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
     setNewCustPhone("");
     setNewOnuSerial("");
     setNewOnuMac("");
-    showToast(`✓ Registered new ONU ${generatedSerial} for ${newCustName}!`);
+    showToast(`✓ Registered new ONU ${serial !== "—" ? serial : newCustName}!`);
   };
 
   // ── Interactive GIS Topology Canvas ──

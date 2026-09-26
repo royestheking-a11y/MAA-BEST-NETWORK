@@ -530,19 +530,41 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     document.body.removeChild(link);
   };
 
-  // Ping test simulator
-  const handlePingTest = (ip: string) => {
+  // Real ICMP Ping test directly from MikroTik RouterOS core (103.12.173.136)
+  const handlePingTest = async (ip: string) => {
+    if (!ip || ip === "—" || ip.startsWith("0.")) {
+      setPingResult("✗ Destination Host Unreachable / Session Offline.");
+      return;
+    }
     setIsPinging(true);
     setPingResult(null);
-    setTimeout(() => {
-      setIsPinging(false);
-      const isSuccess = Boolean(ip && ip !== "—" && !ip.startsWith("0."));
-      if (isSuccess) {
-        setPingResult(`✓ 4 packets transmitted, 4 received, 0% packet loss. RTT min/avg/max = 2.4/4.1/6.8 ms`);
+
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+
+    try {
+      const res = await fetch(`${base}/api/mikrotik/ping`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: ip, count: 4 }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await res.json();
+      if (data.success) {
+        const lossPct = data.sent > 0 ? Math.round((data.lost / data.sent) * 100) : 0;
+        if (data.received > 0) {
+          setPingResult(`✓ ${data.sent} packets sent, ${data.received} received (${lossPct}% loss). RTT min/avg/max = ${data.minMs}/${data.avgMs}/${data.maxMs} ms (from MikroTik DC-CA)`);
+        } else {
+          setPingResult(`✗ ${data.sent} packets transmitted, 0 received, 100% packet loss. Host ${ip} unreachable.`);
+        }
       } else {
-        setPingResult(`✗ Destination Host Unreachable / Session Offline.`);
+        setPingResult(`✗ RouterOS Ping: ${data.error || "Host Unreachable"}`);
       }
-    }, 1200);
+    } catch (err: any) {
+      setPingResult(`✗ MikroTik Ping gateway timeout: ${err.message || "Failed to reach RouterOS API"}`);
+    } finally {
+      setIsPinging(false);
+    }
   };
 
   return (
@@ -1665,7 +1687,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                   </div>
                 </div>
 
-                {/* Ping Simulator */}
+                {/* Live MikroTik Ping Tool */}
                 <div className="p-3 rounded-xl bg-muted/20 border border-border space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Instant Network Ping Test</span>

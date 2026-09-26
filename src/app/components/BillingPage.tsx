@@ -7,6 +7,7 @@ import {
   Sliders, Layers, Save, ExternalLink, Zap, Copy, AlertCircle, Radio,
   Lock, Key, Bell, Globe, ArrowUpRight, CheckSquare, Square
 } from "lucide-react";
+import { billingStore, syncLiveGatewayPackages } from "./billing/billingData";
 
 export type BillTab = "invoices" | "payments" | "packages" | "discounts" | "billing-settings";
 
@@ -93,29 +94,7 @@ interface CustomerAdjustment {
   status: "applied" | "reverted";
 }
 
-// ─── Initial Mock Data ───────────────────────────────────────────────────────
-
-const INITIAL_INVOICES: Invoice[] = [
-  { id: "INV-10204", customer: "Rahim Uddin", custId: "CUST-10001", phone: "01711-234567", zone: "Dhanmondi-01", pkgName: "20 Mbps Plus", subtotal: 1142, vat: 58, discount: 0, amount: 1200, period: "Aug 2026", issued: "01 Aug 2026", due: "05 Aug 2026", status: "paid", method: "bKash", paidAt: "03 Aug 2026", trxId: "BKH8821291" },
-  { id: "INV-10203", customer: "Nasrin Begum", custId: "CUST-10003", phone: "01819-876543", zone: "Gulshan-02", pkgName: "30 Mbps Pro", subtotal: 1428, vat: 72, discount: 0, amount: 1500, period: "Aug 2026", issued: "01 Aug 2026", due: "10 Aug 2026", status: "overdue", method: null },
-  { id: "INV-10202", customer: "Jamal Uddin", custId: "CUST-10004", phone: "01912-349812", zone: "Mirpur-10", pkgName: "50 Mbps Business", subtotal: 2380, vat: 120, discount: 0, amount: 2500, period: "Aug 2026", issued: "01 Aug 2026", due: "15 Aug 2026", status: "pending", method: null },
-  { id: "INV-10201", customer: "Fatema Begum", custId: "CUST-10005", phone: "01722-998811", zone: "Banani-03", pkgName: "100 Mbps Enterprise", subtotal: 4761, vat: 239, discount: 0, amount: 5000, period: "Aug 2026", issued: "01 Aug 2026", due: "20 Aug 2026", status: "paid", method: "Bank", paidAt: "02 Aug 2026", trxId: "BNK0038812" },
-  { id: "INV-10200", customer: "Karim Hossain", custId: "CUST-10002", phone: "01611-554433", zone: "Uttara-Sec4", pkgName: "10 Mbps Home", subtotal: 762, vat: 38, discount: 0, amount: 800, period: "Aug 2026", issued: "01 Aug 2026", due: "05 Aug 2026", status: "overdue", method: null },
-  { id: "INV-10199", customer: "Monir Ahmed", custId: "CUST-10009", phone: "01812-771122", zone: "Mohammadpur", pkgName: "20 Mbps Plus", subtotal: 1142, vat: 58, discount: 0, amount: 1200, period: "Aug 2026", issued: "01 Aug 2026", due: "18 Aug 2026", status: "pending", method: null },
-  { id: "INV-10198", customer: "Shirin Akter", custId: "CUST-10010", phone: "01933-221100", zone: "Mirpur-12", pkgName: "15 Mbps Standard", subtotal: 952, vat: 48, discount: 0, amount: 1000, period: "Aug 2026", issued: "01 Aug 2026", due: "05 Aug 2026", status: "overdue", method: null },
-  { id: "INV-10197", customer: "Delwar Hossain", custId: "CUST-10008", phone: "01755-443322", zone: "Badda-Link", pkgName: "30 Mbps Pro", subtotal: 1428, vat: 72, discount: 0, amount: 1500, period: "Aug 2026", issued: "01 Aug 2026", due: "12 Aug 2026", status: "paid", method: "Nagad", paidAt: "02 Aug 2026", trxId: "NGD7723190" },
-  { id: "INV-10196", customer: "Abul Kalam", custId: "CUST-10014", phone: "01788-990011", zone: "Bashundhara R/A", pkgName: "50 Mbps Business", subtotal: 2380, vat: 120, discount: 200, amount: 2300, period: "Aug 2026", issued: "01 Aug 2026", due: "08 Aug 2026", status: "paid", method: "bKash", paidAt: "04 Aug 2026", trxId: "BKH9932145" },
-];
-
-const INITIAL_PAYMENTS: Payment[] = [
-  { id: "PAY-88312", customer: "Rahim Uddin", custId: "CUST-10001", invoice: "INV-10204", amount: 1200, method: "bKash", txn: "BKH8821291", date: "03 Aug 2026", time: "11:42 AM", addedBy: "bKash IPN Gateway", channel: "Merchant Checkout", status: "verified", notes: "Auto-reconciled via webhook" },
-  { id: "PAY-88311", customer: "Fatema Begum", custId: "CUST-10005", invoice: "INV-10201", amount: 5000, method: "Bank", txn: "BNK0038812", date: "02 Aug 2026", time: "02:15 PM", addedBy: "Admin — Farhana", channel: "Dutch-Bangla Bank Acc", status: "verified", notes: "BEFTN wire verified with bank statement" },
-  { id: "PAY-88310", customer: "Delwar Hossain", custId: "CUST-10008", invoice: "INV-10197", amount: 1500, method: "Nagad", txn: "NGD7723190", date: "02 Aug 2026", time: "10:08 AM", addedBy: "Nagad Gateway", channel: "App Direct Payment", status: "verified", notes: "Verified online" },
-  { id: "PAY-88309", customer: "Monir Ahmed", custId: "CUST-10009", invoice: "INV-10199", amount: 600, method: "Cash", txn: "CSH-20260801-09", date: "01 Aug 2026", time: "04:30 PM", addedBy: "Collector-01 (Rafiq)", channel: "Field Collection Booth", status: "verified", notes: "Part payment collected with receipt booklet #44" },
-  { id: "PAY-88308", customer: "Nasrin Begum", custId: "CUST-10003", invoice: "INV-10203", amount: 750, method: "bKash", txn: "BKH8819004", date: "01 Aug 2026", time: "09:00 AM", addedBy: "Gateway", channel: "Merchant Checkout", status: "pending", notes: "Awaiting bank settlement confirmation" },
-  { id: "PAY-88307", customer: "Abul Kalam", custId: "CUST-10014", invoice: "INV-10196", amount: 2300, method: "bKash", txn: "BKH9932145", date: "04 Aug 2026", time: "03:12 PM", addedBy: "bKash IPN Gateway", channel: "Merchant Checkout", status: "verified", notes: "Full payment with promo applied" },
-  { id: "PAY-88306", customer: "Tanvir Hasan", custId: "CUST-10022", invoice: "INV-10188", amount: 1200, method: "SSLCommerz", txn: "SSL9912048", date: "31 Jul 2026", time: "06:45 PM", addedBy: "SSLCommerz IPN", channel: "Visa / Mastercard", status: "verified", notes: "Automated card payment" },
-];
+// ─── Initial Live Gateway Packages ───────────────────────────────────────────────────
 
 const INITIAL_PACKAGES: IspPackage[] = [
   { id: "PKG-35M", name: "35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 194, margin: 56, mikrotikProfile: "35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber Broadband — Active Primary Tier" },
@@ -188,11 +167,21 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   // Data states
-  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
-  const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
-  const [packagesList, setPackagesList] = useState<IspPackage[]>(INITIAL_PACKAGES);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => billingStore.getInvoices());
+  const [payments, setPayments] = useState<Payment[]>(() => billingStore.getPayments());
+  const [packagesList, setPackagesList] = useState<IspPackage[]>(() => billingStore.getPackages());
   const [discountRules, setDiscountRules] = useState<DiscountRule[]>(INITIAL_DISCOUNT_RULES);
   const [adjustments, setAdjustments] = useState<CustomerAdjustment[]>(INITIAL_ADJUSTMENTS);
+
+  useEffect(() => {
+    syncLiveGatewayPackages().catch(console.error);
+
+    return billingStore.subscribe(() => {
+      setInvoices(billingStore.getInvoices());
+      setPayments(billingStore.getPayments());
+      setPackagesList(billingStore.getPackages());
+    });
+  }, []);
 
   // Invoices Tab state
   const [invSearch, setInvSearch] = useState("");
@@ -200,8 +189,8 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showNewInvoice, setShowNewInvoice] = useState(false);
   const [newInv, setNewInv] = useState({
-    customer: "", custId: "", phone: "", zone: "Dhanmondi-01", pkgName: "20 Mbps Plus",
-    amount: "1200", period: "Aug 2026", due: "10 Aug 2026", discount: "0", applyVat: true
+    customer: "", custId: "", phone: "", zone: "DHAKA DIVISION", pkgName: "35M",
+    amount: "500", period: "Aug 2026", due: "10 Aug 2026", discount: "0", applyVat: true
   });
 
   // Payments Tab state
@@ -211,7 +200,7 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
   const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Payment | null>(null);
   const [newPay, setNewPay] = useState({
-    customer: "Rahim Uddin", custId: "CUST-10001", invoice: "INV-10204", amount: "1200",
+    customer: "", custId: "", invoice: "", amount: "500",
     method: "bKash" as Payment["method"], txn: "", channel: "Merchant Checkout",
     collector: "Admin User", sendSms: true, notes: ""
   });
