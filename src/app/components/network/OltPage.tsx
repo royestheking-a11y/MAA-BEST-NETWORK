@@ -91,17 +91,25 @@ export function OltPage({ onNavigate }: OltPageProps) {
     const userToId = new Map<string, string>();
     const userToCustomer = new Map<string, typeof custList[0]>();
     const userByMac = new Map<string, typeof custList[0]>();
+    const addCustToMap = (key: string | undefined, c: typeof custList[0]) => {
+      if (!key) return;
+      const s = key.toLowerCase().trim();
+      const code = c.clientCode || c.id;
+      userToId.set(s, code);
+      userToCustomer.set(s, c);
+      userToId.set(s.replace(/^mbn@/i, ''), code);
+      userToCustomer.set(s.replace(/^mbn@/i, ''), c);
+      userToId.set(s.replace(/[^a-z0-9]/g, ''), code);
+      userToCustomer.set(s.replace(/[^a-z0-9]/g, ''), c);
+      userToId.set(s.replace(/^mbn/i, '').replace(/[^a-z0-9]/g, ''), code);
+      userToCustomer.set(s.replace(/^mbn/i, '').replace(/[^a-z0-9]/g, ''), c);
+    };
+
     custList.forEach(c => {
-      if (c.name) {
-        const clean = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        userToId.set(clean, c.clientCode || c.id);
-        userToCustomer.set(clean, c);
-      }
-      if (c.pppUser) {
-        const clean = c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, '');
-        userToId.set(clean, c.clientCode || c.id);
-        userToCustomer.set(clean, c);
-      }
+      addCustToMap(c.name, c);
+      addCustToMap(c.pppUser, c);
+      addCustToMap(c.clientCode, c);
+      addCustToMap(c.id, c);
       if (c.mac) {
         userByMac.set(c.mac.toLowerCase().trim(), c);
       }
@@ -142,17 +150,47 @@ export function OltPage({ onNavigate }: OltPageProps) {
       const results: OltOnuRecord[] = [];
       const processedUsers = new Set<string>();
       const processedMacs = new Set<string>();
+      const processedCustIds = new Set<string>();
+
+      const addVariants = (val?: string | null) => {
+        if (!val) return;
+        const s = String(val).toLowerCase().trim();
+        processedUsers.add(s);
+        processedUsers.add(s.replace(/^mbn@/i, ''));
+        processedUsers.add(s.replace(/[^a-z0-9]/g, ''));
+        processedUsers.add(s.replace(/^mbn/i, '').replace(/[^a-z0-9]/g, ''));
+      };
 
       liveData.forEach((c, idx) => {
-        const rawUser = c.pppoe_username || c.user_id || c.full_name || `sub-${idx}`;
-        const custNameClean = rawUser.toLowerCase().replace(/[^a-z0-9]/g, '');
+        addVariants(c.pppoe_username);
+        addVariants(c.user_id);
+        addVariants(c.full_name);
         const macClean = (c.live_mac || '').toLowerCase().trim();
-
-        processedUsers.add(custNameClean);
         if (macClean) processedMacs.add(macClean);
 
-        const designatedCust = userToCustomer.get(custNameClean) || (macClean ? userByMac.get(macClean) : null);
-        const custId = userToId.get(custNameClean) || designatedCust?.clientCode || designatedCust?.id || c.user_id;
+        const rawUser = c.pppoe_username || c.user_id || c.full_name || `sub-${idx}`;
+        const custNameClean = rawUser.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const uClean1 = (c.pppoe_username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const uClean2 = (c.user_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const uClean3 = (c.full_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const designatedCust = (macClean ? userByMac.get(macClean) : null)
+          || userToCustomer.get(uClean1)
+          || userToCustomer.get(uClean2)
+          || userToCustomer.get(uClean3)
+          || userToCustomer.get(custNameClean)
+          || (c.pppoe_username ? userToCustomer.get(c.pppoe_username.toLowerCase().trim()) : null)
+          || (c.user_id ? userToCustomer.get(c.user_id.toLowerCase().trim()) : null);
+
+        if (designatedCust) {
+          processedCustIds.add(designatedCust.id);
+          if (designatedCust.clientCode) processedCustIds.add(designatedCust.clientCode);
+          addVariants(designatedCust.pppUser);
+          addVariants(designatedCust.name);
+          if (designatedCust.mac) processedMacs.add(designatedCust.mac.toLowerCase().trim());
+        }
+
+        const custId = designatedCust?.clientCode || designatedCust?.id || userToId.get(custNameClean) || c.user_id;
         const effectiveOlt = (designatedCust?.olt === "OLT2" || c.server_name?.includes("OLT2")) ? "OLT2" : "OLT1";
         const effectivePon = designatedCust?.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1");
 
@@ -176,30 +214,35 @@ export function OltPage({ onNavigate }: OltPageProps) {
       // Also append any customer registered in CustomerContext not present in liveData (e.g. newly added user)
       custList.forEach(c => {
         const cId = c.clientCode || c.id;
+        if (processedCustIds.has(c.id) || (cId && processedCustIds.has(cId))) return;
+
         const cUserClean = (c.pppUser || c.name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
         const cMacClean = (c.mac || "").toLowerCase().trim();
 
-        if ((!cUserClean || !processedUsers.has(cUserClean)) && (!cMacClean || !processedMacs.has(cMacClean))) {
-          if (cUserClean) processedUsers.add(cUserClean);
-          if (cMacClean) processedMacs.add(cMacClean);
+        if (processedUsers.has(cUserClean) || (cMacClean && processedMacs.has(cMacClean))) return;
 
-          const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
-          const isOnline = c.netStatus === "online";
-          const rxVal = (c.onuSignal && c.onuSignal !== "-18.5 dBm" && c.onuSignal !== "—")
-            ? c.onuSignal
-            : (isOnline ? "—" : "Offline");
+        processedCustIds.add(c.id);
+        if (cId) processedCustIds.add(cId);
+        addVariants(c.pppUser);
+        addVariants(c.name);
+        if (cMacClean) processedMacs.add(cMacClean);
 
-          results.push({
-            id: `onu-cust-${cId}`,
-            mac: c.mac || "—",
-            ponPort: c.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1"),
-            status: isOnline ? "online" : "offline",
-            rxPower: rxVal,
-            customer: c.name || c.pppUser || "— Unassigned —",
-            customerId: cId,
-            oltServer: effectiveOlt as "OLT1" | "OLT2",
-          });
-        }
+        const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
+        const isOnline = c.netStatus === "online";
+        const rxVal = (c.onuSignal && c.onuSignal !== "-18.5 dBm" && c.onuSignal !== "—")
+          ? c.onuSignal
+          : (isOnline ? "—" : "Offline");
+
+        results.push({
+          id: `onu-cust-${cId}`,
+          mac: c.mac || "—",
+          ponPort: c.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1"),
+          status: isOnline ? "online" : "offline",
+          rxPower: rxVal,
+          customer: c.name || c.pppUser || "— Unassigned —",
+          customerId: cId,
+          oltServer: effectiveOlt as "OLT1" | "OLT2",
+        });
       });
 
       return results;

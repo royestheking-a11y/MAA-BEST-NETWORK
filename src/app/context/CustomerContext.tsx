@@ -197,12 +197,13 @@ interface CustomerContextType {
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
-const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v13_live_laser_and_synced";
+const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v14_authentic_194_fixed";
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
       // Purge old cache keys containing stale 195th dummy customer or hardcoded signals
+      localStorage.removeItem("isp_customers_store_v13_live_laser_and_synced");
       localStorage.removeItem("isp_customers_store_v12_authentic_194_subscribers");
       localStorage.removeItem("isp_customers_store_v11_authentic_netx_macs");
       localStorage.removeItem("isp_customers_store_v10");
@@ -213,7 +214,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const clean = parsed
-            .filter((c: any) => c && c.id && !c.id.startsWith("CUST-"))
+            .filter((c: any) => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
             .map((c: any) => ({
               ...c,
               onuSignal: c.onuSignal === "-18.5 dBm" ? "—" : c.onuSignal
@@ -256,7 +257,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     // 2. Subscribe to realtime updates for customers
     const unsubCustomers = subscribeToCustomers(cloudCustomers => {
       if (cloudCustomers && cloudCustomers.length > 0) {
-        const clean = cloudCustomers.filter(c => c && c.id && !c.id.startsWith("CUST-"));
+        const clean = cloudCustomers.filter(c => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"));
         if (clean.length > 0) {
           // Recalculate daysRemaining from endDate so stale cloud values are corrected
           const now = new Date();
