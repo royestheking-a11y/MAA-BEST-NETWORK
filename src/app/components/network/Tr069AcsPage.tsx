@@ -1,5 +1,5 @@
 import { useNetxLiveData } from "../../services/netxApiService";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Wifi, Radio, RefreshCw, Search, CheckCircle2, AlertTriangle,
   Sliders, Shield, Power, Key, Smartphone, HardDrive, Eye,
@@ -42,39 +42,32 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
   const { customers } = useCustomerContext();
 
   const cpeDevices: CpeDevice[] = useMemo(() => {
-    const custMap = new Map<string, any>();
-    customers.forEach(c => {
-      if (c.name) custMap.set(c.name.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
-      if (c.pppUser) custMap.set(c.pppUser.toLowerCase().replace(/[^a-z0-9]/g, ''), c);
-    });
-
-    return AUTHENTIC_NETX_ONUS.map((o, idx) => {
-      const cleanCust = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const matched = custMap.get(cleanCust);
-      const isOnline = o.status === "online";
-      const cleanUser = o.customer !== "— Unassigned —" ? o.customer : `Unassigned-ONU-${idx+1}`;
-      const shortUser = o.customer.replace(/^Mbn@/, '');
+    return customers.map((c, idx) => {
+      const isOnline = c.netStatus === "online" || c.status === "active";
+      const cleanUser = c.pppUser || c.name || `User-${c.id}`;
+      const shortUser = cleanUser.replace(/^Mbn@/i, "");
+      const mac = c.mac || `50:65:F3:11:${String(Math.floor(idx / 256)).padStart(2, "0")}:${String(idx % 256).padStart(2, "0")}`;
 
       return {
-        id: `CPE-${o.mac}`,
-        serial: matched?.deviceSerial || `BDCOM-${o.mac.replace(/:/g, '').toUpperCase().slice(0, 8)}`,
-        manufacturer: "BDCOM / Realtek",
-        model: "EPON Dual-Band AC1200 ONT",
+        id: `CPE-${mac}`,
+        serial: c.deviceSerial || `BDCOM-${mac.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8)}`,
+        manufacturer: c.deviceVendor || "BDCOM / Realtek",
+        model: c.deviceType || "EPON Dual-Band AC1200 ONT",
         hardwareVersion: "v2.4",
         firmwareVersion: "V1.0.8P2T1",
-        customerName: o.customer !== "— Unassigned —" ? o.customer : "Unassigned Subscriber",
-        customerId: matched?.clientCode || matched?.id || `MBN-${(idx + 1).toString().padStart(4, '0')}`,
+        customerName: c.name,
+        customerId: c.clientCode || c.id,
         pppoeUser: cleanUser,
-        ipAddress: matched?.ipAddress || `100.64.${Math.floor(idx / 250) + 10}.${(idx % 250) + 2}`,
-        macAddress: o.mac,
+        ipAddress: c.ipAddress || `100.64.${Math.floor(idx / 250) + 10}.${(idx % 250) + 2}`,
+        macAddress: mac,
         wifiSsid24: `MBN_${shortUser}_2.4G`,
         wifiSsid5: `MBN_${shortUser}_5G`,
-        wifiPass: matched?.passcode || "mbn@123456",
+        wifiPass: c.passcode || "mbn@123456",
         wifiChannel24: (idx % 11) + 1,
         wifiChannel5: 36 + ((idx % 4) * 4),
-        connectedClients: isOnline ? (idx % 6) + 1 : 0,
-        uptime: isOnline ? `${(idx % 14) + 1}d ${(idx % 20) + 1}h` : "Offline",
-        lastInform: isOnline ? "Just now" : `${(idx % 60) + 10}m ago`,
+        connectedClients: isOnline ? Math.max(1, (idx % 5) + 1) : 0,
+        uptime: isOnline ? (c.sessionUptime || c.duration || "Active Session") : "Offline",
+        lastInform: isOnline ? "Active Stream" : (c.logoutTime ? `Offline since ${c.logoutTime}` : "Standby"),
         status: isOnline ? "online" : "offline",
       };
     });
@@ -82,11 +75,15 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
 
   const [cpes, setCpes] = useState<CpeDevice[]>([]);
 
-  useMemo(() => {
-    if (cpeDevices.length > 0 && cpes.length === 0) {
-      setCpes(cpeDevices);
+  useEffect(() => {
+    if (cpeDevices.length > 0) {
+      setCpes(prev => {
+        if (prev.length === 0) return cpeDevices;
+        const editMap = new Map(prev.map(p => [p.id, p]));
+        return cpeDevices.map(d => editMap.get(d.id) || d);
+      });
     }
-  }, [cpeDevices, cpes.length]);
+  }, [cpeDevices]);
   const [search, setSearch] = useState("");
   const [selectedCpe, setSelectedCpe] = useState<CpeDevice | null>(null);
   const [showWifiModal, setShowWifiModal] = useState(false);

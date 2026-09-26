@@ -4,7 +4,8 @@ import {
   Users, CheckCircle2, WifiOff, RefreshCw, Search, Filter,
   Layers, Server, Wifi, Activity, ArrowUpDown, ArrowUp, ArrowDown, Network,
   AlertTriangle, ShieldCheck, HelpCircle, Check, X,
-  Radio, BarChart3, SlidersHorizontal, Download, Eye, ChevronLeft, ChevronRight, Zap, Clock
+  Radio, BarChart3, SlidersHorizontal, Download, Eye, ChevronLeft, ChevronRight, Zap, Clock,
+  AlertCircle, Scissors, PowerOff, ShieldAlert
 } from "lucide-react";
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -21,6 +22,17 @@ type SortDirection = "asc" | "desc";
 function parseUptimeToSeconds(uptimeStr?: string, salt = 0): number {
   if (!uptimeStr || uptimeStr === "—" || uptimeStr.includes("Off") || uptimeStr.includes("Standby")) return 0;
   let total = 0;
+
+  // Handle standard RouterOS format e.g. "01:23:45" or "3d:04:12:00"
+  if (uptimeStr.includes(":")) {
+    const parts = uptimeStr.split(":").map(p => parseInt(p.replace(/\D/g, ""), 10) || 0);
+    if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 4) {
+      return parts[0] * 86400 + parts[1] * 3600 + parts[2] * 60 + parts[3];
+    }
+  }
+
   const d = uptimeStr.match(/(\d+)\s*d/i);
   const h = uptimeStr.match(/(\d+)\s*h/i);
   const m = uptimeStr.match(/(\d+)\s*m/i);
@@ -31,9 +43,6 @@ function parseUptimeToSeconds(uptimeStr?: string, salt = 0): number {
   if (m) total += parseInt(m[1], 10) * 60;
   if (s) total += parseInt(s[1], 10);
 
-  if (total === 0) {
-    total = ((salt % 5) + 1) * 86400 + (((salt * 7) % 24) * 3600) + (((salt * 19) % 60) * 60) + ((salt * 31) % 60);
-  }
   return total;
 }
 
@@ -728,31 +737,52 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
           <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap items-center gap-1.5 text-[10px]">
             <button
               onClick={() => { setHealthReasonFilter("overdue"); setCurrentPage(1); }}
-              className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer"
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer shadow-2xs ${
+                healthReasonFilter === "overdue"
+                  ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
+              }`}
               title="Click to view Overdue / Expired Subscribers"
             >
-              🔴 Overdue: {offlineBreakdown.overdue}
+              <AlertCircle size={12} className={healthReasonFilter === "overdue" ? "text-white" : "text-rose-500"} />
+              <span>Overdue: {offlineBreakdown.overdue}</span>
             </button>
             <button
               onClick={() => { setHealthReasonFilter("fiber_critical"); setCurrentPage(1); }}
-              className="px-2 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 font-bold border border-red-500/20 hover:bg-red-500/20 transition-all cursor-pointer"
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer shadow-2xs ${
+                healthReasonFilter === "fiber_critical"
+                  ? "bg-red-600 text-white border-red-600 shadow-xs"
+                  : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 hover:bg-red-500/20"
+              }`}
               title="Click to view Critical Fiber / Signal Cut"
             >
-              ⚠️ Fiber Cut: {offlineBreakdown.fiberCritical}
+              <Scissors size={12} className={healthReasonFilter === "fiber_critical" ? "text-white" : "text-red-500"} />
+              <span>Fiber Cut: {offlineBreakdown.fiberCritical}</span>
             </button>
             <button
               onClick={() => { setHealthReasonFilter("onu_unpowered"); setCurrentPage(1); }}
-              className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20 hover:bg-amber-500/20 transition-all cursor-pointer"
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer shadow-2xs ${
+                healthReasonFilter === "onu_unpowered"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+              }`}
               title="Click to view Unpowered ONUs / Standby"
             >
-              🔌 ONU Off: {offlineBreakdown.onuPowerLoss}
+              <PowerOff size={12} className={healthReasonFilter === "onu_unpowered" ? "text-white" : "text-amber-500"} />
+              <span>ONU Off: {offlineBreakdown.onuPowerLoss}</span>
             </button>
             {offlineBreakdown.adminSuspended > 0 && (
               <button
                 onClick={() => { setHealthReasonFilter("admin_suspended"); setCurrentPage(1); }}
-                className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold border border-purple-500/20 hover:bg-purple-500/20 transition-all cursor-pointer"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer shadow-2xs ${
+                  healthReasonFilter === "admin_suspended"
+                    ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                    : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 hover:bg-purple-500/20"
+                }`}
+                title="Click to view Admin Suspended Subscribers"
               >
-                🛡️ Admin Suspended: {offlineBreakdown.adminSuspended}
+                <ShieldAlert size={12} className={healthReasonFilter === "admin_suspended" ? "text-white" : "text-purple-500"} />
+                <span>Admin Suspended: {offlineBreakdown.adminSuspended}</span>
               </button>
             )}
           </div>
@@ -812,12 +842,12 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
               className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary font-medium"
             >
               <option value="all">All Diagnoses & Causes</option>
-              <option value="online">🟢 Connected (Active Sessions)</option>
-              <option value="overdue">🔴 Offline: Bill Overdue ({offlineBreakdown.overdue})</option>
-              <option value="fiber_critical">⚠️ Offline: Fiber Cut / Loss ({offlineBreakdown.fiberCritical})</option>
-              <option value="fiber_warning">🟡 Offline: Laser Warning ({offlineBreakdown.fiberWarning})</option>
-              <option value="onu_unpowered">🔌 Offline: ONU Power Off ({offlineBreakdown.onuPowerLoss})</option>
-              <option value="admin_suspended">🛡️ Offline: Admin Suspended ({offlineBreakdown.adminSuspended})</option>
+              <option value="online">Connected (Active Sessions)</option>
+              <option value="overdue">Offline: Bill Overdue ({offlineBreakdown.overdue})</option>
+              <option value="fiber_critical">Offline: Fiber Cut / Loss ({offlineBreakdown.fiberCritical})</option>
+              <option value="fiber_warning">Offline: Laser Warning ({offlineBreakdown.fiberWarning})</option>
+              <option value="onu_unpowered">Offline: ONU Power Off ({offlineBreakdown.onuPowerLoss})</option>
+              <option value="admin_suspended">Offline: Admin Suspended ({offlineBreakdown.adminSuspended})</option>
             </select>
           </div>
         </div>

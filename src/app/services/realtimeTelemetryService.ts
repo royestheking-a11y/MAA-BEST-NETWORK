@@ -24,6 +24,7 @@ export interface LiveMikrotikData {
   usedRamMb: number;
   interfaces: LiveInterfaceMetric[];
   latencyMs?: number;
+  temperature?: number;
   version?: string;
   activePppoe?: number;
   lastSync?: string;
@@ -77,6 +78,7 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     freeRamMb: 28445,
     usedRamMb: 3619,
     latencyMs: 46,
+    temperature: 38,
     version: "7.11 (stable)",
     activePppoe: 843,
     interfaces: [

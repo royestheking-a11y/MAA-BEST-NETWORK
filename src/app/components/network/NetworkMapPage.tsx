@@ -9,6 +9,7 @@ import {
 } from "./networkData";
 import { useNetxLiveData } from "../../services/netxApiService";
 import { useRealtimeHardwareTelemetry } from "../../services/realtimeTelemetryService";
+import { useCustomerContext } from "../../context/CustomerContext";
 
 const NR: Record<MapNodeType, number> = { internet: 38, mikrotik: 31, olt: 25, zone: 31 };
 
@@ -37,6 +38,7 @@ interface NetworkMapPageProps {
 }
 
 export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
+  const { customers } = useCustomerContext();
   const { oltServers, liveStats, refresh: refreshNetx } = useNetxLiveData(30000);
   const { telemetry } = useRealtimeHardwareTelemetry(3000);
 
@@ -74,9 +76,48 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
           latency: `${telemetry.olt2.latencyMs || 33}ms`,
         };
       }
+      if (node.id === "ZONE-SADAR") {
+        const zoneCusts = customers.filter(c => {
+          const z = ((c.zone || "") + " " + (c.subzone || "")).toUpperCase();
+          return z.includes("SADAR") || z.includes("SOMITIR");
+        });
+        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online" || c.status === "active").length;
+        const totalCusts = zoneCusts.length || 85;
+        return {
+          ...node,
+          sessions: onlineCusts,
+          traffic: `${onlineCusts}/${totalCusts} Active`,
+        };
+      }
+      if (node.id === "ZONE-PORT") {
+        const zoneCusts = customers.filter(c => {
+          const z = ((c.zone || "") + " " + (c.subzone || "")).toUpperCase();
+          return z.includes("CHARMUGURIA") || z.includes("PORT") || z.includes("BAZAR");
+        });
+        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online" || c.status === "active").length;
+        const totalCusts = zoneCusts.length || 65;
+        return {
+          ...node,
+          sessions: onlineCusts,
+          traffic: `${onlineCusts}/${totalCusts} Active`,
+        };
+      }
+      if (node.id === "ZONE-KALKINI") {
+        const zoneCusts = customers.filter(c => {
+          const z = ((c.zone || "") + " " + (c.subzone || "")).toUpperCase();
+          return z.includes("KALKINI") || z.includes("DASHAR") || z.includes("RAJOIR");
+        });
+        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online" || c.status === "active").length;
+        const totalCusts = zoneCusts.length || 145;
+        return {
+          ...node,
+          sessions: onlineCusts,
+          traffic: `${onlineCusts}/${totalCusts} Active`,
+        };
+      }
       return node;
     });
-  }, [oltServers, liveStats, telemetry, netxOlt1, netxOlt2]);
+  }, [oltServers, liveStats, telemetry, netxOlt1, netxOlt2, customers]);
 
   const VW = 1020, VH = 530;
   const nodeMap = new Map(dynamicMapNodes.map(n => [n.id, n]));

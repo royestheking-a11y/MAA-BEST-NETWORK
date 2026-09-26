@@ -195,11 +195,35 @@ export function OltPage({ onNavigate }: OltPageProps) {
         }
       });
 
+      // Ensure all dynamic customers from CustomerContext are linked to OLT roster
+      const registeredCustIds = new Set(results.map(r => r.customerId).filter(Boolean));
+      const registeredMacs = new Set(results.map(r => r.mac.toLowerCase().trim()).filter(m => m && m !== "—"));
+
+      custList.forEach(c => {
+        const cId = c.clientCode || c.id;
+        const cMac = (c.mac || "").toLowerCase().trim();
+        if ((cId && !registeredCustIds.has(cId)) && (!cMac || !registeredMacs.has(cMac))) {
+          registeredCustIds.add(cId);
+          if (cMac) registeredMacs.add(cMac);
+          const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
+          results.push({
+            id: `onu-cust-${cId}`,
+            mac: c.mac || "—",
+            ponPort: c.ponPort || "epon 0/1",
+            status: c.netStatus === "online" ? "online" : "offline",
+            rxPower: c.onuSignal || "-19.2 dBm",
+            customer: c.name,
+            customerId: cId,
+            oltServer: effectiveOlt as "OLT1" | "OLT2",
+          });
+        }
+      });
+
       return results;
     }
 
     if (isNetxConnected === false && liveData.length === 0) return [];
-    return AUTHENTIC_NETX_ONUS.map(o => {
+    const fallbackResults: OltOnuRecord[] = AUTHENTIC_NETX_ONUS.map(o => {
       let custId: string | undefined = undefined;
       const custNameClean = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (o.customer && o.customer !== "— Unassigned —") {
@@ -216,6 +240,31 @@ export function OltPage({ onNavigate }: OltPageProps) {
         oltServer: o.oltServer,
       };
     });
+
+    const fallbackCustIds = new Set(fallbackResults.map(r => r.customerId).filter(Boolean));
+    const fallbackMacs = new Set(fallbackResults.map(r => r.mac.toLowerCase().trim()).filter(m => m && m !== "—"));
+
+    custList.forEach(c => {
+      const cId = c.clientCode || c.id;
+      const cMac = (c.mac || "").toLowerCase().trim();
+      if ((cId && !fallbackCustIds.has(cId)) && (!cMac || !fallbackMacs.has(cMac))) {
+        fallbackCustIds.add(cId);
+        if (cMac) fallbackMacs.add(cMac);
+        const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
+        fallbackResults.push({
+          id: `onu-cust-${cId}`,
+          mac: c.mac || "—",
+          ponPort: c.ponPort || "epon 0/1",
+          status: c.netStatus === "online" ? "online" : "offline",
+          rxPower: c.onuSignal || "-19.2 dBm",
+          customer: c.name,
+          customerId: cId,
+          oltServer: effectiveOlt as "OLT1" | "OLT2",
+        });
+      }
+    });
+
+    return fallbackResults;
   }, [isNetxConnected]);
 
   // ONU List Table State

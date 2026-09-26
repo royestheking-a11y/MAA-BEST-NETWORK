@@ -191,8 +191,8 @@ export function Sidebar({ currentPage, onNavigate, collapsed, onToggle, mobileOp
   const onlineCount = (Array.isArray(liveStats) && liveStats.length > 0)
     ? liveStats.filter(c => c.connection_status === "online").length
     : customers.filter(c => c.netStatus === "online" || c.status === "active").length;
-  const dueCount = customers.filter(c => (c.dueAmount || 0) > 0 || c.status === "due").length;
-  const disconnectedCount = customers.filter(c => c.status === "disconnected" || c.status === "offline").length;
+  const dueCount = customers.filter(c => ((c.dueAmount || 0) > 0 || (c.due || 0) > 0 || c.status === "due") && c.userType !== "free").length;
+  const disconnectedCount = customers.filter(c => c.status === "disconnected" || c.status === "suspended" || c.netStatus === "offline").length;
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(
     Object.fromEntries(navSections.filter(s => s.title).map(s => [s.title!, true]))

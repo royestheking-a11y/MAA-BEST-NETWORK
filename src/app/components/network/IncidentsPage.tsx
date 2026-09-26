@@ -1,5 +1,5 @@
 import { useNetxLiveData } from "../../services/netxApiService";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Zap, Search, Plus, AlertTriangle, CheckCircle2, Clock, XCircle,
   X, Check, ShieldAlert, User, MapPin
@@ -10,11 +10,16 @@ import {
 
 import { usePermission } from "../../context/AuthContext";
 
+import { useCustomerContext } from "../../context/CustomerContext";
+import { useRealtimeHardwareTelemetry } from "../../services/realtimeTelemetryService";
+
 interface IncidentsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
+  const { customers } = useCustomerContext();
+  const { telemetry } = useRealtimeHardwareTelemetry(3000);
   const { canEdit, isReadOnly } = usePermission("incidents");
   const { isLoading: isNetxLoading } = useNetxLiveData(30000);
   const [incidents, setIncidents] = useState<NetworkIncident[]>(networkStore.getIncidents());
@@ -23,10 +28,35 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
   const [showAddIncident, setShowAddIncident] = useState(false);
   const [toast, setToast] = useState("");
 
-  const [newInc, setNewInc] = useState({
-    title: "", zone: "Gulshan", affectedCustomers: "120", severity: "critical" as NetworkIncident["severity"],
-    assignee: "Tanvir Hasan", rootCause: ""
-  });
+  // Dynamically compute real ISP zones
+  const realZones = useMemo(() => {
+    const set = new Set<string>();
+    customers.forEach(c => {
+      if (c.zone) set.add(c.zone.trim());
+      if (c.subzone) set.add(c.subzone.trim());
+    });
+    if (set.size === 0) {
+      ["Somitir Hat", "Kalkini", "Madaripur Sadar", "Dasar", "Rajoir", "Shibchar"].forEach(z => set.add(z));
+    }
+    return Array.from(set).sort();
+  }, [customers]);
+
+  const [newInc, setNewInc] = useState(() => ({
+    title: "",
+    zone: "Somitir Hat",
+    affectedCustomers: "15",
+    severity: "critical" as NetworkIncident["severity"],
+    assignee: "Tanvir Hasan",
+    rootCause: ""
+  }));
+
+  const handleZoneChange = (zoneName: string) => {
+    const count = customers.filter(c =>
+      (c.zone && c.zone.toLowerCase().includes(zoneName.toLowerCase())) ||
+      (c.subzone && c.subzone.toLowerCase().includes(zoneName.toLowerCase()))
+    ).length;
+    setNewInc(p => ({ ...p, zone: zoneName, affectedCustomers: String(count || 10) }));
+  };
 
   useEffect(() => {
     return networkStore.subscribe(() => {
@@ -36,7 +66,53 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  const filteredIncidents = incidents.filter(inc => {
+  // Real-time auto-detected incidents from live hardware and customer optical levels
+  const autoDetectedIncidents = useMemo<NetworkIncident[]>(() => {
+    const list: NetworkIncident[] = [];
+    const weakCusts = customers.filter(c => {
+      const rx = c.onuSignal ? parseFloat(c.onuSignal) : -18;
+      return rx < -26.0;
+    });
+
+    if (weakCusts.length >= 3) {
+      list.push({
+        id: "AUTO-OPT-01",
+        title: "Optical Power Degradation Alert (< -26.0 dBm)",
+        zone: weakCusts[0]?.zone || "Somitir Hat",
+        affectedCustomers: weakCusts.length,
+        severity: "warning",
+        status: "open",
+        assignee: "Auto-Telemetry Guard",
+        time: "Active Telemetry",
+        createdAt: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+        rootCause: `${weakCusts.length} subscriber ONU(s) reporting critical optical signal attenuation. Suspected dirty patch cord or bend loss on feeder closure.`,
+      });
+    }
+
+    const offlineCusts = customers.filter(c => c.netStatus === "offline" || c.status === "offline");
+    if (offlineCusts.length >= 5) {
+      list.push({
+        id: "AUTO-LOS-02",
+        title: "Cluster Drop Cable Loss of Signal (LOS)",
+        zone: offlineCusts[0]?.zone || "Kalkini",
+        affectedCustomers: offlineCusts.length,
+        severity: "critical",
+        status: "open",
+        assignee: "Auto-Telemetry Guard",
+        time: "Active Telemetry",
+        createdAt: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+        rootCause: `Multiple subscriber lines offline in ${offlineCusts[0]?.zone || "Kalkini"}. OLT PON port monitoring indicates possible drop line disruption.`,
+      });
+    }
+
+    return list;
+  }, [customers]);
+
+  const allIncidents = useMemo(() => {
+    return [...autoDetectedIncidents, ...incidents];
+  }, [autoDetectedIncidents, incidents]);
+
+  const filteredIncidents = allIncidents.filter(inc => {
     const q = search.toLowerCase();
     const matchSearch = !search ||
       inc.id.toLowerCase().includes(q) ||
@@ -68,7 +144,7 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
     networkStore.addIncident(inc);
     setShowAddIncident(false);
     showToast(`Incident #${inc.id} declared and assigned to ${inc.assignee}!`);
-    setNewInc({ title: "", zone: "Gulshan", affectedCustomers: "120", severity: "critical", assignee: "Tanvir Hasan", rootCause: "" });
+    setNewInc({ title: "", zone: realZones[0] || "Somitir Hat", affectedCustomers: "15", severity: "critical", assignee: "Tanvir Hasan", rootCause: "" });
   };
 
   const handleResolve = (id: string) => {
@@ -80,9 +156,9 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
     showToast(`Incident #${id} resolved! Customer SMS status updated.`);
   };
 
-  const openCount = incidents.filter(i => i.status === "open").length;
-  const investigatingCount = incidents.filter(i => i.status === "investigating").length;
-  const resolvedCount = incidents.filter(i => i.status === "resolved").length;
+  const openCount = allIncidents.filter(i => i.status === "open").length;
+  const investigatingCount = allIncidents.filter(i => i.status === "investigating").length;
+  const resolvedCount = allIncidents.filter(i => i.status === "resolved").length;
 
   const inputStyle = {
     background: "var(--muted)",
@@ -91,14 +167,6 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
     color: "var(--foreground)",
   };
 
-  if (isNetxLoading) {
-    return (
-      <div className="p-6 h-screen flex flex-col items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-muted-foreground font-medium">Synchronizing Network Incidents...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="p-3 sm:p-6">
@@ -336,16 +404,13 @@ export function IncidentsPage({ onNavigate }: IncidentsPageProps) {
                   <label className="font-semibold text-muted-foreground block mb-1">AFFECTED ZONE</label>
                   <select
                     value={newInc.zone}
-                    onChange={e => setNewInc(p => ({ ...p, zone: e.target.value }))}
+                    onChange={e => handleZoneChange(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg outline-none"
                     style={inputStyle}
                   >
-                    <option>Mirpur</option>
-                    <option>Uttara</option>
-                    <option>Dhanmondi</option>
-                    <option>Gulshan</option>
-                    <option>Mohammadpur</option>
-                    <option>Bashundhara R/A</option>
+                    {realZones.map(z => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

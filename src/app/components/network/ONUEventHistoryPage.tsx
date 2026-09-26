@@ -145,11 +145,11 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
       if (!isOnline || c.status === "disconnected" || c.status === "offline") {
         health = "issue";
         lastEvent = `Terminal Standby / LOS Optical link down on ${c.olt || "OLT1"}`;
-        lastEventTime = `${(i % 45) + 5}m ago`;
+        lastEventTime = c.logoutTime ? `Offline since ${c.logoutTime}` : (c.disconnectedAt ? new Date(c.disconnectedAt).toLocaleTimeString() : "Recent Link Loss");
       } else if (realRxNum < -26.0) {
         health = "warning";
         lastEvent = `Optical Signal Attenuated (${realRxNum.toFixed(1)} dBm). Drop cable inspection recommended.`;
-        lastEventTime = `${(i % 20) + 2}m ago`;
+        lastEventTime = c.sessionUptime ? `Session ${c.sessionUptime}` : "Active Stream";
       }
 
       const isOlt1 = (c.olt || "OLT1").includes("OLT1") || i % 2 === 0;
@@ -246,7 +246,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           customerId: d.customerId,
           zone: d.subzone,
           eventType: "signal_change",
-          timestamp: `${(idx % 18) + 2}m ago`,
+          timestamp: d.lastEventTime || "Active",
           rxPower: `${d.rxPower} dBm`,
           txPower: "+2.4 dBm",
           description: `Optical signal degraded to ${d.rxPower} dBm (below standard -24 dBm threshold) on ${d.olt} (${d.ponPort}). Drop cable inspection recommended.`,
@@ -265,7 +265,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           customerId: d.customerId,
           zone: d.subzone,
           eventType: "online",
-          timestamp: `${(idx * 3) % 40 + 1}m ago`,
+          timestamp: d.rawCustomer.sessionUptime || d.rawCustomer.duration || "Active Session",
           rxPower: `${d.rxPower} dBm`,
           txPower: "+2.4 dBm",
           description: `ONU terminal registered & active on ${d.olt} (${d.ponPort}). Optical Rx: ${d.rxPower} dBm. Link 100% optimal.`,
@@ -284,11 +284,11 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
           customerId: d.customerId,
           zone: d.subzone,
           eventType: "los",
-          timestamp: `${(idx % 45) + 8}m ago`,
+          timestamp: d.rawCustomer.logoutTime || d.rawCustomer.disconnectedAt || "Standby / Down",
           rxPower: "—",
           txPower: "—",
           description: `Loss of Signal (LOS) alarm detected. Customer CPE offline or drop cable cut on ${d.olt} (${d.ponPort}).`,
-          duration: `${(idx % 25) + 10}m`,
+          duration: d.rawCustomer.logoutTime ? `Since ${d.rawCustomer.logoutTime}` : "Standby",
           rawCustomer: d.rawCustomer,
         });
       }

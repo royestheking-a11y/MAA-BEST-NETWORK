@@ -115,11 +115,16 @@ export interface Customer {
   disabledInMikrotik?: boolean;
   disabledInSystem?: boolean;
   profileMismatch?: boolean;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
   invoices: Invoice[];
   paymentHistory: PaymentTransaction[];
 }
 
 import { REAL_ISP_CUSTOMERS } from "../data/realIspData";
+import { splitterStore } from "../data/splitterData";
 
 export const INITIAL_CUSTOMERS: Customer[] = REAL_ISP_CUSTOMERS.map(c => ({
   ...c,
@@ -244,7 +249,20 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       if (cloudCustomers && cloudCustomers.length > 0) {
         const clean = cloudCustomers.filter(c => c && c.id && !c.id.startsWith("CUST-"));
         if (clean.length > 0) {
-          setCustomers(clean);
+          // Recalculate daysRemaining from endDate so stale cloud values are corrected
+          const now = new Date();
+          const refreshed = clean.map(c => {
+            if (c.userType === "free" || c.userType === "unlimited") return c;
+            if (!c.endDate || c.endDate === "Permanent / Lifetime") return c;
+            const end = new Date(c.endDate);
+            if (!isNaN(end.getTime())) {
+              const diffMs = end.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+              return { ...c, daysRemaining: diffDays };
+            }
+            return c;
+          });
+          setCustomers(refreshed);
         }
       }
     });
@@ -261,6 +279,40 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       unsubUpgrades();
     };
   }, []);
+
+  // ── Daily daysRemaining Recalculation ──
+  useEffect(() => {
+    const recalcDaysRemaining = () => {
+      const now = new Date();
+      setCustomers(prev => {
+        let changed = false;
+        const updated = prev.map(c => {
+          if (c.userType === "free" || c.userType === "unlimited") return c;
+          if (!c.endDate || c.endDate === "Permanent / Lifetime") return c;
+          const end = new Date(c.endDate);
+          if (!isNaN(end.getTime())) {
+            const diffMs = end.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            if (diffDays !== c.daysRemaining) {
+              changed = true;
+              return { ...c, daysRemaining: diffDays };
+            }
+          }
+          return c;
+        });
+        return changed ? updated : prev;
+      });
+    };
+
+    // Run immediately on mount
+    recalcDaysRemaining();
+
+    // Then recalculate every hour to keep it accurate
+    const timer = setInterval(recalcDaysRemaining, 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+
 
   useEffect(() => {
     try {
@@ -403,6 +455,30 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error(e);
     }
+    // Auto-link with Optical Splitter Ledger if box & port are assigned
+    if (newCustomer.splitterBox && newCustomer.splitterPort) {
+      try {
+        const portNum = parseInt(String(newCustomer.splitterPort).replace(/\D/g, ""), 10) || 1;
+        const splitters = splitterStore.getSplitters();
+        const matchedBox = splitters.find(s =>
+          s.id === newCustomer.splitterBox ||
+          s.name.toLowerCase().includes(String(newCustomer.splitterBox).toLowerCase().trim()) ||
+          String(newCustomer.splitterBox).toLowerCase().includes(s.name.toLowerCase().trim())
+        );
+        if (matchedBox) {
+          splitterStore.assignSubscriberToPort(matchedBox.id, portNum, {
+            id: newCustomer.clientCode || newCustomer.id,
+            name: newCustomer.name,
+            phone: newCustomer.phone,
+            dropMeters: typeof newCustomer.cableMetre === "number" ? newCustomer.cableMetre : 45,
+            rxPowerDbm: newCustomer.onuSignal ? parseFloat(newCustomer.onuSignal) : -19.5,
+          });
+        }
+      } catch (err) {
+        console.warn("Auto splitter assignment skipped:", err);
+      }
+    }
+
     saveCustomerToFirestore(newCustomer);
     activityLogger.log({
       type: "customer",
@@ -412,6 +488,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       targetId: newId,
       metadata: { package: newCustomer.package, ip: newCustomer.ipAddress, mac: newCustomer.mac, userType: newCustomer.userType }
     });
+
     return newCustomer;
   };
 

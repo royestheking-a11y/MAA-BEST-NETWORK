@@ -254,36 +254,49 @@ function notify() {
 
 let isBillingSyncInitialized = false;
 let hasPackagesSynced = false;
+let hasInvoicesSynced = false;
+let hasPaymentsSynced = false;
+
 export function initBillingFirestoreSync() {
   if (isBillingSyncInitialized || typeof window === "undefined") return;
   isBillingSyncInitialized = true;
 
   subscribeToInvoices(cloudInvoices => {
     if (cloudInvoices && cloudInvoices.length > 0) {
-      sharedInvoices = cloudInvoices as Invoice[];
-      saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
-      notify();
-    } else if (sharedInvoices && sharedInvoices.length > 0) {
+      // Only overwrite if cloud has MORE or NEWER invoices (never wipe local data)
+      if (!hasInvoicesSynced || cloudInvoices.length >= sharedInvoices.length) {
+        sharedInvoices = cloudInvoices as Invoice[];
+        saveStorage(STORAGE_KEYS.INVOICES, sharedInvoices);
+        notify();
+      }
+    } else if (!hasInvoicesSynced && sharedInvoices.length > 0) {
+      // Upload local invoices to Firestore on first sync if cloud is empty
       saveInvoicesBatchToFirestore(sharedInvoices);
     }
+    hasInvoicesSynced = true;
   });
 
   subscribeToPayments(cloudPayments => {
     if (cloudPayments && cloudPayments.length > 0) {
-      sharedPayments = cloudPayments as Payment[];
-      saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
-      notify();
-    } else if (sharedPayments && sharedPayments.length > 0) {
+      if (!hasPaymentsSynced || cloudPayments.length >= sharedPayments.length) {
+        sharedPayments = cloudPayments as Payment[];
+        saveStorage(STORAGE_KEYS.PAYMENTS, sharedPayments);
+        notify();
+      }
+    } else if (!hasPaymentsSynced && sharedPayments.length > 0) {
       sharedPayments.forEach(p => savePaymentToFirestore(p));
     }
+    hasPaymentsSynced = true;
   });
 
   subscribeToPackages(cloudPackages => {
     if (cloudPackages && cloudPackages.length > 0) {
+      // Accept cloud packages — they are the canonical truth
       sharedPackages = cloudPackages as IspPackage[];
       saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
       notify();
-    } else if (!hasPackagesSynced && (!cloudPackages || cloudPackages.length === 0)) {
+    } else if (!hasPackagesSynced) {
+      // First sync and cloud is empty — seed from local/defaults
       const wasInit = localStorage.getItem("isp_packages_initialized");
       if (!wasInit && INITIAL_PACKAGES.length > 0) {
         localStorage.setItem("isp_packages_initialized", "true");
@@ -291,16 +304,13 @@ export function initBillingFirestoreSync() {
         saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
         sharedPackages.forEach(p => savePackageToFirestore(p));
         notify();
-      } else {
-        sharedPackages = [];
-        saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
-        notify();
+      } else if (sharedPackages.length > 0) {
+        // Already have local packages — upload them to cloud
+        sharedPackages.forEach(p => savePackageToFirestore(p));
       }
-    } else {
-      sharedPackages = (cloudPackages || []) as IspPackage[];
-      saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
-      notify();
+      // CRITICAL: Do NOT wipe sharedPackages when cloud returns empty after first sync
     }
+    // After first sync, if cloud is empty it's a Firestore transient — keep local state
     hasPackagesSynced = true;
   });
 }

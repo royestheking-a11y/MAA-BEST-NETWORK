@@ -438,6 +438,7 @@ export function initNetworkFirestoreSync() {
       saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
       notify();
     } else if (!hasMikrotikSynced) {
+      // First sync, cloud empty — seed with defaults
       const wasInit = localStorage.getItem("isp_mikrotik_initialized");
       if (!wasInit && INITIAL_MIKROTIK.length > 0) {
         localStorage.setItem("isp_mikrotik_initialized", "true");
@@ -445,16 +446,13 @@ export function initNetworkFirestoreSync() {
         saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
         sharedMikrotik.forEach(m => saveMikrotikToFirestore(m));
         notify();
-      } else {
-        sharedMikrotik = [];
-        saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
-        notify();
+      } else if (sharedMikrotik.length > 0) {
+        // Upload local routers to cloud
+        sharedMikrotik.forEach(m => saveMikrotikToFirestore(m));
       }
-    } else {
-      sharedMikrotik = sanitized;
-      saveToStorage(STORAGE_KEY_MIKROTIK, sharedMikrotik);
-      notify();
+      // CRITICAL: Do NOT set sharedMikrotik = [] when cloud returns empty on first sync
     }
+    // After first sync: empty Firestore snapshot = transient, keep local state
     hasMikrotikSynced = true;
   });
 
@@ -463,7 +461,8 @@ export function initNetworkFirestoreSync() {
       sharedOlts = cloudOlts as OltDevice[];
       saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
       notify();
-    } else if (!hasOltsSynced && (!cloudOlts || cloudOlts.length === 0)) {
+    } else if (!hasOltsSynced) {
+      // First sync, cloud empty — seed with local/defaults
       const wasInit = localStorage.getItem("isp_olts_initialized");
       if (!wasInit && INITIAL_OLTS.length > 0) {
         localStorage.setItem("isp_olts_initialized", "true");
@@ -471,16 +470,13 @@ export function initNetworkFirestoreSync() {
         saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
         sharedOlts.forEach(o => saveOltToFirestore(o));
         notify();
-      } else {
-        sharedOlts = [];
-        saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
-        notify();
+      } else if (sharedOlts.length > 0) {
+        // Upload existing local OLTs to cloud
+        sharedOlts.forEach(o => saveOltToFirestore(o));
       }
-    } else {
-      sharedOlts = (cloudOlts || []) as OltDevice[];
-      saveToStorage(STORAGE_KEY_OLTS, sharedOlts);
-      notify();
+      // CRITICAL: Do NOT set sharedOlts = [] when cloud is empty after initial sync
     }
+    // After first sync: if cloud fires empty, it's transient — preserve local state
     hasOltsSynced = true;
   });
 
@@ -489,7 +485,8 @@ export function initNetworkFirestoreSync() {
       sharedZones = cloudZones as ServiceZone[];
       saveToStorage(STORAGE_KEY_ZONES, sharedZones);
       notify();
-    } else if (!hasZonesSynced && (!cloudZones || cloudZones.length === 0)) {
+    } else if (!hasZonesSynced) {
+      // First sync, cloud empty — seed with local/defaults
       const wasInit = localStorage.getItem("isp_zones_initialized");
       if (!wasInit && INITIAL_ZONES.length > 0) {
         localStorage.setItem("isp_zones_initialized", "true");
@@ -497,16 +494,13 @@ export function initNetworkFirestoreSync() {
         saveToStorage(STORAGE_KEY_ZONES, sharedZones);
         sharedZones.forEach(z => saveZoneToFirestore(z));
         notify();
-      } else {
-        sharedZones = [];
-        saveToStorage(STORAGE_KEY_ZONES, sharedZones);
-        notify();
+      } else if (sharedZones.length > 0) {
+        // Upload existing local zones to cloud
+        sharedZones.forEach(z => saveZoneToFirestore(z));
       }
-    } else {
-      sharedZones = (cloudZones || []) as ServiceZone[];
-      saveToStorage(STORAGE_KEY_ZONES, sharedZones);
-      notify();
+      // CRITICAL: Do NOT set sharedZones = [] when cloud is empty after initial sync
     }
+    // After first sync: if cloud fires empty, it's transient — preserve local state
     hasZonesSynced = true;
   });
 

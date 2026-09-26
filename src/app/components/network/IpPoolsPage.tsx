@@ -180,12 +180,28 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
     setNewSub({ name: "", cidr: "100.64.30.0/24", type: "pppoe_cgnat", gateway: "100.64.30.1", vlanId: "250", zone: "Madaripur Sadar", routerName: "MikroTik-MBN-Core" });
   };
 
-  const filteredSubnets = subnets.filter(s => {
-    const q = search.toLowerCase();
-    const matchSearch = !search || s.name.toLowerCase().includes(q) || s.cidr.includes(q) || s.zone.toLowerCase().includes(q);
-    const matchType = typeFilter === "all" || s.type === typeFilter;
-    return matchSearch && matchType;
-  });
+  const dynamicSubnets = useMemo(() => {
+    return subnets.map(s => {
+      const basePrefix = s.cidr.split('/')[0].split('.').slice(0, 3).join('.');
+      const matchedCount = customers.filter(c => c.ipAddress && c.ipAddress.startsWith(basePrefix)).length;
+      const used = matchedCount > 0 ? matchedCount : (s.id === "SUB-02" ? customers.length : s.usedIps);
+      const free = Math.max(0, s.totalIps - used - (s.id === "SUB-01" ? 2 : 3));
+      return {
+        ...s,
+        usedIps: used,
+        freeIps: free,
+      };
+    });
+  }, [subnets, customers]);
+
+  const filteredSubnets = useMemo(() => {
+    return dynamicSubnets.filter(s => {
+      const q = search.toLowerCase();
+      const matchSearch = !search || s.name.toLowerCase().includes(q) || s.cidr.includes(q) || s.zone.toLowerCase().includes(q);
+      const matchType = typeFilter === "all" || s.type === typeFilter;
+      return matchSearch && matchType;
+    });
+  }, [dynamicSubnets, search, typeFilter]);
 
   // Dynamically calculate IP allocation breakdown for selectedSubnet from real customers
   const ipAllocations: IpAllocation[] = useMemo(() => {

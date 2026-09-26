@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Package, Search, Plus, RefreshCw, CheckCircle2, Zap, DollarSign,
   Edit2, Trash2, X, Check
@@ -7,6 +7,7 @@ import {
   billingStore, type IspPackage
 } from "./billingData";
 import { usePermission } from "../../context/AuthContext";
+import { useCustomerContext } from "../../context/CustomerContext";
 
 interface PackagesPageProps {
   onNavigate?: (page: string) => void;
@@ -14,6 +15,7 @@ interface PackagesPageProps {
 
 export function PackagesPage({ onNavigate }: PackagesPageProps) {
   const { canEdit, canDelete, isReadOnly } = usePermission("packages");
+  const { customers } = useCustomerContext();
   const [packagesList, setPackagesList] = useState<IspPackage[]>(billingStore.getPackages());
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -34,13 +36,6 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
   }, []);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
-
-  const filteredPackages = packagesList.filter(pkg => {
-    const q = search.toLowerCase();
-    const matchSearch = !search || pkg.name.toLowerCase().includes(q) || pkg.mikrotikProfile.toLowerCase().includes(q);
-    const matchType = typeFilter === "all" || pkg.type === typeFilter;
-    return matchSearch && matchType;
-  });
 
   const handleCreatePackage = () => {
     if (isReadOnly || !canEdit) {
@@ -91,12 +86,31 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
     }
   };
 
+  // Compute real customer counts per package dynamically
+  const packagesWithRealCounts = useMemo(() => {
+    return packagesList.map(pkg => {
+      const count = customers.filter(c =>
+        c.package === pkg.name ||
+        c.profile === pkg.mikrotikProfile ||
+        c.profile === pkg.name
+      ).length;
+      return { ...pkg, customers: count };
+    });
+  }, [packagesList, customers]);
+
   const packageStats = {
-    totalSubscribers: packagesList.reduce((a, b) => a + b.customers, 0),
-    totalGbps: ((packagesList.reduce((a, b) => a + (b.down * b.customers), 0)) / 1000).toFixed(1),
-    avgArpu: Math.round(packagesList.reduce((a, b) => a + (b.price * b.customers), 0) / (packagesList.reduce((a, b) => a + b.customers, 0) || 1)),
-    activeCount: packagesList.filter(p => p.status === "active").length,
+    totalSubscribers: packagesWithRealCounts.reduce((a, b) => a + b.customers, 0),
+    totalGbps: ((packagesWithRealCounts.reduce((a, b) => a + (b.down * b.customers), 0)) / 1000).toFixed(1),
+    avgArpu: Math.round(packagesWithRealCounts.reduce((a, b) => a + (b.price * b.customers), 0) / (packagesWithRealCounts.reduce((a, b) => a + b.customers, 0) || 1)),
+    activeCount: packagesWithRealCounts.filter(p => p.status === "active").length,
   };
+
+  const filteredPackages = packagesWithRealCounts.filter(pkg => {
+    const q = search.toLowerCase();
+    const matchSearch = !search || pkg.name.toLowerCase().includes(q) || pkg.mikrotikProfile.toLowerCase().includes(q);
+    const matchType = typeFilter === "all" || pkg.type === typeFilter;
+    return matchSearch && matchType;
+  });
 
   const inputStyle = {
     background: "var(--muted)",

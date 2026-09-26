@@ -196,7 +196,7 @@ export function SettingsPage({ onNavigate, defaultTab }: SettingsPageProps) {
     } catch (e) {
       console.error(e);
     }
-    return null;
+    return {};
   }, []);
 
   // ── Company Profile ──────────────────────────────────────────────────────

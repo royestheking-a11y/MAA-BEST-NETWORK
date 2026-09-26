@@ -1,5 +1,5 @@
 import { useNetxLiveData } from "../../services/netxApiService";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Layers, MapPin, Users, Plus, Search, ChevronRight, CheckCircle2,
   AlertTriangle, XCircle, X, Shield, Activity, Radio, Server, Trash2
@@ -7,7 +7,8 @@ import {
 import {
   networkStore, type ServiceZone
 } from "./networkData";
-
+import { useCustomerContext } from "../../context/CustomerContext";
+import { useNetxLiveData as _useNetxLiveData } from "../../services/netxApiService";
 import { usePermission } from "../../context/AuthContext";
 
 interface ZonesPageProps {
@@ -16,7 +17,8 @@ interface ZonesPageProps {
 
 export function ZonesPage({ onNavigate }: ZonesPageProps) {
   const { canEdit, isReadOnly } = usePermission("zones");
-  const { isLoading: isNetxLoading } = useNetxLiveData(30000);
+  const { isLoading: isNetxLoading, liveStats } = useNetxLiveData(30000);
+  const { customers } = useCustomerContext();
   const [zones, setZones] = useState<ServiceZone[]>(networkStore.getZones());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -34,9 +36,53 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
     });
   }, []);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  const filteredZones = zones.filter(z => {
+  // ── Compute live zone stats from real customer data ──────────────────────
+  const zonesWithRealStats = useMemo(() => {
+    return zones.map(z => {
+      const zoneName = z.name.toLowerCase();
+      const zoneCode = z.code.toLowerCase();
+      // Match customers to this zone by name or code
+      const zoneCustomers = customers.filter(c => {
+        const cZone = (c.zone || "").toLowerCase();
+        const cSubzone = (c.subzone || "").toLowerCase();
+        return (
+          cZone.includes(zoneName) || zoneName.includes(cZone) ||
+          cZone.includes(zoneCode) || cSubzone.includes(zoneCode)
+        );
+      });
+
+      // Active = online/connected customers in this zone
+      const liveOnlineUsers = liveStats.length > 0
+        ? liveStats.filter(l => l.connection_status === "online" && zoneCustomers.some(c =>
+            (c.pppUser || c.name || "").toLowerCase() === l.pppoe_username?.toLowerCase()))
+        : null;
+
+      const activeCount = liveOnlineUsers !== null
+        ? liveOnlineUsers.length
+        : zoneCustomers.filter(c => c.netStatus === "online" || c.status === "active").length;
+
+      const dueCount = zoneCustomers.filter(c =>
+        (c.daysRemaining !== undefined && c.daysRemaining <= 3) ||
+        c.status === "due" ||
+        (c.dueAmount !== undefined && c.dueAmount > 0) ||
+        (c.due !== undefined && c.due > 0)
+      ).length;
+
+      return {
+        ...z,
+        customers: zoneCustomers.length,
+        active: activeCount,
+        due: dueCount,
+      };
+    });
+  }, [zones, customers, liveStats]);
+
+  const totalSubscribers = customers.length;
+  const totalActive = zonesWithRealStats.reduce((a, b) => a + b.active, 0);
+  const totalSubzones = zones.reduce((a, b) => a + b.subzones, 0);
+
+  const filteredZones = zonesWithRealStats.filter(z => {
     const q = search.toLowerCase();
     const matchSearch = !search ||
       z.name.toLowerCase().includes(q) ||
@@ -46,6 +92,8 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
     const matchStatus = statusFilter === "all" || z.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
   const handleAddZone = () => {
     if (isReadOnly || !canEdit) {
@@ -71,10 +119,6 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
     showToast(`Coverage Zone "${zone.name}" created!`);
     setNewZone({ name: "", code: "", subzones: "4", mikrotik: "MikroTik-01", olt: "OLT-Mirpur-01", bandwidth: "1.5 Gbps" });
   };
-
-  const totalSubscribers = zones.reduce((a, b) => a + b.customers, 0);
-  const totalActive = zones.reduce((a, b) => a + b.active, 0);
-  const totalSubzones = zones.reduce((a, b) => a + b.subzones, 0);
 
   const inputStyle = {
     background: "var(--muted)",
@@ -173,7 +217,11 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
           <p style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, color: "#DC2626", marginBottom: 2 }}>
             {zones.filter(z => z.status === "down").length} Down
           </p>
-          <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>Gulshan POP power incident</p>
+          <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
+            {zones.some(z => z.status === "down")
+              ? `${zones.find(z => z.status === "down")?.name} affected`
+              : "All distribution zones normal"}
+          </p>
         </div>
       </div>
 

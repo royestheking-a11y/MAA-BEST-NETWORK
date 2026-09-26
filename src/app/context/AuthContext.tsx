@@ -847,6 +847,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [adminPasswords]);
 
+  // Track the last time we saved admin passwords locally (to prevent Firestore stale overwrite)
+  const lastLocalPasswordSaveRef = { current: 0 };
+
   // Realtime Cloud Firestore Sync
   useEffect(() => {
     const unsubEmp = subscribeToEmployees((remoteEmployees) => {
@@ -863,6 +866,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsubAdminAuth = subscribeToAdminAuth((remotePasswords) => {
       if (remotePasswords && Object.keys(remotePasswords).length > 0) {
+        // GUARD: If admin just changed password locally within last 30 seconds,
+        // don't let the stale Firestore snapshot overwrite it
+        const timeSinceLocalSave = Date.now() - lastLocalPasswordSaveRef.current;
+        if (timeSinceLocalSave < 30000) {
+          // Too recent — Firestore may have old data, skip this update
+          return;
+        }
         setAdminPasswords(prev => ({ ...prev, ...remotePasswords }));
       }
     });
@@ -1281,6 +1291,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setAdminPasswords(updatedPasswords);
+    // Record the time of this local save so Firestore sync doesn't overwrite it
+    lastLocalPasswordSaveRef.current = Date.now();
     try {
       localStorage.setItem(STORAGE_KEY_ADMIN_PASSWORDS, JSON.stringify(updatedPasswords));
     } catch {}
