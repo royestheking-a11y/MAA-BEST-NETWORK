@@ -315,7 +315,7 @@ export function CustomerRiskPage({ onNavigate }: { onNavigate?: (page: string) =
                   <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 pt-1 flex-wrap">
                     <span>Plan: <strong className="text-foreground">{item.customer.package}</strong></span>
                     <span>Rate: <strong className="text-emerald-600 dark:text-emerald-400">৳{item.customer.price || item.customer.monthlyBill}/mo</strong></span>
-                    <span>Optical Rx: <strong className={item.customer.onuSignal?.includes("-2") ? "text-amber-600 dark:text-amber-400 font-bold" : "text-foreground font-medium"}>{item.customer.onuSignal || "-18.5 dBm"}</strong></span>
+                    <span>Optical Rx: <strong className={item.customer.onuSignal?.includes("-2") ? "text-amber-600 dark:text-amber-400 font-bold" : "text-foreground font-medium"}>{item.customer.onuSignal || "—"}</strong></span>
                   </div>
 
                   {/* Key Risk Factors List */}

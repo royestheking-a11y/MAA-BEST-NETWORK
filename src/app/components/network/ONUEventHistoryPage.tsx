@@ -136,7 +136,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
       const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
       const realRxNum = liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null
         ? Number(liveMatch.onu_rx_power)
-        : (c.onuSignal ? parseFloat(c.onuSignal) : -18.5 - ((i % 7) * 0.8));
+        : (c.onuSignal && !isNaN(parseFloat(c.onuSignal)) ? parseFloat(c.onuSignal) : (isOnline ? -27.5 : -35));
 
       let health: OnuHealth = "good";
       let lastEvent = `Authenticated & Operational on ${c.olt || "OLT1"} (${c.ponPort || "epon 0/1"})`;
@@ -417,7 +417,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
       package: "Standard 20M",
       price: 800,
       monthlyBill: 800,
-      onuSignal: "-19.4 dBm",
+      onuSignal: "—",
     });
 
     setShowAddModal(false);

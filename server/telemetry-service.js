@@ -757,11 +757,6 @@ export function mikrotikPing(target, count = 4) {
 
 // ─── Create a new PPPoE Secret (provision new subscriber) ────────────────────
 export async function createPppoeSecret(username, password, profile = 'default', comment = '') {
-  // First check if user already exists
-  const findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${username}`]);
-  if (findResult.success && findResult.results.length > 0) {
-    return { success: false, error: `PPPoE secret "${username}" already exists on MikroTik. Use toggle to enable/disable.`, alreadyExists: true };
-  }
   const words = [
     '/ppp/secret/add',
     `=name=${username}`,
@@ -771,6 +766,18 @@ export async function createPppoeSecret(username, password, profile = 'default',
   ];
   if (comment) words.push(`=comment=${comment}`);
   let result = await executeRouterOsCommand(words);
+
+  // If secret already exists, update its password & profile so user is verified
+  if (!result.success && result.error && result.error.includes('already have secret')) {
+    const updateWords = ['/ppp/secret/set', `=numbers=${username}`, `=password=${password}`, `=profile=${profile}`];
+    if (comment) updateWords.push(`=comment=${comment}`);
+    result = await executeRouterOsCommand(updateWords);
+    if (result.success) {
+      console.log(`[RouterOS] PPPoE secret updated existing: ${username} (profile: ${profile})`);
+      return { success: true, username, profile, alreadyExisted: true, error: null };
+    }
+  }
+
   if (!result.success) {
     try {
       const upstream = await fetch('https://maa-best-network.onrender.com/api/mikrotik/user/create', {
@@ -794,23 +801,67 @@ export async function createPppoeSecret(username, password, profile = 'default',
   return { success: result.success, username, profile, error: result.error };
 }
 
-// ─── Delete a PPPoE Secret (terminate subscriber) ────────────────────────────
-export async function deletePppoeSecret(username) {
-  // First disconnect any active session
-  try { await disconnectPppoeUser(username); } catch (_) {}
-  // Find the secret
-  let findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${username}`]);
-  if (!findResult.success || findResult.results.length === 0) {
-    // Try alternate form mbn@xxx vs mbnxxx
-    const alt = username.toLowerCase().startsWith('mbn@') ? username : 'mbn@' + username.replace(/^mbn/i, '');
-    findResult = await executeRouterOsCommand(['/ppp/secret/print', `?name=${alt}`]);
+// ─── Update a PPPoE Secret (modify subscriber profile/password/status) ────────
+export async function updatePppoeSecret(username, updates = {}) {
+  const { newUsername, password, profile, comment, disabled } = updates;
+  const words = ['/ppp/secret/set', `=numbers=${username}`];
+
+  if (password) words.push(`=password=${password}`);
+  if (profile) words.push(`=profile=${profile}`);
+  if (comment) words.push(`=comment=${comment}`);
+  if (disabled !== undefined) words.push(`=disabled=${disabled ? 'yes' : 'no'}`);
+  if (newUsername && newUsername !== username) words.push(`=name=${newUsername}`);
+
+  let result = await executeRouterOsCommand(words);
+
+  // If failed with username variant, try alternate format (mbn@xxx vs xxx)
+  if (!result.success) {
+    const alt = username.toLowerCase().startsWith('mbn@') ? username.replace(/^mbn@/i, '') : `mbn@${username}`;
+    const altWords = ['/ppp/secret/set', `=numbers=${alt}`];
+    if (password) altWords.push(`=password=${password}`);
+    if (profile) altWords.push(`=profile=${profile}`);
+    if (comment) altWords.push(`=comment=${comment}`);
+    if (disabled !== undefined) altWords.push(`=disabled=${disabled ? 'yes' : 'no'}`);
+    if (newUsername && newUsername !== alt) altWords.push(`=name=${newUsername}`);
+    result = await executeRouterOsCommand(altWords);
   }
 
-  let secretId = findResult?.results?.[0]?.['.id'];
-  let removeResult = { success: false, error: 'Secret not found locally' };
+  // If secret didn't exist yet on router, auto-provision it
+  if (!result.success && (result.error?.includes('no such item') || result.error?.includes('not found') || result.error?.includes('failure'))) {
+    console.log(`[RouterOS] Secret not present during update; auto-provisioning ${newUsername || username}`);
+    return await createPppoeSecret(newUsername || username, password || '123456', profile || 'default', comment || '');
+  }
 
-  if (secretId) {
-    removeResult = await executeRouterOsCommand(['/ppp/secret/remove', `=.id=${secretId}`]);
+  if (!result.success) {
+    try {
+      const upstream = await fetch('https://maa-best-network.onrender.com/api/mikrotik/user/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, ...updates }),
+        signal: AbortSignal.timeout(6000)
+      });
+      if (upstream.ok) {
+        const uData = await upstream.json();
+        if (uData.success) result = uData;
+      }
+    } catch (_) {}
+  }
+
+  if (result.success) {
+    console.log(`[RouterOS] PPPoE secret updated: ${username} -> ${JSON.stringify(updates)}`);
+  }
+  return { success: result.success, username, error: result.error };
+}
+
+// ─── Delete a PPPoE Secret (terminate subscriber) ────────────────────────────
+export async function deletePppoeSecret(username) {
+  // Directly remove by numbers=username
+  let removeResult = await executeRouterOsCommand(['/ppp/secret/remove', `=numbers=${username}`]);
+
+  // Try alternate format (mbn@xxx vs xxx)
+  if (!removeResult.success) {
+    const alt = username.toLowerCase().startsWith('mbn@') ? username.replace(/^mbn@/i, '') : `mbn@${username}`;
+    removeResult = await executeRouterOsCommand(['/ppp/secret/remove', `=numbers=${alt}`]);
   }
 
   if (!removeResult.success) {
@@ -831,9 +882,9 @@ export async function deletePppoeSecret(username) {
   if (removeResult.success) {
     console.log(`[RouterOS] PPPoE secret deleted: ${username}`);
   } else {
-    console.warn(`[RouterOS] PPPoE secret deprovision notice for "${username}": ${removeResult.error || 'Removed from local subscriber database'}`);
+    console.warn(`[RouterOS] PPPoE secret deprovision notice for "${username}": ${removeResult.error || 'Removed from local database'}`);
   }
-  return { success: removeResult.success, username, notFound: !secretId && !removeResult.success, error: removeResult.error };
+  return { success: removeResult.success, username, error: removeResult.error };
 }
 
 // ─── Get Extended System Details (queues, firewall) ───────────────────────────

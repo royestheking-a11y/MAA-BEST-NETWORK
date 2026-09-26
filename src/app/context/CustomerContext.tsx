@@ -197,12 +197,13 @@ interface CustomerContextType {
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
-const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v12_authentic_194_subscribers";
+const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v13_live_laser_and_synced";
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
-      // Purge old cache keys containing stale 195th dummy customer (CUST-10001)
+      // Purge old cache keys containing stale 195th dummy customer or hardcoded signals
+      localStorage.removeItem("isp_customers_store_v12_authentic_194_subscribers");
       localStorage.removeItem("isp_customers_store_v11_authentic_netx_macs");
       localStorage.removeItem("isp_customers_store_v10");
       localStorage.removeItem("isp_customers_store_v9");
@@ -211,14 +212,22 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const clean = parsed.filter((c: any) => c && c.id && !c.id.startsWith("CUST-"));
+          const clean = parsed
+            .filter((c: any) => c && c.id && !c.id.startsWith("CUST-"))
+            .map((c: any) => ({
+              ...c,
+              onuSignal: c.onuSignal === "-18.5 dBm" ? "—" : c.onuSignal
+            }));
           if (clean.length > 0) return clean;
         }
       }
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_CUSTOMERS;
+    return INITIAL_CUSTOMERS.map(c => ({
+      ...c,
+      onuSignal: c.onuSignal === "-18.5 dBm" ? "—" : c.onuSignal
+    }));
   });
 
   const [upgradeRequests, setUpgradeRequests] = useState<PlanUpgradeRequest[]>(() => {
@@ -310,12 +319,18 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             const nameKey = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
             const macKey = (c.mac || "").toLowerCase().trim();
             const match = liveMap.get(pppKey) || macMap.get(macKey) || liveMap.get(nameKey);
-            if (!match) return c;
+            if (!match) {
+              if (c.onuSignal === "-18.5 dBm") {
+                hasChange = true;
+                return { ...c, onuSignal: "—" };
+              }
+              return c;
+            }
 
             const newNetStatus: "online" | "offline" = match.connection_status === "online" ? "online" : "offline";
             const newSignal = (match.onu_rx_power !== null && match.onu_rx_power !== undefined)
               ? `${match.onu_rx_power} dBm`
-              : (c.onuSignal?.includes("dBm") ? c.onuSignal : "—");
+              : (newNetStatus === "online" ? "—" : "Offline");
             const newIp = match.live_ip || c.ipAddress;
             const newMac = match.live_mac || c.mac;
             const newUptime = match.live_uptime || c.sessionUptime;
@@ -495,7 +510,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       pppPass: data.pppPass || "123456",
       mikrotik: data.mikrotik || "MikroTik-01",
       olt: data.olt || "OLT-Dhaka-01",
-      onuSignal: data.onuSignal || "-18.5 dBm",
+      onuSignal: data.onuSignal || "—",
       sessionUptime: data.sessionUptime || "0d 0h 0m",
       monthlyUsageGB: data.monthlyUsageGB ?? 0,
       joinDate: data.joinDate || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
@@ -534,7 +549,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             name: newCustomer.name,
             phone: newCustomer.phone,
             dropMeters: typeof newCustomer.cableMetre === "number" ? newCustomer.cableMetre : 45,
-            rxPowerDbm: newCustomer.onuSignal ? parseFloat(newCustomer.onuSignal) : -19.5,
+            rxPowerDbm: newCustomer.onuSignal ? parseFloat(newCustomer.onuSignal) : -27.5,
           });
         }
       } catch (err) {
@@ -545,8 +560,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     saveCustomerToFirestore(newCustomer);
 
     // ── Auto-Provision PPPoE Secret on MikroTik RouterOS ────────────────────
-    // Only provision real PPPoE/hotspot services (skip free/unlimited or static)
-    if (newCustomer.service === "pppoe" || newCustomer.service === "hotspot") {
+    const srv = (newCustomer.service || "").toLowerCase();
+    const shouldProvision = Boolean(newCustomer.pppUser) || srv === "pppoe" || srv === "hotspot" || !srv;
+    if (shouldProvision) {
       const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
         ? "" : "https://maa-best-network.onrender.com";
       const pppUser = newCustomer.pppUser || `mbn@${(newCustomer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
@@ -647,7 +663,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         pppPass: data.pppPass || "123456",
         mikrotik: data.mikrotik || "MikroTik-01",
         olt: data.olt || "OLT-Dhaka-01",
-        onuSignal: data.onuSignal || "-18.5 dBm",
+        onuSignal: data.onuSignal || "—",
         sessionUptime: data.sessionUptime || "0d 0h 0m",
         monthlyUsageGB: data.monthlyUsageGB ?? 0,
         joinDate: data.joinDate || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
@@ -755,6 +771,54 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         }
         return updated;
       });
+    }
+
+    // ── Propagate modifications to MikroTik RouterOS ──────────────────────
+    const pppUser = target?.pppUser || (target?.name ? `mbn@${target.name.toLowerCase().replace(/[^a-z0-9]/g, "")}` : undefined);
+    if (pppUser) {
+      const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+        ? "" : "https://maa-best-network.onrender.com";
+
+      const mkUpdates: Record<string, any> = {};
+      if (updates.pppPass) mkUpdates.password = updates.pppPass;
+      if (updates.pppUser && updates.pppUser !== pppUser) mkUpdates.newUsername = updates.pppUser;
+      if (updates.profile) mkUpdates.profile = updates.profile;
+      else if (updates.package) {
+        const match = updates.package.match(/\d+M/i);
+        if (match) mkUpdates.profile = match[0].toUpperCase();
+      }
+      if (updates.status !== undefined) {
+        mkUpdates.disabled = updates.status === "suspended" || (updates.status as string) === "inactive" || updates.status === "offline";
+      }
+      if (updates.disabledInMikrotik !== undefined) {
+        mkUpdates.disabled = updates.disabledInMikrotik;
+      }
+      if (updates.name) {
+        mkUpdates.comment = `${updates.name} (${newId}) — Updated via ISP Portal`;
+      }
+
+      if (Object.keys(mkUpdates).length > 0) {
+        fetch(`${gatewayBase}/api/mikrotik/user/update`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: pppUser, ...mkUpdates }),
+        })
+        .then(r => r.json())
+        .then(result => {
+          if (result.success) {
+            activityLogger.log({
+              type: "network",
+              severity: "info",
+              action: "MikroTik Secret Synced",
+              detail: `Updated RouterOS secret for "${pppUser}" on MikroTik (${Object.keys(mkUpdates).join(", ")}).`,
+              targetId: newId,
+            });
+          }
+        })
+        .catch(err => {
+          console.warn("[MikroTik Sync] Failed to update PPPoE secret on RouterOS:", err.message);
+        });
+      }
     }
   };
 

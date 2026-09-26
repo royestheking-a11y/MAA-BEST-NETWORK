@@ -277,6 +277,29 @@ function realtimeTelemetryPlugin() {
         }
       });
 
+      // MikroTik update / modify subscriber credentials/profile/status
+      server.middlewares.use('/api/mikrotik/user/update', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { username, newUsername, password, profile, comment, disabled } = body;
+          if (!username) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'username required' }));
+            return;
+          }
+          const { updatePppoeSecret } = await import('./server/telemetry-service.js');
+          const result = await updatePppoeSecret(username, { newUsername, password, profile, comment, disabled });
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
       // NetX live ONU RX power for a MAC
       server.middlewares.use('/api/netx/onu-power', async (req: any, res: any) => {
         try {

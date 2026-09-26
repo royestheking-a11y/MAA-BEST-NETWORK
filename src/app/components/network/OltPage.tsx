@@ -139,89 +139,63 @@ export function OltPage({ onNavigate }: OltPageProps) {
     };
 
     if (liveData.length > 0) {
-      const usedLiveIds = new Set<string>();
       const results: OltOnuRecord[] = [];
-
-      for (const o of AUTHENTIC_NETX_ONUS) {
-        const custNameClean = o.customer.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const liveMatch = getMatch(o.customer, o.mac);
-
-        if (liveMatch && !usedLiveIds.has(liveMatch.id)) {
-          usedLiveIds.add(liveMatch.id);
-          const custId = o.customer && o.customer !== "— Unassigned —" ? userToId.get(custNameClean) : undefined;
-          results.push({
-            id: o.id,
-            mac: liveMatch.live_mac || o.mac,
-            ponPort: o.ponPort,
-            status: liveMatch.connection_status === 'online' ? 'online' : 'offline',
-            rxPower: (liveMatch.onu_rx_power !== null && liveMatch.onu_rx_power !== undefined)
-              ? `${liveMatch.onu_rx_power} dBm` : '—',
-            customer: o.customer,
-            customerId: custId,
-            oltServer: o.oltServer,
-          });
-        } else if (!liveMatch) {
-          const custId = o.customer && o.customer !== "— Unassigned —" ? userToId.get(custNameClean) : undefined;
-          results.push({
-            id: o.id,
-            mac: o.mac,
-            ponPort: o.ponPort,
-            status: o.customer.includes("Unassigned") ? 'unassigned' : 'offline',
-            rxPower: '—',
-            customer: o.customer,
-            customerId: custId,
-            oltServer: o.oltServer,
-          });
-        }
-      }
+      const processedUsers = new Set<string>();
+      const processedMacs = new Set<string>();
 
       liveData.forEach((c, idx) => {
-        if (!usedLiveIds.has(c.id)) {
-          const custNameClean = (c.full_name || c.pppoe_username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const designatedCust = userToCustomer.get(custNameClean) || (c.live_mac ? userByMac.get(c.live_mac.toLowerCase().trim()) : null);
-          const effectiveOlt = (designatedCust?.olt === "OLT2" || c.server_name?.includes('OLT2')) ? "OLT2" : "OLT1";
+        const rawUser = c.pppoe_username || c.user_id || c.full_name || `sub-${idx}`;
+        const custNameClean = rawUser.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const macClean = (c.live_mac || '').toLowerCase().trim();
 
-          results.push({
-            id: `onu-live-${idx}`,
-            mac: c.live_mac || '—',
-            ponPort: designatedCust?.ponPort || 'epon 0/1',
-            status: c.connection_status === 'online' ? 'online' : 'offline',
-            rxPower: (c.onu_rx_power !== null && c.onu_rx_power !== undefined)
-              ? `${c.onu_rx_power} dBm` : '—',
-            customer: c.full_name || c.pppoe_username || '— Unassigned —',
-            customerId: userToId.get(custNameClean) || designatedCust?.clientCode || designatedCust?.id,
-            oltServer: effectiveOlt as "OLT1" | "OLT2",
-          });
-        }
+        processedUsers.add(custNameClean);
+        if (macClean) processedMacs.add(macClean);
+
+        const designatedCust = userToCustomer.get(custNameClean) || (macClean ? userByMac.get(macClean) : null);
+        const custId = userToId.get(custNameClean) || designatedCust?.clientCode || designatedCust?.id || c.user_id;
+        const effectiveOlt = (designatedCust?.olt === "OLT2" || c.server_name?.includes("OLT2")) ? "OLT2" : "OLT1";
+        const effectivePon = designatedCust?.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1");
+
+        const isOnline = c.connection_status === 'online';
+        const rxVal = (c.onu_rx_power !== null && c.onu_rx_power !== undefined)
+          ? `${c.onu_rx_power} dBm`
+          : (isOnline ? "—" : "Offline");
+
+        results.push({
+          id: `onu-live-${c.id || idx}`,
+          mac: c.live_mac || "—",
+          ponPort: effectivePon,
+          status: isOnline ? "online" : ((c.connection_status as string) === "disabled" ? "unassigned" : "offline"),
+          rxPower: rxVal,
+          customer: c.full_name || c.pppoe_username || "— Unassigned —",
+          customerId: custId,
+          oltServer: effectiveOlt as "OLT1" | "OLT2",
+        });
       });
 
-      // Ensure all dynamic customers from CustomerContext are linked to OLT roster
-      const registeredCustIds = new Set(results.map(r => r.customerId).filter(Boolean));
-      const registeredMacs = new Set(results.map(r => r.mac.toLowerCase().trim()).filter(m => m && m !== "—"));
-
+      // Also append any customer registered in CustomerContext not present in liveData (e.g. newly added user)
       custList.forEach(c => {
         const cId = c.clientCode || c.id;
-        const cMac = (c.mac || "").toLowerCase().trim();
-        if ((cId && !registeredCustIds.has(cId)) && (!cMac || !registeredMacs.has(cMac))) {
-          registeredCustIds.add(cId);
-          if (cMac) registeredMacs.add(cMac);
+        const cUserClean = (c.pppUser || c.name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cMacClean = (c.mac || "").toLowerCase().trim();
+
+        if ((!cUserClean || !processedUsers.has(cUserClean)) && (!cMacClean || !processedMacs.has(cMacClean))) {
+          if (cUserClean) processedUsers.add(cUserClean);
+          if (cMacClean) processedMacs.add(cMacClean);
+
           const effectiveOlt = (c.olt === "OLT2" || c.olt?.includes("2")) ? "OLT2" : "OLT1";
+          const isOnline = c.netStatus === "online";
+          const rxVal = (c.onuSignal && c.onuSignal !== "-18.5 dBm" && c.onuSignal !== "—")
+            ? c.onuSignal
+            : (isOnline ? "—" : "Offline");
+
           results.push({
             id: `onu-cust-${cId}`,
             mac: c.mac || "—",
-            ponPort: c.ponPort || "epon 0/1",
-            status: c.netStatus === "online" ? "online" : "offline",
-            rxPower: (() => {
-              // Try to find live onu_rx_power from NetX data by MAC or PPPoE username
-              const macKey = (c.mac || "").toLowerCase().trim();
-              const livByMac = macKey ? liveMacMap.get(macKey) : null;
-              const custNameClean = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-              const livByName = liveMap.get(custNameClean);
-              const liv = livByMac || livByName;
-              if (liv && liv.onu_rx_power !== null && liv.onu_rx_power !== undefined) return `${liv.onu_rx_power} dBm`;
-              return c.onuSignal || "—";
-            })(),
-            customer: c.name,
+            ponPort: c.ponPort || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1"),
+            status: isOnline ? "online" : "offline",
+            rxPower: rxVal,
+            customer: c.name || c.pppUser || "— Unassigned —",
             customerId: cId,
             oltServer: effectiveOlt as "OLT1" | "OLT2",
           });

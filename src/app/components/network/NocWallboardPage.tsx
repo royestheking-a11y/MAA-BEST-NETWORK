@@ -145,7 +145,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
 
       const total = matchedCustomers.length > 0 ? matchedCustomers.length : (telPort?.total || 32);
       const active = matchedCustomers.filter(c => c.netStatus === "online" || c.status === "active").length;
-      const rxDbm = telPort?.rxPowerDbm !== undefined ? `${telPort.rxPowerDbm.toFixed(1)} dBm` : "-18.5 dBm";
+      const rxDbm = telPort?.rxPowerDbm !== undefined ? `${telPort.rxPowerDbm.toFixed(1)} dBm` : (active > 0 ? "—" : "Offline");
       const status = (telPort?.status === "healthy" || active > 0) ? "optimal" : "warning";
 
       return {

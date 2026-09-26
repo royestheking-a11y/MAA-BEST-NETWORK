@@ -551,7 +551,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       netStatus: "online",
       downloadSpeedMbps: 20,
       uploadSpeedMbps: 10,
-      onuSignal: "-18.5 dBm",
+      onuSignal: "—",
     });
 
     setShowProvisionModal(false);

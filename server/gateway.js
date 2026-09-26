@@ -1,5 +1,5 @@
 import http from 'http';
-import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, getCachedMbnUsers, executeRouterOsCommand, disconnectPppoeUser, setUserDisabledState, mikrotikPing, getMikrotikDetails, createPppoeSecret, deletePppoeSecret } from './telemetry-service.js';
+import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, getCachedMbnUsers, executeRouterOsCommand, disconnectPppoeUser, setUserDisabledState, mikrotikPing, getMikrotikDetails, createPppoeSecret, updatePppoeSecret, deletePppoeSecret } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
 
@@ -300,7 +300,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 19. Fetch live ONU RX power for a specific MAC from NetX
+  // 19. Update (modify) a PPPoE secret on MikroTik
+  if (url.pathname === '/api/mikrotik/user/update' && req.method === 'POST') {
+    const body = await readBody();
+    const { username, newUsername, password, profile, comment, disabled } = body;
+    if (!username) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'username required' }));
+      return;
+    }
+    const result = await updatePppoeSecret(username, { newUsername, password, profile, comment, disabled });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  // 20. Fetch live ONU RX power for a specific MAC from NetX
   if (url.pathname === '/api/netx/onu-power' && req.method === 'POST') {
     const body = await readBody();
     const { mac } = body;
