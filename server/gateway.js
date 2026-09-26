@@ -334,6 +334,11 @@ const server = http.createServer(async (req, res) => {
       success: !!match,
       onu_rx_power: match ? match.onu_rx_power : null,
       connection_status: match ? match.connection_status : null,
+      pppoe_username: match ? match.pppoe_username : null,
+    }));
+    return;
+  }
+
   // 21. Real MikroTik / NetX Internet Setup Packages
   if (url.pathname === '/api/packages' || url.pathname === '/api/netx/packages') {
     let cached = getCachedNetxPackages();
