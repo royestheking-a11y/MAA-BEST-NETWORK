@@ -1,5 +1,12 @@
 import http from 'http';
-import { getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection, getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus, fetchDeduplicatedMbnUsers, getCachedMbnUsers, executeRouterOsCommand, disconnectPppoeUser, setUserDisabledState, mikrotikPing, getMikrotikDetails, createPppoeSecret, updatePppoeSecret, deletePppoeSecret } from './telemetry-service.js';
+import {
+  getCachedTelemetry, refreshLiveHardwareTelemetry, syncNetxOltData, testOltConnection,
+  getCachedLiveStats, getCachedOltServers, fetchNetxLiveStats, fetchMikrotikLiveStatus,
+  fetchDeduplicatedMbnUsers, getCachedMbnUsers, executeRouterOsCommand, disconnectPppoeUser,
+  setUserDisabledState, mikrotikPing, getMikrotikDetails, createPppoeSecret, updatePppoeSecret,
+  deletePppoeSecret, fetchNetxPackages, getCachedNetxPackages, fetchNetxZones, getCachedNetxZones,
+  fetchNetxFullCustomers, getCachedNetxCustomers, fetchNetxDashboard, getCachedNetxDashboard
+} from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
 
@@ -327,8 +334,59 @@ const server = http.createServer(async (req, res) => {
       success: !!match,
       onu_rx_power: match ? match.onu_rx_power : null,
       connection_status: match ? match.connection_status : null,
-      pppoe_username: match ? match.pppoe_username : null,
-    }));
+  // 21. Real MikroTik / NetX Internet Setup Packages
+  if (url.pathname === '/api/packages' || url.pathname === '/api/netx/packages') {
+    let cached = getCachedNetxPackages();
+    if (!cached.data || cached.ageMs > 60000) {
+      const fresh = await fetchNetxPackages();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, count: fresh.length, data: fresh }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, count: cached.data.length, data: cached.data }));
+    return;
+  }
+
+  // 22. Live NetX Dashboard (total customers, dues, collections)
+  if (url.pathname === '/api/netx/dashboard') {
+    let cached = getCachedNetxDashboard();
+    if (!cached.data || cached.ageMs > 30000) {
+      const fresh = await fetchNetxDashboard();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, data: fresh }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, data: cached.data }));
+    return;
+  }
+
+  // 23. Full 194 Authentic Customers from NetX Database
+  if (url.pathname === '/api/netx/customers') {
+    let cached = getCachedNetxCustomers();
+    if (!cached.data || cached.ageMs > 30000) {
+      const fresh = await fetchNetxFullCustomers();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, count: fresh.length, data: fresh }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, count: cached.data.length, data: cached.data }));
+    return;
+  }
+
+  // 24. Live Network Zones from NetX
+  if (url.pathname === '/api/zones' || url.pathname === '/api/netx/zones') {
+    let cached = getCachedNetxZones();
+    if (!cached.data || cached.ageMs > 60000) {
+      const fresh = await fetchNetxZones();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, data: fresh }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, data: cached.data }));
     return;
   }
 

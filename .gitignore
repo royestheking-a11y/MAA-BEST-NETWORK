@@ -34,3 +34,4 @@ Thumbs.db
 # Vite / Firebase cache
 .firebase/
 .vite/
+.netx_token_cache.json

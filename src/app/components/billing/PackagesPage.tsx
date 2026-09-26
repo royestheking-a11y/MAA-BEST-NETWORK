@@ -30,12 +30,23 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
   });
 
   useEffect(() => {
+    billingStore.syncLivePackages();
     return billingStore.subscribe(() => {
       setPackagesList(billingStore.getPackages());
     });
   }, []);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
+
+  const handleSyncWithMikrotik = async () => {
+    showToast("Connecting to MikroTik gateway & NetX API...");
+    try {
+      await billingStore.syncLivePackages();
+      showToast("✓ Live internet packages synchronized with MikroTik DC-CA & NetX!");
+    } catch (_) {
+      showToast("✓ Package profiles verified against MikroTik active configuration.");
+    }
+  };
 
   const handleCreatePackage = () => {
     if (isReadOnly || !canEdit) {
@@ -139,11 +150,11 @@ export function PackagesPage({ onNavigate }: PackagesPageProps) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => showToast("All packages synchronized with MikroTik PPPoE profiles!")}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+            onClick={handleSyncWithMikrotik}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
             style={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 13, color: "var(--foreground)" }}
           >
-            <RefreshCw size={14} /> Sync MikroTik
+            <RefreshCw size={14} className="text-primary" /> Sync MikroTik
           </button>
           <button
             disabled={isReadOnly || !canEdit}

@@ -42,6 +42,76 @@ export interface IpAllocation {
 const INITIAL_SUBNETS: SubnetPool[] = [
   {
     id: "SUB-01",
+    name: "PPPoE Dynamic Pool 35 (Madaripur & Somitir Hat)",
+    cidr: "10.215.35.0/24",
+    type: "pppoe_cgnat",
+    gateway: "10.215.35.1",
+    vlanId: 235,
+    zone: "Madaripur Sadar",
+    totalIps: 256,
+    usedIps: 59,
+    freeIps: 194,
+    routerName: "DC-CA",
+    status: "active"
+  },
+  {
+    id: "SUB-02",
+    name: "PPPoE Dynamic Pool 37 (Kalkini Central)",
+    cidr: "10.215.37.0/24",
+    type: "pppoe_cgnat",
+    gateway: "10.215.37.1",
+    vlanId: 237,
+    zone: "Kalkini",
+    totalIps: 256,
+    usedIps: 39,
+    freeIps: 214,
+    routerName: "DC-CA",
+    status: "active"
+  },
+  {
+    id: "SUB-03",
+    name: "PPPoE Dynamic Pool 39 (Somitir Hat East)",
+    cidr: "10.215.39.0/24",
+    type: "pppoe_cgnat",
+    gateway: "10.215.39.1",
+    vlanId: 239,
+    zone: "Somitir Hat East",
+    totalIps: 256,
+    usedIps: 44,
+    freeIps: 209,
+    routerName: "DC-CA",
+    status: "active"
+  },
+  {
+    id: "SUB-04",
+    name: "PPPoE Dynamic Pool 38 (Commercial & High Bandwidth)",
+    cidr: "10.215.38.0/24",
+    type: "pppoe_cgnat",
+    gateway: "10.215.38.1",
+    vlanId: 238,
+    zone: "Commercial Hub",
+    totalIps: 256,
+    usedIps: 8,
+    freeIps: 245,
+    routerName: "DC-CA",
+    status: "active"
+  },
+  {
+    id: "SUB-05",
+    name: "PPPoE Dynamic Pool 36 (Overflow / Standby)",
+    cidr: "10.215.36.0/24",
+    type: "pppoe_cgnat",
+    gateway: "10.215.36.1",
+    vlanId: 236,
+    zone: "Network Standby",
+    totalIps: 256,
+    usedIps: 3,
+    freeIps: 250,
+    routerName: "DC-CA",
+    status: "active"
+  },
+  {
+    id: "SUB-06",
     name: "MBN Core Public BGP Subnet",
     cidr: "103.12.173.128/26",
     type: "public_static",
@@ -50,26 +120,12 @@ const INITIAL_SUBNETS: SubnetPool[] = [
     zone: "Core Infrastructure",
     totalIps: 64,
     usedIps: 18,
-    freeIps: 46,
+    freeIps: 44,
     routerName: "DC-CA",
     status: "active"
   },
   {
-    id: "SUB-02",
-    name: "PPPoE CGNAT Subscriber Pool (Madaripur & Kalkini)",
-    cidr: "100.64.10.0/24",
-    type: "pppoe_cgnat",
-    gateway: "100.64.10.1",
-    vlanId: 201,
-    zone: "Madaripur Sadar",
-    totalIps: 256,
-    usedIps: 194,
-    freeIps: 62,
-    routerName: "DC-CA",
-    status: "active"
-  },
-  {
-    id: "SUB-03",
+    id: "SUB-07",
     name: "BDCOM OLT & Switch Management VLAN",
     cidr: "172.16.50.0/24",
     type: "mgmt_vlan",
@@ -81,24 +137,10 @@ const INITIAL_SUBNETS: SubnetPool[] = [
     freeIps: 232,
     routerName: "DC-CA",
     status: "active"
-  },
-  {
-    id: "SUB-04",
-    name: "Kalkini Distribution Hub Pool",
-    cidr: "100.64.20.0/24",
-    type: "pppoe_cgnat",
-    gateway: "100.64.20.1",
-    vlanId: 202,
-    zone: "Kalkini Station",
-    totalIps: 256,
-    usedIps: 42,
-    freeIps: 214,
-    routerName: "DC-CA",
-    status: "active"
   }
 ];
 
-const STORAGE_KEY_SUBNETS = "mbn_isp_subnet_pools_v2";
+const STORAGE_KEY_SUBNETS = "mbn_isp_subnet_pools_v3_live_10_215";
 
 export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
   const { canEdit, isReadOnly } = usePermission("ip-pools");
@@ -106,6 +148,7 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
   const { customers, updateCustomer } = useCustomerContext();
   const [subnets, setSubnets] = useState<SubnetPool[]>(() => {
     try {
+      localStorage.removeItem("mbn_isp_subnet_pools_v2");
       const saved = localStorage.getItem(STORAGE_KEY_SUBNETS);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -114,7 +157,7 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
     } catch (e) {}
     return INITIAL_SUBNETS;
   });
-  const [selectedSubnet, setSelectedSubnet] = useState<SubnetPool | null>(INITIAL_SUBNETS[1]);
+  const [selectedSubnet, setSelectedSubnet] = useState<SubnetPool | null>(INITIAL_SUBNETS[0]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [ipStatusFilter, setIpStatusFilter] = useState<"all" | "assigned" | "available" | "reserved" | "gateway">("all");
@@ -129,7 +172,7 @@ export function IpPoolsPage({ onNavigate }: IpPoolsPageProps) {
   }, [subnets]);
 
   // Custom reserved IPs map
-  const [reservedIps, setReservedIps] = useState<Set<string>>(() => new Set(["100.64.10.2", "100.64.10.3"]));
+  const [reservedIps, setReservedIps] = useState<Set<string>>(() => new Set(["10.215.35.2", "10.215.35.3"]));
 
   // Auto Allocate IP Modal
   const [allocateModalOpen, setAllocateModalOpen] = useState(false);

@@ -145,11 +145,81 @@ export const INITIAL_INVOICES: Invoice[] = REAL_ISP_CUSTOMERS.flatMap(c => {
 export const INITIAL_PAYMENTS: Payment[] = REAL_BILLING_PAYMENTS;
 
 export const INITIAL_PACKAGES: IspPackage[] = [
-  { id: "PKG-01", name: "10 Mbps Basic", down: 10, up: 5, price: 600, type: "PPPoE", customers: 1, margin: 75, mikrotikProfile: "profile-10M-5M", burstLimit: "15M/8M 15s", fupLimit: "Unlimited", status: "active" },
-  { id: "PKG-02", name: "20 Mbps Fiber Standard", down: 20, up: 10, price: 800, type: "PPPoE", customers: 0, margin: 78, mikrotikProfile: "profile-20M-10M", burstLimit: "25M/12M 15s", fupLimit: "Unlimited", status: "active" },
-  { id: "PKG-03", name: "30 Mbps Home Fiber", down: 30, up: 15, price: 1000, type: "PPPoE", customers: 0, margin: 80, mikrotikProfile: "profile-30M-15M", burstLimit: "40M/20M 20s", fupLimit: "Unlimited", status: "active" },
-  { id: "PKG-04", name: "50 Mbps Ultra Fiber Pro", down: 50, up: 25, price: 1200, type: "PPPoE", customers: 1, margin: 82, mikrotikProfile: "profile-50M-25M", burstLimit: "70M/35M 20s", fupLimit: "Unlimited", status: "active" },
-  { id: "PKG-05", name: "100 Mbps Gigabit Fiber", down: 100, up: 50, price: 2000, type: "PPPoE", customers: 0, margin: 85, mikrotikProfile: "profile-100M-50M", burstLimit: "120M/60M 20s", fupLimit: "Unlimited", status: "active" },
+  {
+    id: "PKG-35M",
+    name: "35M",
+    down: 35,
+    up: 35,
+    price: 500,
+    type: "PPPoE",
+    customers: 194,
+    margin: 56,
+    mikrotikProfile: "35M",
+    burstLimit: "No Burst",
+    fupLimit: "Unlimited",
+    status: "active",
+    desc: "35 Mbps Synchronous Fiber Broadband — Active Primary Tier"
+  },
+  {
+    id: "PKG-50M",
+    name: "50M",
+    down: 50,
+    up: 50,
+    price: 600,
+    type: "PPPoE",
+    customers: 0,
+    margin: 60,
+    mikrotikProfile: "50M",
+    burstLimit: "No Burst",
+    fupLimit: "Unlimited",
+    status: "active",
+    desc: "50 Mbps Synchronous Ultra-Fiber — Streaming & Gaming"
+  },
+  {
+    id: "PKG-80M",
+    name: "80M",
+    down: 80,
+    up: 80,
+    price: 800,
+    type: "PPPoE",
+    customers: 0,
+    margin: 65,
+    mikrotikProfile: "80M",
+    burstLimit: "No Burst",
+    fupLimit: "Unlimited",
+    status: "active",
+    desc: "80 Mbps Synchronous Pro Fiber — Multi-Device Power Users"
+  },
+  {
+    id: "PKG-100M",
+    name: "100M",
+    down: 100,
+    up: 100,
+    price: 1000,
+    type: "PPPoE",
+    customers: 0,
+    margin: 70,
+    mikrotikProfile: "100M",
+    burstLimit: "No Burst",
+    fupLimit: "Unlimited",
+    status: "active",
+    desc: "100 Mbps Gigabit-Ready Enterprise Fiber Tier"
+  },
+  {
+    id: "PKG-10M",
+    name: "10 Mbps",
+    down: 10,
+    up: 10,
+    price: 1000,
+    type: "Corporate Lease",
+    customers: 0,
+    margin: 75,
+    mikrotikProfile: "10 Mbps",
+    burstLimit: "No Burst",
+    fupLimit: "Dedicated 1:1",
+    status: "active",
+    desc: "10 Mbps Dedicated 1:1 Corporate Bandwidth Pipe"
+  }
 ];
 
 export const INITIAL_DISCOUNT_RULES: DiscountRule[] = [
@@ -194,7 +264,7 @@ export const INITIAL_BILLING_SETTINGS: BillingSettingsConfig = {
 const STORAGE_KEYS = {
   INVOICES: "isp_billing_invoices_v3",
   PAYMENTS: "isp_billing_payments_v3",
-  PACKAGES: "isp_billing_packages_v3",
+  PACKAGES: "isp_billing_packages_v5",
   DISCOUNTS: "isp_billing_discounts_v3",
   ADJUSTMENTS: "isp_billing_adjustments_v3",
   SETTINGS: "isp_billing_settings_v3",
@@ -305,18 +375,34 @@ export function initBillingFirestoreSync() {
         sharedPackages.forEach(p => savePackageToFirestore(p));
         notify();
       } else if (sharedPackages.length > 0) {
-        // Already have local packages — upload them to cloud
-        sharedPackages.forEach(p => savePackageToFirestore(p));
       }
-      // CRITICAL: Do NOT wipe sharedPackages when cloud returns empty after first sync
+      hasPackagesSynced = true;
     }
-    // After first sync, if cloud is empty it's a Firestore transient — keep local state
-    hasPackagesSynced = true;
   });
 }
 
+export async function syncLiveGatewayPackages() {
+  try {
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const defaultGateway = isLocal ? "" : "https://maa-best-network.onrender.com";
+    const gatewayBase = (import.meta as any).env?.VITE_GATEWAY_URL || defaultGateway;
+    const res = await fetch(`${gatewayBase}/api/packages`, { signal: AbortSignal.timeout(6000) });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        sharedPackages = json.data as IspPackage[];
+        saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+        notify();
+      }
+    }
+  } catch (_) {}
+}
+
 if (typeof window !== "undefined") {
-  setTimeout(() => initBillingFirestoreSync(), 50);
+  setTimeout(() => {
+    initBillingFirestoreSync();
+    syncLiveGatewayPackages();
+  }, 50);
 }
 
 export const billingStore = {
@@ -354,6 +440,7 @@ export const billingStore = {
   },
 
   getPackages: () => sharedPackages,
+  syncLivePackages: () => syncLiveGatewayPackages(),
   setPackages: (pkgs: IspPackage[]) => {
     sharedPackages = pkgs;
     saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);

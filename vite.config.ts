@@ -381,6 +381,128 @@ function realtimeTelemetryPlugin() {
           res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });
+
+      // ─── Real MikroTik / NetX Internet Setup Packages ───
+      server.middlewares.use('/api/packages', async (_req: any, res: any) => {
+        try {
+          const { getCachedNetxPackages, fetchNetxPackages } = await import('./server/telemetry-service.js');
+          let cached = getCachedNetxPackages();
+          if (!cached.data || cached.ageMs > 60000) {
+            const fresh = await fetchNetxPackages();
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, count: fresh.length, data: fresh }));
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, count: cached.data.length, data: cached.data }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      server.middlewares.use('/api/netx/packages', async (_req: any, res: any) => {
+        try {
+          const { getCachedNetxPackages, fetchNetxPackages } = await import('./server/telemetry-service.js');
+          let cached = getCachedNetxPackages();
+          if (!cached.data || cached.ageMs > 60000) {
+            const fresh = await fetchNetxPackages();
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, count: fresh.length, data: fresh }));
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, count: cached.data.length, data: cached.data }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // ─── Live NetX Dashboard ───
+      server.middlewares.use('/api/netx/dashboard', async (_req: any, res: any) => {
+        try {
+          const { getCachedNetxDashboard, fetchNetxDashboard } = await import('./server/telemetry-service.js');
+          let cached = getCachedNetxDashboard();
+          if (!cached.data || cached.ageMs > 30000) {
+            const fresh = await fetchNetxDashboard();
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, data: fresh }));
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, data: cached.data }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // ─── Live 194 Customers from NetX ───
+      server.middlewares.use('/api/netx/customers', async (_req: any, res: any) => {
+        try {
+          const { getCachedNetxCustomers, fetchNetxFullCustomers } = await import('./server/telemetry-service.js');
+          let cached = getCachedNetxCustomers();
+          if (!cached.data || cached.ageMs > 30000) {
+            const fresh = await fetchNetxFullCustomers();
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, count: fresh.length, data: fresh }));
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, count: cached.data.length, data: cached.data }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
+      // ─── Live Zones from NetX ───
+      server.middlewares.use('/api/zones', async (_req: any, res: any) => {
+        try {
+          const { getCachedNetxZones, fetchNetxZones } = await import('./server/telemetry-service.js');
+          let cached = getCachedNetxZones();
+          if (!cached.data || cached.ageMs > 60000) {
+            const fresh = await fetchNetxZones();
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, data: fresh }));
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, data: cached.data }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      server.middlewares.use('/api/netx/zones', async (_req: any, res: any) => {
+        try {
+          const { getCachedNetxZones, fetchNetxZones } = await import('./server/telemetry-service.js');
+          let cached = getCachedNetxZones();
+          if (!cached.data || cached.ageMs > 60000) {
+            const fresh = await fetchNetxZones();
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ success: true, data: fresh }));
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify({ success: true, data: cached.data }));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
     }
   }
 }

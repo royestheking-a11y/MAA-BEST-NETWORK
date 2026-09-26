@@ -197,12 +197,36 @@ interface CustomerContextType {
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
-const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v14_authentic_194_fixed";
+const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v16_authentic_mikrotik_packages";
+
+export function normalizeCustomerPackage(c: Customer): Customer {
+  const isOldPkg = !c.package || c.package === "20Mbps" || c.package === "10 Mbps Basic" || c.package.includes("PIONEER");
+  const pkg = isOldPkg ? "35M" : c.package;
+  const prof = isOldPkg ? "35M" : (c.profile || "35M");
+  const speed = pkg === "35M" ? "35/35" : (pkg === "50M" ? "50/50" : (pkg === "80M" ? "80/80" : (pkg === "100M" ? "100/100" : (c.speed || "35/35"))));
+  const down = pkg === "35M" ? 35 : (pkg === "50M" ? 50 : (pkg === "80M" ? 80 : (pkg === "100M" ? 100 : (c.downloadSpeedMbps || 35))));
+  const up = pkg === "35M" ? 35 : (pkg === "50M" ? 50 : (pkg === "80M" ? 80 : (pkg === "100M" ? 100 : (c.uploadSpeedMbps || 35))));
+  const signal = c.onuSignal === "-18.5 dBm" ? "—" : (c.onuSignal || "—");
+
+  return {
+    ...c,
+    package: pkg,
+    profile: prof,
+    speed,
+    downloadSpeedMbps: down,
+    uploadSpeedMbps: up,
+    price: c.price || 500,
+    monthlyBill: c.monthlyBill || 500,
+    serverName: "DC-CA",
+    onuSignal: signal
+  };
+}
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
-      // Purge old cache keys containing stale 195th dummy customer or hardcoded signals
+      // Purge old cache keys containing stale 195th dummy customer or hardcoded signals or legacy package names
+      localStorage.removeItem("isp_customers_store_v14_authentic_194_fixed");
       localStorage.removeItem("isp_customers_store_v13_live_laser_and_synced");
       localStorage.removeItem("isp_customers_store_v12_authentic_194_subscribers");
       localStorage.removeItem("isp_customers_store_v11_authentic_netx_macs");
@@ -215,20 +239,14 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const clean = parsed
             .filter((c: any) => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
-            .map((c: any) => ({
-              ...c,
-              onuSignal: c.onuSignal === "-18.5 dBm" ? "—" : c.onuSignal
-            }));
+            .map((c: any) => normalizeCustomerPackage(c));
           if (clean.length > 0) return clean;
         }
       }
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_CUSTOMERS.map(c => ({
-      ...c,
-      onuSignal: c.onuSignal === "-18.5 dBm" ? "—" : c.onuSignal
-    }));
+    return INITIAL_CUSTOMERS.map(c => normalizeCustomerPackage(c));
   });
 
   const [upgradeRequests, setUpgradeRequests] = useState<PlanUpgradeRequest[]>(() => {
@@ -262,15 +280,16 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           // Recalculate daysRemaining from endDate so stale cloud values are corrected
           const now = new Date();
           const refreshed = clean.map(c => {
-            if (c.userType === "free" || c.userType === "unlimited") return c;
-            if (!c.endDate || c.endDate === "Permanent / Lifetime") return c;
-            const end = new Date(c.endDate);
+            const base = normalizeCustomerPackage(c);
+            if (base.userType === "free" || base.userType === "unlimited") return base;
+            if (!base.endDate || base.endDate === "Permanent / Lifetime") return base;
+            const end = new Date(base.endDate);
             if (!isNaN(end.getTime())) {
               const diffMs = end.getTime() - now.getTime();
               const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-              return { ...c, daysRemaining: diffDays };
+              return { ...base, daysRemaining: diffDays };
             }
-            return c;
+            return base;
           });
           setCustomers(refreshed);
         }
@@ -290,7 +309,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ── Sync Live Telemetry from NetX API (Optical Power, Real IP, Real Online/Offline) ──
+  // ── Sync Live Telemetry from NetX API (Optical Power, Real IP, Real Package, Online/Offline) ──
   useEffect(() => {
     let mounted = true;
     const syncNetx = async () => {
@@ -336,7 +355,22 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             const newMac = match.live_mac || c.mac;
             const newUptime = match.live_uptime || c.sessionUptime;
 
-            if (c.netStatus !== newNetStatus || c.onuSignal !== newSignal || c.ipAddress !== newIp || c.mac !== newMac) {
+            // Live MikroTik internet package sync
+            const livePkg = match.package_name || "35M";
+            const livePrice = match.package_price ? Number(match.package_price) : 500;
+            const liveSpeed = livePkg === "35M" ? "35/35" : (livePkg === "50M" ? "50/50" : (livePkg === "80M" ? "80/80" : (livePkg === "100M" ? "100/100" : (livePkg === "10 Mbps" ? "10/10" : "35/35"))));
+            const liveDown = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : 35))));
+            const liveUp = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : 35))));
+
+            if (
+              c.netStatus !== newNetStatus ||
+              c.onuSignal !== newSignal ||
+              c.ipAddress !== newIp ||
+              c.mac !== newMac ||
+              c.package !== livePkg ||
+              c.profile !== livePkg ||
+              c.speed !== liveSpeed
+            ) {
               hasChange = true;
               return {
                 ...c,
@@ -344,7 +378,15 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 onuSignal: newSignal,
                 ipAddress: newIp,
                 mac: newMac,
-                sessionUptime: newUptime
+                sessionUptime: newUptime,
+                package: livePkg,
+                profile: livePkg,
+                speed: liveSpeed,
+                downloadSpeedMbps: liveDown,
+                uploadSpeedMbps: liveUp,
+                price: livePrice,
+                monthlyBill: livePrice,
+                serverName: match.server_name || "DC-CA"
               };
             }
             return c;

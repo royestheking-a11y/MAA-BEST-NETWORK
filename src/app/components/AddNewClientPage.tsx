@@ -114,13 +114,13 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
 
   const [selectedPackage, setSelectedPackage] = useState(() => {
     const pkgs = billingStore.getPackages();
-    return pkgs[0] ? `${pkgs[0].name} — ৳${pkgs[0].price.toLocaleString()}` : "20 Mbps Fiber Standard — ৳1,200";
+    return pkgs[0] ? `${pkgs[0].name} — ৳${pkgs[0].price.toLocaleString()}` : "35M — ৳500";
   });
   const [serverName, setServerName] = useState(() => networkStore.getMikrotik()[0]?.name || "DC-CA");
   const [protocolType, setProtocolType] = useState("pppoe");
   const [profileName, setProfileName] = useState(() => {
     const pkgs = billingStore.getPackages();
-    return pkgs[0]?.name || "20 Mbps Fiber Standard";
+    return pkgs[0]?.mikrotikProfile || pkgs[0]?.name || "35M";
   });
   const [selectedOlt, setSelectedOlt] = useState<"OLT1" | "OLT2">("OLT1");
   const [selectedPonPort, setSelectedPonPort] = useState("epon 0/1");
@@ -215,9 +215,10 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
     const source = packagesList.length > 0 ? packagesList : billingStore.getPackages();
     if (source.length === 0) {
       return [
-        { name: "10 Mbps — ৳800", speed: "10/5 Mbps", price: 800, badge: "Budget Fiber" },
-        { name: "20 Mbps Fiber Standard — ৳1,200", speed: "20/10 Mbps", price: 1200, badge: "Most Popular" },
-        { name: "30 Mbps Home Fiber — ৳1,500", speed: "30/15 Mbps", price: 1500, badge: "High Speed" },
+        { name: "35M — ৳500", cleanName: "35M", speed: "35/35 Mbps", price: 500, badge: "Most Popular", down: 35, up: 35 },
+        { name: "50M — ৳600", cleanName: "50M", speed: "50/50 Mbps", price: 600, badge: "Ultra Fiber", down: 50, up: 50 },
+        { name: "80M — ৳800", cleanName: "80M", speed: "80/80 Mbps", price: 800, badge: "Pro Speed", down: 80, up: 80 },
+        { name: "100M — ৳1,000", cleanName: "100M", speed: "100/100 Mbps", price: 1000, badge: "Gigabit Ready", down: 100, up: 100 },
       ];
     }
     return source.map((pkg, idx) => ({
@@ -225,7 +226,9 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       cleanName: pkg.name,
       speed: `${pkg.down}/${pkg.up} Mbps`,
       price: pkg.price,
-      badge: idx === 1 ? "Most Popular" : pkg.type === "Corporate Lease" ? "Enterprise" : "Standard Fiber"
+      down: pkg.down,
+      up: pkg.up,
+      badge: pkg.name === "35M" ? "Primary Live Tier" : idx === 1 ? "Ultra Fiber" : pkg.type === "Corporate Lease" ? "Enterprise" : "Standard Fiber"
     }));
   }, [packagesList]);
 
@@ -284,15 +287,24 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       subzone: selectedSubZone,
       box: selectedBox,
       connectionType: connectionType,
-      serverName: serverName,
-      profile: profileName,
+      serverName: serverName || "DC-CA",
+      profile: (selectedPackage.split("—")[0].trim()) || profileName || "35M",
       service: protocolType as "pppoe",
-      package: selectedPackage,
-      speed: selectedPackage.includes("100") ? "100/50" : selectedPackage.includes("50") ? "50/25" : selectedPackage.includes("30") ? "30/15" : selectedPackage.includes("20") ? "20/10" : "10/5",
-      downloadSpeedMbps: selectedPackage.includes("100") ? 100 : selectedPackage.includes("50") ? 50 : selectedPackage.includes("30") ? 30 : selectedPackage.includes("20") ? 20 : 10,
-      uploadSpeedMbps: selectedPackage.includes("100") ? 50 : selectedPackage.includes("50") ? 25 : selectedPackage.includes("30") ? 15 : selectedPackage.includes("20") ? 10 : 5,
-      price: userType === "free" ? 0 : (Number(monthlyBill) || 1200),
-      monthlyBill: userType === "free" ? 0 : (Number(monthlyBill) || 1200),
+      package: selectedPackage.split("—")[0].trim() || "35M",
+      speed: (() => {
+        const p = PACKAGES.find(x => x.name === selectedPackage || x.cleanName === selectedPackage.split("—")[0].trim());
+        return p ? p.speed.replace(" Mbps", "") : "35/35";
+      })(),
+      downloadSpeedMbps: (() => {
+        const p = PACKAGES.find(x => x.name === selectedPackage || x.cleanName === selectedPackage.split("—")[0].trim());
+        return p?.down || (selectedPackage.includes("100") ? 100 : selectedPackage.includes("80") ? 80 : selectedPackage.includes("50") ? 50 : 35);
+      })(),
+      uploadSpeedMbps: (() => {
+        const p = PACKAGES.find(x => x.name === selectedPackage || x.cleanName === selectedPackage.split("—")[0].trim());
+        return p?.up || (selectedPackage.includes("100") ? 100 : selectedPackage.includes("80") ? 80 : selectedPackage.includes("50") ? 50 : 35);
+      })(),
+      price: userType === "free" ? 0 : (Number(monthlyBill) || (PACKAGES.find(x => x.name === selectedPackage)?.price || 500)),
+      monthlyBill: userType === "free" ? 0 : (Number(monthlyBill) || (PACKAGES.find(x => x.name === selectedPackage)?.price || 500)),
       status: userType === "free" ? "active" : (wantDisableClient ? "suspended" : "active"),
       netStatus: userType === "free" ? "online" : (wantDisableClient ? "offline" : "online"),
       userType: userType,

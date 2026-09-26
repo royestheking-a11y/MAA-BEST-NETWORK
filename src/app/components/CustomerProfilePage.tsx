@@ -16,11 +16,11 @@ import { usePermission } from "../context/AuthContext";
 import { billingStore, type IspPackage } from "./billing/billingData";
 
 const FALLBACK_PACKAGES: IspPackage[] = [
-  { id: "PKG-01", name: "5 Mbps Basic", down: 5, up: 2, price: 500, type: "PPPoE", customers: 0, margin: 40, mikrotikProfile: "profile-5M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "Economy home browsing & light streaming" },
-  { id: "PKG-02", name: "10 Mbps Home", down: 10, up: 5, price: 800, type: "PPPoE", customers: 0, margin: 45, mikrotikProfile: "profile-10M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "Standard family browsing, HD video & social" },
-  { id: "PKG-03", name: "15 Mbps Standard", down: 15, up: 8, price: 1000, type: "PPPoE", customers: 0, margin: 50, mikrotikProfile: "profile-15M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "HD streaming & smooth work-from-home" },
-  { id: "PKG-04", name: "20 Mbps Fiber Standard", down: 20, up: 10, price: 1200, type: "PPPoE", customers: 0, margin: 55, mikrotikProfile: "profile-20M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "4K streaming, low latency & gaming" },
-  { id: "PKG-05", name: "30 Mbps Home Fiber", down: 30, up: 15, price: 1500, type: "PPPoE", customers: 0, margin: 60, mikrotikProfile: "profile-30M", burstLimit: "0/0", fupLimit: "Unlimited", status: "active", desc: "Multi-device heavy home broadband" },
+  { id: "PKG-35M", name: "35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 194, margin: 56, mikrotikProfile: "35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber Broadband — Active Primary Tier" },
+  { id: "PKG-50M", name: "50M", down: 50, up: 50, price: 600, type: "PPPoE", customers: 0, margin: 60, mikrotikProfile: "50M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "50 Mbps Synchronous Ultra-Fiber — Streaming & Gaming" },
+  { id: "PKG-80M", name: "80M", down: 80, up: 80, price: 800, type: "PPPoE", customers: 0, margin: 65, mikrotikProfile: "80M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "80 Mbps Synchronous Pro Fiber — Multi-Device Power Users" },
+  { id: "PKG-100M", name: "100M", down: 100, up: 100, price: 1000, type: "PPPoE", customers: 0, margin: 70, mikrotikProfile: "100M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "100 Mbps Gigabit-Ready Enterprise Fiber Tier" },
+  { id: "PKG-10M", name: "10 Mbps", down: 10, up: 10, price: 1000, type: "Corporate Lease", customers: 0, margin: 75, mikrotikProfile: "10 Mbps", burstLimit: "No Burst", fupLimit: "Dedicated 1:1", status: "active", desc: "10 Mbps Dedicated 1:1 Corporate Bandwidth Pipe" },
 ];
 
 interface CustomerProfilePageProps {
