@@ -61,8 +61,8 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
           ...node,
           name: "BDCOM OLT 1 (Somitir Hat :1895)",
           status: (netxOlt1 ? (netxOlt1.last_status === 'online' ? 'online' : 'offline') : 'online') as MapNodeStatus,
-          sessions: netxOlt1?.online_onu_count || 94,
-          traffic: `${netxOlt1?.online_onu_count || 94}/${netxOlt1?.onu_count || 157} ONUs Active`,
+          sessions: netxOlt1?.online_onu_count ?? 94,
+          traffic: `${netxOlt1?.online_onu_count ?? 94}/${netxOlt1?.onu_count ?? 157} ONUs Active`,
           latency: `${telemetry.olt1.latencyMs || 12}ms`,
         };
       }
@@ -71,8 +71,8 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
           ...node,
           name: "BDCOM OLT 2 (Kalkini Hub :1896)",
           status: (netxOlt2 ? (netxOlt2.last_status === 'online' ? 'online' : 'offline') : 'online') as MapNodeStatus,
-          sessions: netxOlt2?.online_onu_count || 16,
-          traffic: `${netxOlt2?.online_onu_count || 16}/${netxOlt2?.onu_count || 156} ONUs Active`,
+          sessions: netxOlt2?.online_onu_count ?? 16,
+          traffic: `${netxOlt2?.online_onu_count ?? 16}/${netxOlt2?.onu_count ?? 156} ONUs Active`,
           latency: `${telemetry.olt2.latencyMs || 33}ms`,
         };
       }

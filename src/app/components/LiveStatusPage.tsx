@@ -277,7 +277,7 @@ export function LiveStatusPage() {
           ip: isOnline ? (liveMatch?.live_ip || c.ipAddress || `10.200.201.${50 + (idx % 200)}`) : "—",
           mac: liveMatch?.live_mac || c.mac || `50:65:F3:11:88:${String(idx + 1).padStart(2, "0")}`,
           rxPower: rxStr,
-          rxPowerNum: Number(realRx.toFixed(1)),
+          rxPowerNum: realRx !== null ? Number(realRx.toFixed(1)) : 0,
           ponPort: c.ponPort || `epon 0/${(idx % 4) + 1}`,
           olt: c.olt?.includes("OLT2") ? "OLT2" : "OLT1",
           up: isOnline ? `${pkgUp} Mbps` : "—",
@@ -376,16 +376,16 @@ export function LiveStatusPage() {
             const nextUptime = s.uptimeSeconds + 1;
             const bw = computeLiveBandwidth(s.pkgDown, s.pkgUp, true, idx, nextTick);
 
-            // Subtle optical laser drift (±0.03 dBm)
-            const rxDrift = (((idx * 13 + nextTick) % 7) - 3) * 0.015;
-            const newRxNum = Number((s.rxPowerNum + rxDrift).toFixed(1));
+            // Subtle optical laser drift (±0.03 dBm) only when active signal reading exists
+            const rxDrift = (s.rxPowerNum !== 0) ? (((idx * 13 + nextTick) % 7) - 3) * 0.015 : 0;
+            const newRxNum = s.rxPowerNum !== 0 ? Number((s.rxPowerNum + rxDrift).toFixed(1)) : 0;
 
             return {
               ...s,
               uptimeSeconds: nextUptime,
               uptime: formatTickingUptime(nextUptime),
               rxPowerNum: newRxNum,
-              rxPower: `${newRxNum.toFixed(1)} dBm`,
+              rxPower: newRxNum !== 0 ? `${newRxNum.toFixed(1)} dBm` : s.rxPower,
               liveDownMbps: bw.liveDownMbps,
               liveUpMbps: bw.liveUpMbps,
               liveDownFormatted: bw.liveDownFormatted,
