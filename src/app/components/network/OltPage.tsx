@@ -724,19 +724,20 @@ export function OltPage({ onNavigate }: OltPageProps) {
 
   useEffect(() => {
     if (editingOlt) {
+      const isGpon = editingOlt.ponStandard === "GPON" || editingOlt.id === "OLT-02" || editingOlt.name === "OLT2";
       setNewOlt({
         name: editingOlt.name,
         ip: editingOlt.ip,
         vendor: editingOlt.vendor || "BDCOM",
-        ponStandard: editingOlt.ponStandard || "EPON",
+        ponStandard: editingOlt.ponStandard || (isGpon ? "GPON" : "EPON"),
         connectionProtocol: editingOlt.connectionProtocol || "Telnet",
-        port: String(editingOlt.port || 1895),
+        port: String(editingOlt.port || (isGpon ? 1894 : 1895)),
         username: editingOlt.username || "admin",
         password: editingOlt.password || "",
         snmpCommunity: editingOlt.snmpCommunity || "public",
         snmpPort: String(editingOlt.snmpPort || 161),
         location: editingOlt.location || "Somitir Hat Core POP",
-        model: editingOlt.model || "BDCOM P3608B EPON OLT",
+        model: editingOlt.model || (isGpon ? "BDCOM GP3600-08 GPON OLT" : "BDCOM P3608B EPON OLT"),
         ponPorts: String(editingOlt.ponPorts || 8),
       });
       setShowAddOlt(true);
@@ -775,14 +776,15 @@ export function OltPage({ onNavigate }: OltPageProps) {
       setEditingOlt(null);
       setShowAddOlt(false);
     } else {
+      const isGpon = newOlt.ponStandard === "GPON" || newOlt.ponStandard === "XG-PON" || newOlt.ponStandard === "XGS-PON" || newOlt.name.toLowerCase().includes("gpon");
       const generatedId = `OLT-${String(olts.length + 1).padStart(2, "0")}`;
       const newChassis: OltDevice = {
         id: generatedId,
         name: newOlt.name.trim(),
         vendor: newOlt.vendor || "BDCOM",
-        model: newOlt.model || "BDCOM P3608B EPON OLT",
+        model: newOlt.model || (isGpon ? "BDCOM GP3600-08 GPON OLT" : "BDCOM P3608B EPON OLT"),
         ip: newOlt.ip.trim(),
-        port: Number(newOlt.port) || 1895,
+        port: Number(newOlt.port) || (isGpon ? 1894 : 1895),
         connectionProtocol: (newOlt.connectionProtocol || "Telnet") as any,
         username: newOlt.username || "admin",
         password: newOlt.password || "admin123",
@@ -798,7 +800,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
         rxPower: -20.5,
         status: "online",
         lastSync: "Just now (Added)",
-        ponStandard: (newOlt.ponStandard || "EPON") as any,
+        ponStandard: (newOlt.ponStandard || (isGpon ? "GPON" : "EPON")) as any,
       };
 
       networkStore.addOlt(newChassis);
@@ -2105,10 +2107,18 @@ export function OltPage({ onNavigate }: OltPageProps) {
                   <label className="font-bold text-muted-foreground block mb-1">OLT SERVER</label>
                   <select
                     value={newOnuOlt}
-                    onChange={e => setNewOnuOlt(e.target.value as "OLT1" | "OLT2")}
+                    onChange={e => {
+                      const val = e.target.value as "OLT1" | "OLT2";
+                      setNewOnuOlt(val);
+                      if (val === "OLT2" && newOnuPon.startsWith("epon")) {
+                        setNewOnuPon("gpon 0/1");
+                      } else if (val === "OLT1" && newOnuPon.startsWith("gpon")) {
+                        setNewOnuPon("epon 0/1");
+                      }
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-semibold outline-none">
-                    <option value="OLT1">OLT1 (Somitir Hat Core)</option>
-                    <option value="OLT2">OLT2 (Kalkini Hub)</option>
+                    <option value="OLT1">OLT1 (Somitir Hat Core EPON)</option>
+                    <option value="OLT2">OLT2 (Kalkini Hub GPON)</option>
                   </select>
                 </div>
                 <div>
@@ -2236,10 +2246,21 @@ export function OltPage({ onNavigate }: OltPageProps) {
                   <label className="font-bold text-muted-foreground block mb-1">PON STANDARD</label>
                   <select
                     value={newOlt.ponStandard}
-                    onChange={e => setNewOlt({ ...newOlt, ponStandard: e.target.value as any })}
+                    onChange={e => {
+                      const val = e.target.value as any;
+                      const isNowGpon = val === "GPON" || val === "XG-PON" || val === "XGS-PON";
+                      setNewOlt(prev => ({
+                        ...prev,
+                        ponStandard: val,
+                        model: isNowGpon && prev.model.includes("EPON")
+                          ? "BDCOM GP3600-08 GPON OLT"
+                          : (!isNowGpon && prev.model.includes("GPON") ? "BDCOM P3608B EPON OLT" : prev.model),
+                        port: isNowGpon && prev.port === "1895" ? "1894" : (!isNowGpon && prev.port === "1894" ? "1895" : prev.port)
+                      }));
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-semibold outline-none">
-                    <option value="EPON">EPON (1.25G)</option>
-                    <option value="GPON">GPON (2.5G)</option>
+                    <option value="EPON">EPON (1.25G IEEE 802.3ah)</option>
+                    <option value="GPON">GPON (2.5G ITU-T G.984)</option>
                     <option value="XG-PON">XG-PON (10G)</option>
                     <option value="XGS-PON">XGS-PON (10G/10G)</option>
                   </select>
