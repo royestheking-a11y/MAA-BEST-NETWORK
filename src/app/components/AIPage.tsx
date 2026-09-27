@@ -53,11 +53,11 @@ const highRiskCustomers = [
 
 const ASSISTANT_RESPONSES: Record<string, string> = {
   default:    "I can help you analyze your ISP business data in Madaripur & Kalkini. Ask me about revenue, collections, customer risk, zone performance, or network health.",
-  revenue:    "📊 **September 2026 Revenue Summary**\n\nTotal billed: ৳1,48,200\nCollected so far: ৳1,23,700 (83.5%)\nOutstanding due: ৳24,500\n\nThe main growth driver is Kalkini Somitir Hat (+14%) from new subscriber connections. Collection efficiency across Madaripur Sadar remains strong.",
-  due:        "⚠️ **Due Customer Analysis**\n\n45 customers are currently overdue in Kalkini & Madaripur.\nTotal outstanding: ৳24,500\n\nTop zones by outstanding:\n1. Kalkini Somitir Hat — ৳14,500 (14 days avg)\n2. Madaripur Sadar — ৳6,000\n3. Shibchar — ৳4,000\n\n**Recommendation**: Send SMS payment link reminders to Kalkini overdue subscribers.",
-  collection: "📈 **Collection Rate Analysis**\n\nSeptember collection rate: **83.5%**\nProjected end-of-month collection: 96.5%\n\n**AI Recommendation**: Automated bKash payment gateway links have reduced manual collection turnaround time by 65%.",
-  margin:     "💰 **Package Margin Analysis**\n\nHighest margin: 20 Mbps Fiber Standard (৳1,200/mo)\nMost popular: 20 Mbps Home Fiber (119 subscribers)\n\nConsider promotional upgrades for subscribers on 10 Mbps packages to 20 Mbps.",
-  mikrotik:   "🖥️ **MikroTik RouterOS Status**\n\n● MikroTik-01 (Madaripur Core) — Online, CPU 23%\n● MikroTik-02 (Kalkini Hub) — Online, CPU 34%\n● OLT-Madaripur-01 (Huawei GPON) — Online, 31 active sessions\n\n**Action**: All optical links and PON distribution boxes are operating within optimal Rx optical signal margins (-18.4 dBm).",
+  revenue:    "**September 2026 Revenue Summary**\n\nTotal billed: ৳1,48,200\nCollected so far: ৳1,23,700 (83.5%)\nOutstanding due: ৳24,500\n\nThe main growth driver is Kalkini Somitir Hat (+14%) from new subscriber connections. Collection efficiency across Madaripur Sadar remains strong.",
+  due:        "**Due Customer Analysis**\n\n45 customers are currently overdue in Kalkini & Madaripur.\nTotal outstanding: ৳24,500\n\nTop zones by outstanding:\n1. Kalkini Somitir Hat — ৳14,500 (14 days avg)\n2. Madaripur Sadar — ৳6,000\n3. Shibchar — ৳4,000\n\n**Recommendation**: Send SMS payment link reminders to Kalkini overdue subscribers.",
+  collection: "**Collection Rate Analysis**\n\nSeptember collection rate: **83.5%**\nProjected end-of-month collection: 96.5%\n\n**AI Recommendation**: Automated bKash payment gateway links have reduced manual collection turnaround time by 65%.",
+  margin:     "**Package Margin Analysis**\n\nHighest margin: 20 Mbps Fiber Standard (৳1,200/mo)\nMost popular: 20 Mbps Home Fiber (119 subscribers)\n\nConsider promotional upgrades for subscribers on 10 Mbps packages to 20 Mbps.",
+  mikrotik:   "**MikroTik RouterOS Status**\n\n● MikroTik-01 (Madaripur Core) — Online, CPU 23%\n● MikroTik-02 (Kalkini Hub) — Online, CPU 34%\n● OLT-Madaripur-01 (Huawei GPON) — Online, 31 active sessions\n\n**Action**: All optical links and PON distribution boxes are operating within optimal Rx optical signal margins (-18.4 dBm).",
 };
 
 function getResponse(msg: string): string {

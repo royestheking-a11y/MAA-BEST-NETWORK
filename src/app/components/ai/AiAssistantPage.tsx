@@ -53,13 +53,13 @@ export function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
       const q = userText.toLowerCase();
 
       if (q.includes("gulshan") || q.includes("down")) {
-        reply = "⚠️ **Gulshan POP Status Alert**:\n- Incident #INC-881 is active (Power Failure).\n- 1,890 customers affected.\n- Generator starter tripped. Technician Tanvir Hasan is on-site with an estimated restoration time of 30 minutes.";
+        reply = "**Gulshan POP Status Alert**:\n- Incident #INC-881 is active (Power Failure).\n- 1,890 customers affected.\n- Generator starter tripped. Technician Tanvir Hasan is on-site with an estimated restoration time of 30 minutes.";
       } else if (q.includes("optical") || q.includes("signal") || q.includes("degradation")) {
-        reply = "🔍 **Optical RX Power Diagnostics**:\n- 4 ONUs detected with signal worse than -27 dBm.\n- Worst: CUST-10003 (Nasrin Begum) on EPON 0/2:2 is reading **-27.8 dBm**.\n- Recommended Action: Clean SC/APC patch cord and verify optical splitter insertion loss.";
+        reply = "**Optical RX Power Diagnostics**:\n- 4 ONUs detected with signal worse than -27 dBm.\n- Worst: CUST-10003 (Nasrin Begum) on EPON 0/2:2 is reading **-27.8 dBm**.\n- Recommended Action: Clean SC/APC patch cord and verify optical splitter insertion loss.";
       } else if (q.includes("sms") || q.includes("reminder")) {
-        reply = "✉️ **Generated SMS Template**:\n`Dear [Customer_Name], your ISP bill of ৳[Amount] for [Month] is due. Avoid line suspension by paying today via bKash Merchant 01788-990011.`\nWould you like me to queue this into the Automation Engine?";
+        reply = "**Generated SMS Template**:\n`Dear [Customer_Name], your ISP bill of ৳[Amount] for [Month] is due. Avoid line suspension by paying today via bKash Merchant 01788-990011.`\nWould you like me to queue this into the Automation Engine?";
       } else if (q.includes("collection") || q.includes("bkash") || q.includes("revenue")) {
-        reply = "💰 **Today's Financial Summary**:\n- Total Realized Today: ৳63,200\n- bKash IPN: ৳48,200 (76.2%)\n- Nagad Business: ৳15,000 (23.8%)\n- Unpaid Invoices Remaining: 847 subscribers (৳6.8 Lac).";
+        reply = "**Today's Financial Summary**:\n- Total Realized Today: ৳63,200\n- bKash IPN: ৳48,200 (76.2%)\n- Nagad Business: ৳15,000 (23.8%)\n- Unpaid Invoices Remaining: 847 subscribers (৳6.8 Lac).";
       } else {
         reply = `I have cross-checked the database regarding "${userText}". All core systems (CCR2004, CCR2016, Huawei MA5800) are stable, with 12,840 total customers active and 8.84 Gbps aggregate throughput.`;
       }
@@ -134,9 +134,10 @@ export function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
                         <button
                           key={idx}
                           onClick={() => handleSend(s)}
-                          className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-card hover:bg-muted text-foreground transition-colors text-left"
+                          className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-card hover:bg-muted text-foreground transition-colors text-left flex items-center gap-1.5"
                         >
-                          ⚡ {s}
+                          <Sparkles size={11} className="text-primary shrink-0" />
+                          <span>{s}</span>
                         </button>
                       ))}
                     </div>

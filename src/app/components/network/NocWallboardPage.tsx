@@ -290,7 +290,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
                 const next = !audioAlerts;
                 setAudioAlerts(next);
                 if (next) playAlertSound(1000, 0.15);
-                showToast(next ? "🔊 NOC Audio Alert Chimes Enabled" : "🔇 Audio Alerts Muted");
+                showToast(next ? "NOC Audio Alert Chimes Enabled" : "Audio Alerts Muted");
               }}
               className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                 audioAlerts ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "hover:bg-muted"
@@ -305,7 +305,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
               onClick={() => {
                 refreshNetx();
                 playAlertSound(750, 0.1);
-                showToast("✓ Core router & OLT telemetry sync dispatched");
+                showToast("Core router & OLT telemetry sync dispatched");
               }}
               disabled={isNetxLoading}
               className="p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer hover:bg-muted"
@@ -584,7 +584,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => showToast("✓ MikroTik RouterOS API & RADIUS Session Table Sync Verified")}
+            onClick={() => showToast("MikroTik RouterOS API & RADIUS Session Table Sync Verified")}
             className="px-3.5 py-1.5 rounded-xl border font-semibold transition-all cursor-pointer hover:bg-muted"
             style={{ borderColor: cardBorder, color: textPrimary, background: cardBg }}>
             Sync RouterOS RADIUS

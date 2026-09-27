@@ -1045,9 +1045,9 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 {search && (
                   <button
                     onClick={() => { setSearch(""); setPage(1); }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
                   >
-                    ✕
+                    <X size={13} />
                   </button>
                 )}
               </div>
@@ -3954,8 +3954,9 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               </div>
             </div>
 
-            <p className="text-xs text-rose-600 dark:text-rose-400 font-medium leading-relaxed">
-              ⚠️ Warning: This will permanently remove the subscriber from Cloud Firestore, Billing records, and deprovision / remove the PPPoE secret on MikroTik RouterOS.
+            <p className="text-xs text-rose-600 dark:text-rose-400 font-medium leading-relaxed flex items-start gap-1.5">
+              <AlertTriangle size={15} className="text-rose-500 shrink-0 mt-0.5" />
+              <span>Warning: This will permanently remove the subscriber from Cloud Firestore, Billing records, and deprovision / remove the PPPoE secret on MikroTik RouterOS.</span>
             </p>
 
             <div className="flex gap-3 pt-2">

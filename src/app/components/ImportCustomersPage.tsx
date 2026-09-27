@@ -4,7 +4,7 @@ import {
   ArrowRight, ArrowLeft, RefreshCw, Filter, Search, Check, Sparkles,
   Server, Smartphone, User, ShieldCheck, Database, FileCheck,
   AlertCircle, ChevronRight, X, ExternalLink, HardDrive, Cpu, Radio,
-  Tag, Layers, CheckCheck, Play
+  Tag, Layers, CheckCheck, Play, Map as MapIcon
 } from "lucide-react";
 import { useCustomerContext, Customer, Invoice } from "../context/CustomerContext";
 import { usePermission } from "../context/AuthContext";
@@ -916,17 +916,19 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
 
               <button
                 onClick={() => onNavigate?.("customer-map")}
-                className="px-6 py-3 rounded-xl border border-border bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-6 py-3 rounded-xl border border-border bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-colors cursor-pointer flex items-center gap-2"
               >
-                <span>View on Hybrid Map 🗺️</span>
+                <MapIcon size={14} className="text-primary" />
+                <span>View on Hybrid Map</span>
               </button>
 
               <button
                 onClick={() => onNavigate?.("customers")}
-                className="px-8 py-3 rounded-xl text-white text-xs font-semibold shadow-md hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5"
+                className="px-8 py-3 rounded-xl text-white text-xs font-semibold shadow-md hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2"
                 style={{ background: "var(--primary)" }}
               >
-                <span>Open Customer Directory →</span>
+                <span>Open Customer Directory</span>
+                <ArrowRight size={14} />
               </button>
             </div>
           </div>

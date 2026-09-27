@@ -291,10 +291,10 @@ export function LeakageDetectorPage({ onNavigate }: { onNavigate?: (page: string
             onChange={e => setSeverityFilter(e.target.value)}
             className="w-full px-3 py-2 rounded-xl text-xs bg-card border border-border text-foreground outline-none cursor-pointer focus:border-amber-500 shadow-xs"
           >
-            <option value="all">⚡ All Severity Levels</option>
-            <option value="critical">🚨 Critical Anomalies</option>
-            <option value="high">⚠️ High Risk / Unbound MACs</option>
-            <option value="warning">ℹ️ Rate / Usage Warnings</option>
+            <option value="all">All Severity Levels</option>
+            <option value="critical">Critical Anomalies</option>
+            <option value="high">High Risk / Unbound MACs</option>
+            <option value="warning">Rate / Usage Warnings</option>
           </select>
         </div>
       </div>

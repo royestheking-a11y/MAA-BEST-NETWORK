@@ -399,9 +399,9 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
         model: "RouterOS x86 (Intel Xeon 72-Core)",
       });
 
-      showToast(`✓ Router "${srv.name}" (${srv.ip}:8728) synchronized! ${activeSessions.length} unique MBN subscribers verified with 0 duplicates.`);
+      showToast(`Router "${srv.name}" (${srv.ip}:8728) synchronized! ${activeSessions.length} unique MBN subscribers verified with 0 duplicates.`);
     } catch (e: any) {
-      showToast(`⚠️ Sync notice: ${e.message}`);
+      showToast(`Sync notice: ${e.message}`);
     } finally {
       setSyncingId(null);
     }
@@ -420,24 +420,24 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       if (data && data.success) {
         setTestResult({
           ok: true,
-          message: `✓ Connection Handshake Successful! RouterOS API responded for gateway ${serverFormData.ip} with ${data.count || 194} active subscriber queues.`
+          message: `Connection Handshake Successful! RouterOS API responded for gateway ${serverFormData.ip} with ${data.count || 194} active subscriber queues.`
         });
       } else {
         setTestResult({
           ok: false,
-          message: `⚠️ Gateway responded but could not reach ${serverFormData.ip}:${serverFormData.apiPort || 8728}. Verify RouterOS API service is enabled.`
+          message: `Gateway responded but could not reach ${serverFormData.ip}:${serverFormData.apiPort || 8728}. Verify RouterOS API service is enabled.`
         });
       }
     } catch {
       if (serverFormData.ip.includes("103.12.173")) {
         setTestResult({
           ok: true,
-          message: `✓ Core Router Link verified (${serverFormData.ip}:${serverFormData.apiPort || 8728}). Active BGP PPPoE Gateway.`
+          message: `Core Router Link verified (${serverFormData.ip}:${serverFormData.apiPort || 8728}). Active BGP PPPoE Gateway.`
         });
       } else {
         setTestResult({
           ok: false,
-          message: `⚠️ Connection test timed out for ${serverFormData.ip}. Ensure port ${serverFormData.apiPort || 8728} is open in MikroTik firewall.`
+          message: `Connection test timed out for ${serverFormData.ip}. Ensure port ${serverFormData.apiPort || 8728} is open in MikroTik firewall.`
         });
       }
     } finally {
@@ -755,12 +755,12 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       const data = await res.json();
       if (data.success) {
         toggleNetStatus(session.rawCustomer.id, false);
-        showToast(`✓ PPPoE session for '${username}' forcibly disconnected from RouterOS. Session ID: ${data.sessionId || 'N/A'}`);
+        showToast(`PPPoE session for '${username}' forcibly disconnected from RouterOS. Session ID: ${data.sessionId || 'N/A'}`);
       } else {
-        showToast(`⚠️ Disconnect: ${data.error || 'Unknown error from RouterOS'}`);
+        showToast(`Disconnect: ${data.error || 'Unknown error from RouterOS'}`);
       }
     } catch (e: any) {
-      showToast(`⚠️ Disconnect failed: ${e.message}`);
+      showToast(`Disconnect failed: ${e.message}`);
     } finally {
       setActionInProgress(null);
     }
@@ -783,12 +783,12 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       const data = await res.json();
       if (data.success) {
         toggleNetStatus(session.rawCustomer.id, !disabled);
-        showToast(`✓ PPPoE secret '${username}' ${disabled ? 'DISABLED' : 'ENABLED'} on RouterOS. Connection state updated.`);
+        showToast(`PPPoE secret '${username}' ${disabled ? 'DISABLED' : 'ENABLED'} on RouterOS. Connection state updated.`);
       } else {
-        showToast(`⚠️ Toggle: ${data.error || 'Unknown error from RouterOS'}`);
+        showToast(`Toggle: ${data.error || 'Unknown error from RouterOS'}`);
       }
     } catch (e: any) {
-      showToast(`⚠️ Toggle failed: ${e.message}`);
+      showToast(`Toggle failed: ${e.message}`);
     } finally {
       setActionInProgress(null);
     }
@@ -1741,8 +1741,13 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
               </div>
 
               {testResult && (
-                <div className={`p-3 rounded-xl text-xs font-semibold ${testResult.ok ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-amber-500/10 text-amber-600 border border-amber-500/20"}`}>
-                  {testResult.message}
+                <div className={`p-3 rounded-xl text-xs font-semibold flex items-start gap-2 ${testResult.ok ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-amber-500/10 text-amber-600 border border-amber-500/20"}`}>
+                  {testResult.ok ? (
+                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  )}
+                  <span>{testResult.message}</span>
                 </div>
               )}
 
@@ -1914,8 +1919,16 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-[650] flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 text-white border border-emerald-500/40 text-xs font-bold shadow-2xl animate-in fade-in slide-in-from-bottom duration-200">
-          <CheckCircle2 size={16} className="text-emerald-400" />
+        <div className={`fixed bottom-6 right-6 z-[650] flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-bold shadow-2xl animate-in fade-in slide-in-from-bottom duration-200 border ${
+          toast.toLowerCase().includes("fail") || toast.toLowerCase().includes("error") || toast.toLowerCase().includes("notice") || toast.toLowerCase().includes("denied")
+            ? "border-amber-500/40"
+            : "border-emerald-500/40"
+        }`}>
+          {toast.toLowerCase().includes("fail") || toast.toLowerCase().includes("error") || toast.toLowerCase().includes("notice") || toast.toLowerCase().includes("denied") ? (
+            <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+          ) : (
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+          )}
           <span>{toast}</span>
         </div>
       )}

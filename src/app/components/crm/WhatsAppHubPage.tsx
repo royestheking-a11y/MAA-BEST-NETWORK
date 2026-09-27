@@ -434,8 +434,9 @@ export function WhatsAppHubPage({ onNavigate }: WhatsAppHubPageProps) {
               <div key={t.name} className="p-4 rounded-xl border space-y-2.5" style={{ background: "var(--muted)", borderColor: "var(--border)" }}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-bold" style={{ color: "var(--foreground)" }}>{t.name}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-700 bg-emerald-100">
-                    ✓ {t.status}
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-700 bg-emerald-100 flex items-center gap-1">
+                    <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                    <span>{t.status}</span>
                   </span>
                 </div>
                 <div className="text-xs p-3 rounded-lg bg-white border text-gray-700 font-sans leading-relaxed">

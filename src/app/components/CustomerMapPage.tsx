@@ -619,7 +619,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
             <strong style="color:#0284C7;">${c.name}</strong> (${c.clientCode})<br/>
             <span>Status: <strong style="color:${nodeColor};">${isOnline ? "Online (Active)" : "Offline / Broken"}</strong></span><br/>
             <span>Signal: <strong>${isOnline && c.opticalPower !== null ? `${c.opticalPower} dBm` : 'LOS (No Light)'}</strong> · Speed: <strong>${c.downloadSpeedMbps} Mbps</strong></span><br/>
-            <span style="color:#64748B;">📍 ${c.address}</span>
+            <span style="color:#64748B; display:flex; align-items:center; gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${c.address}</span>
           </div>
         `, {
           direction: "top",
@@ -1216,7 +1216,10 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
                       <p className="text-[11px] text-muted-foreground font-mono">
                         {c.clientCode} · {c.package} · {c.ipAddress}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">📍 {c.address}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} className="text-slate-400 shrink-0" />
+                        <span>{c.address}</span>
+                      </p>
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-muted text-foreground block">

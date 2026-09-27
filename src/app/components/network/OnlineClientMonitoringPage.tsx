@@ -5,7 +5,7 @@ import {
   Layers, Server, Wifi, Activity, ArrowUpDown, ArrowUp, ArrowDown, Network,
   AlertTriangle, ShieldCheck, HelpCircle, Check, X,
   Radio, BarChart3, SlidersHorizontal, Download, Eye, ChevronLeft, ChevronRight, Zap, Clock,
-  AlertCircle, Scissors, PowerOff, ShieldAlert
+  AlertCircle, Scissors, PowerOff, ShieldAlert, Lock
 } from "lucide-react";
 import { useCustomerContext, Customer } from "../../context/CustomerContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -139,7 +139,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     refreshNetx();
     setTimeout(() => {
       setIsSyncing(false);
-      setSyncToast(`✓ Live sync complete: Synchronized ${customers.length} client(s) with MikroTik RouterOS & OLT telemetry.`);
+      setSyncToast(`Live sync complete: Synchronized ${customers.length} client(s) with MikroTik RouterOS & OLT telemetry.`);
       setTimeout(() => setSyncToast(""), 4000);
     }, 1000);
   };
@@ -148,7 +148,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   const handleSessionAction = (c: Customer) => {
     const nextStatus = c.netStatus === "online" ? false : true;
     toggleNetStatus(c.id, nextStatus);
-    setSyncToast(`✓ Sent RouterOS API command: ${nextStatus ? "Re-authorize" : "Disconnect/Kick"} for ${c.name} (${c.clientCode || c.id})`);
+    setSyncToast(`Sent RouterOS API command: ${nextStatus ? "Re-authorize" : "Disconnect/Kick"} for ${c.name} (${c.clientCode || c.id})`);
     setTimeout(() => setSyncToast(""), 3500);
   };
 
@@ -535,7 +535,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   // Real ICMP Ping test directly from MikroTik RouterOS core (103.12.173.136)
   const handlePingTest = async (ip: string) => {
     if (!ip || ip === "—" || ip.startsWith("0.")) {
-      setPingResult("✗ Destination Host Unreachable / Session Offline.");
+      setPingResult("Destination Host Unreachable / Session Offline.");
       return;
     }
     setIsPinging(true);
@@ -555,15 +555,15 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       if (data.success) {
         const lossPct = data.sent > 0 ? Math.round((data.lost / data.sent) * 100) : 0;
         if (data.received > 0) {
-          setPingResult(`✓ ${data.sent} packets sent, ${data.received} received (${lossPct}% loss). RTT min/avg/max = ${data.minMs}/${data.avgMs}/${data.maxMs} ms (from MikroTik DC-CA)`);
+          setPingResult(`${data.sent} packets sent, ${data.received} received (${lossPct}% loss). RTT min/avg/max = ${data.minMs}/${data.avgMs}/${data.maxMs} ms (from MikroTik DC-CA)`);
         } else {
-          setPingResult(`✗ ${data.sent} packets transmitted, 0 received, 100% packet loss. Host ${ip} unreachable.`);
+          setPingResult(`${data.sent} packets transmitted, 0 received, 100% packet loss. Host ${ip} unreachable.`);
         }
       } else {
-        setPingResult(`✗ RouterOS Ping: ${data.error || "Host Unreachable"}`);
+        setPingResult(`RouterOS Ping: ${data.error || "Host Unreachable"}`);
       }
     } catch (err: any) {
-      setPingResult(`✗ MikroTik Ping gateway timeout: ${err.message || "Failed to reach RouterOS API"}`);
+      setPingResult(`MikroTik Ping gateway timeout: ${err.message || "Failed to reach RouterOS API"}`);
     } finally {
       setIsPinging(false);
     }
@@ -696,7 +696,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
           <button
             onClick={() => {
               const count = runBillingCutoffEngine();
-              setSyncToast(`✓ Auto-Billing Engine: Scanned 194 subscribers. ${count > 0 ? `${count} overdue subscriber(s) suspended & disabled on MikroTik.` : "All accounts verified & current."}`);
+              setSyncToast(`Auto-Billing Engine: Scanned 194 subscribers. ${count > 0 ? `${count} overdue subscriber(s) suspended & disabled on MikroTik.` : "All accounts verified & current."}`);
               setTimeout(() => setSyncToast(""), 4500);
             }}
             className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
@@ -1352,12 +1352,14 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                             </span>
                           </div>
                           <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
-                            <span className={`px-1.5 py-0.2 rounded border font-semibold ${diagnosis.laserStatus.badgeClass}`}>
-                              ⚡ {diagnosis.laserStatus.displayText}
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border font-semibold ${diagnosis.laserStatus.badgeClass}`}>
+                              <Zap size={10} className="text-amber-500 fill-amber-500/20 shrink-0" />
+                              <span>{diagnosis.laserStatus.displayText}</span>
                             </span>
                             {diagnosis.macBinding.isBound && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5" title={`Bound MAC: ${diagnosis.macBinding.boundMac}`}>
-                                🔒 Bound
+                              <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1 font-semibold" title={`Bound MAC: ${diagnosis.macBinding.boundMac}`}>
+                                <Lock size={10} className="text-primary shrink-0" />
+                                <span>Bound</span>
                               </span>
                             )}
                           </div>
@@ -1707,8 +1709,15 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                     </button>
                   </div>
                   {pingResult && (
-                    <div className="p-2 rounded bg-slate-900 text-emerald-400 font-mono text-[11px] animate-in fade-in">
-                      {pingResult}
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-border/40 font-mono text-[11px] animate-in fade-in flex items-start gap-2">
+                      {pingResult.includes("0 received") || pingResult.includes("Unreachable") || pingResult.includes("timeout") || pingResult.includes("failed") ? (
+                        <AlertTriangle size={14} className="text-rose-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <CheckCircle2 size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                      )}
+                      <span className={pingResult.includes("0 received") || pingResult.includes("Unreachable") || pingResult.includes("timeout") || pingResult.includes("failed") ? "text-rose-400" : "text-emerald-400"}>
+                        {pingResult}
+                      </span>
                     </div>
                   )}
                 </div>

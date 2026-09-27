@@ -1009,8 +1009,9 @@ export function SettingsPage({ onNavigate, defaultTab }: SettingsPageProps) {
                   <div className="flex items-center gap-3">
                     <Toggle value={security.require2FA} onChange={v => setSecurity(s => ({ ...s, require2FA: v }))} />
                     {security.require2FA && (
-                      <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{ background: "rgba(22,163,74,0.1)", color: "#16A34A" }}>
-                        ✓ Enabled
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1" style={{ background: "rgba(22,163,74,0.1)", color: "#16A34A" }}>
+                        <Check size={12} strokeWidth={2.5} />
+                        <span>Enabled</span>
                       </span>
                     )}
                   </div>
