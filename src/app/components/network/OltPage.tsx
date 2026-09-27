@@ -736,7 +736,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
         password: editingOlt.password || "",
         snmpCommunity: editingOlt.snmpCommunity || "public",
         snmpPort: String(editingOlt.snmpPort || 161),
-        location: editingOlt.location || "Somitir Hat Core POP",
+        location: editingOlt.location || (isGpon ? "Kalkini Distribution Hub" : "Somitir Hat Core POP"),
         model: editingOlt.model || (isGpon ? "BDCOM GP3600-08 GPON OLT" : "BDCOM P3608B EPON OLT"),
         ponPorts: String(editingOlt.ponPorts || 8),
       });
@@ -2233,7 +2233,22 @@ export function OltPage({ onNavigate }: OltPageProps) {
                   <label className="font-bold text-muted-foreground block mb-1">VENDOR</label>
                   <select
                     value={newOlt.vendor}
-                    onChange={e => setNewOlt({ ...newOlt, vendor: e.target.value })}
+                    onChange={e => {
+                      const v = e.target.value;
+                      const isGpon = newOlt.ponStandard === "GPON" || newOlt.ponStandard === "XG-PON" || newOlt.ponStandard === "XGS-PON";
+                      let autoModel = newOlt.model;
+                      if (v === "Huawei") autoModel = isGpon ? "Huawei SmartAX MA5608T GPON OLT" : "Huawei SmartAX MA5680T EPON OLT";
+                      else if (v === "VSOL") autoModel = isGpon ? "VSOL V1600G1 GPON OLT" : "VSOL V1600D4-DP EPON OLT";
+                      else if (v === "ZTE") autoModel = isGpon ? "ZTE ZXA10 C320 GPON OLT" : "ZTE C220 EPON OLT";
+                      else if (v === "Fiberhome") autoModel = isGpon ? "Fiberhome AN5516-04 GPON OLT" : "Fiberhome AN5116 EPON OLT";
+                      else if (v === "BDCOM") autoModel = isGpon ? "BDCOM GP3600-08 GPON OLT" : "BDCOM P3608B EPON OLT";
+
+                      setNewOlt(prev => ({
+                        ...prev,
+                        vendor: v,
+                        model: autoModel
+                      }));
+                    }}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-semibold outline-none">
                     <option value="BDCOM">BDCOM</option>
                     <option value="VSOL">VSOL</option>
