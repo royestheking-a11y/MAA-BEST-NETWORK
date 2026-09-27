@@ -14,6 +14,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useCustomerContext, Customer } from "../context/CustomerContext";
 import { usePermission } from "../context/AuthContext";
 import { billingStore, type IspPackage } from "./billing/billingData";
+import { crmStore, type SupportTicket } from "./crm/crmData";
 
 const FALLBACK_PACKAGES: IspPackage[] = [
   { id: "PKG-35M", name: "35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 194, margin: 56, mikrotikProfile: "35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber Broadband — Active Primary Tier" },
@@ -140,45 +141,6 @@ const usageData = [
   { day: "Sun", upload: 4.1, download: 27.9 },
 ];
 
-const paymentHistory = [
-  { date: "01 Aug 2026", amount: 1200, method: "bKash", txn: "TX8832761", by: "Gateway", status: "verified" },
-  { date: "01 Jul 2026", amount: 1200, method: "bKash", txn: "TX7744821", by: "Gateway", status: "verified" },
-  { date: "01 Jun 2026", amount: 1200, method: "Cash", txn: "—", by: "Admin", status: "verified" },
-  { date: "01 May 2026", amount: 1100, method: "Nagad", txn: "NG44029", by: "Gateway", status: "verified" },
-  { date: "01 Apr 2026", amount: 1200, method: "bKash", txn: "TX5521389", by: "Gateway", status: "verified" },
-  { date: "15 Mar 2026", amount: 200, method: "Cash", txn: "—", by: "Collector", status: "verified" },
-];
-
-const activityLog = [
-  { time: "01 Aug 2026, 09:14", event: "Payment received ৳1,200 via bKash", type: "payment", icon: CreditCard, color: "#16A34A" },
-  { time: "01 Aug 2026, 09:15", event: "Internet reconnected automatically", type: "network", icon: Wifi, color: "#2563EB" },
-  { time: "10 Jul 2026, 00:00", event: "Auto-disconnected (due date passed)", type: "disconnect", icon: WifiOff, color: "#DC2626" },
-  { time: "28 Jul 2026, 14:22", event: "SMS sent: bill reminder (3 days due)", type: "sms", icon: MessageSquare, color: "#D97706" },
-  { time: "01 Jul 2026, 10:05", event: "Invoice #INV-4821 generated ৳1,200", type: "billing", icon: FileText, color: "#7C3AED" },
-  { time: "15 Jun 2026, 16:40", event: "Package changed to 20 Mbps Fiber", type: "package", icon: Package, color: "#0891B2" },
-  { time: "12 Aug 2023, 11:00", event: "Customer account created", type: "created", icon: UserCheck, color: "#8B2020" },
-];
-
-const tickets = [
-  { id: "TKT-2241", subject: "Internet speed slow in evenings", priority: "medium", status: "resolved", created: "10 Jul 2026", resolved: "11 Jul 2026" },
-  { id: "TKT-1882", subject: "Connection drops every 2 hours", priority: "high", status: "resolved", created: "22 Mar 2026", resolved: "23 Mar 2026" },
-  { id: "TKT-0990", subject: "Request IP change", priority: "low", status: "resolved", created: "05 Jan 2026", resolved: "06 Jan 2026" },
-];
-
-const invoices = [
-  { id: "INV-5021", period: "Aug 2026", amount: 1200, status: "paid", issued: "01 Aug 2026", paid: "01 Aug 2026" },
-  { id: "INV-4821", period: "Jul 2026", amount: 1200, status: "paid", issued: "01 Jul 2026", paid: "01 Jul 2026" },
-  { id: "INV-4608", period: "Jun 2026", amount: 1200, status: "paid", issued: "01 Jun 2026", paid: "02 Jun 2026" },
-  { id: "INV-4394", period: "May 2026", amount: 1100, status: "paid", issued: "01 May 2026", paid: "01 May 2026" },
-];
-
-const messages = [
-  { date: "01 Aug 2026", msg: "Dear Rahim, payment of ৳1,200 received. Internet activated. Thank you! — MAA BEST NETWORK", type: "auto" },
-  { date: "28 Jul 2026", msg: "Dear Rahim, your bill of ৳1,200 is due on 10 Aug. Please pay on time to avoid disconnection. — MAA BEST NETWORK", type: "auto" },
-  { date: "01 Jul 2026", msg: "Dear Rahim, payment of ৳1,200 received. Internet activated. Thank you! — MAA BEST NETWORK", type: "auto" },
-  { date: "01 Jul 2026", msg: "Dear Rahim, invoice #INV-4821 for ৳1,200 has been generated for Jul 2026. — MAA BEST NETWORK", type: "auto" },
-];
-
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: "rgba(22,163,74,0.1)", text: "#16A34A", dot: "#16A34A" },
   online: { bg: "rgba(22,163,74,0.1)", text: "#16A34A", dot: "#16A34A" },
@@ -263,13 +225,14 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
   const [customer, setCustomer] = useState<CustomerProfileData>(() => {
     const c = realCustomer || customers[0];
     if (!c) return initialCustomer;
+    const initialPrice = c.price || c.monthlyBill || 500;
     return {
       id: c.clientCode || c.id,
       name: c.name,
-      phone: c.phone || "01711-223344",
+      phone: c.phone || "—",
       altPhone: c.phone2 || "—",
       email: c.email || `${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`,
-      nid: c.nidNo || "19821234567890",
+      nid: c.nidNo || "—",
       address: c.address || "Kalkini, Madaripur",
       zone: c.zone || "Madaripur",
       subZone: c.subzone || "Kalkini Somitir Hat",
@@ -281,26 +244,26 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       createdAt: c.joinDate || "12 Aug 2023",
       pppoeUsername: c.pppUser || `mbn_${c.name.toLowerCase()}`,
       pppoePassword: c.pppPass || "••••••••",
-      staticIP: c.ipAddress || "103.145.60.47",
+      staticIP: c.ipAddress || "—",
       connectionType: "PPPoE",
-      macAddress: c.mac || "4c:46:d1:55:08:25",
+      macAddress: c.mac || "—",
       mikrotik: c.mikrotik || "MikroTik-01 (Madaripur Core)",
       olt: c.olt || "OLT1",
       onu: c.deviceSerial || "ONU-0802",
-      onuMac: c.mac || "4c:46:d1:55:08:25",
+      onuMac: c.mac || "—",
       ponPort: c.ponPort || "epon 0/1",
       onuModel: "BDCOM EPON ONU",
       onuSerial: c.deviceSerial || "BDCM7A1190BC",
       vlan: "VLAN-100",
       serviceProfile: "EPON-1G-Profile",
       rxPower: c.onuSignal || "—",
-      txPower: "2.1 dBm",
-      distance: "1.24 km",
+      txPower: c.netStatus === "online" ? "Normal (+2.5 dBm nominal)" : "—",
+      distance: c.cableMetre ? `${c.cableMetre}m drop cable` : "Auto-Ranged",
       currentStatus: (c.netStatus === "online" || c.status === "active" ? "online" : "offline") as any,
       uptimeSeconds: parseUptimeToSeconds(c.sessionUptime),
       uptime: formatTickingUptime(parseUptimeToSeconds(c.sessionUptime)),
-      package: c.profile || "20 Mbps Fiber Standard",
-      packagePrice: c.price || c.monthlyBill || 1200,
+      package: c.profile || "35M",
+      packagePrice: initialPrice,
       billingDate: 1,
       dueDate: 10,
       discount: 0,
@@ -309,7 +272,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       currentBalance: c.dueAmount || 0,
       previousDue: 0,
       lastPaidDate: "01 Aug 2026",
-      lastPaidAmount: c.price || c.monthlyBill || 1200,
+      lastPaidAmount: initialPrice,
     };
   });
 
@@ -332,13 +295,14 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
   useEffect(() => {
     if (realCustomer) {
       const upSec = parseUptimeToSeconds(realCustomer.sessionUptime);
+      const pkgPrice = realCustomer.price || realCustomer.monthlyBill || 500;
       setCustomer({
         id: realCustomer.clientCode || realCustomer.id,
         name: realCustomer.name,
-        phone: realCustomer.phone || "01711-223344",
+        phone: realCustomer.phone || "—",
         altPhone: realCustomer.phone2 || "—",
         email: realCustomer.email || `${realCustomer.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`,
-        nid: realCustomer.nidNo || "19821234567890",
+        nid: realCustomer.nidNo || "—",
         address: realCustomer.address || "Kalkini, Madaripur",
         zone: realCustomer.zone || "Madaripur",
         subZone: realCustomer.subzone || "Kalkini Somitir Hat",
@@ -350,26 +314,26 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         createdAt: realCustomer.joinDate || "12 Aug 2023",
         pppoeUsername: realCustomer.pppUser || `mbn_${realCustomer.name.toLowerCase()}`,
         pppoePassword: realCustomer.pppPass || "••••••••",
-        staticIP: realCustomer.ipAddress || "103.145.60.47",
+        staticIP: realCustomer.ipAddress || "—",
         connectionType: "PPPoE",
-        macAddress: realCustomer.mac || "4c:46:d1:55:08:25",
+        macAddress: realCustomer.mac || "—",
         mikrotik: realCustomer.mikrotik || "MikroTik-01 (Madaripur Core)",
         olt: realCustomer.olt || "OLT1",
         onu: realCustomer.deviceSerial || "ONU-0802",
-        onuMac: realCustomer.mac || "4c:46:d1:55:08:25",
+        onuMac: realCustomer.mac || "—",
         ponPort: realCustomer.ponPort || "epon 0/1",
         onuModel: "BDCOM EPON ONU",
         onuSerial: realCustomer.deviceSerial || "BDCM7A1190BC",
         vlan: "VLAN-100",
         serviceProfile: "EPON-1G-Profile",
         rxPower: realCustomer.onuSignal || "—",
-        txPower: "2.1 dBm",
-        distance: "1.24 km",
+        txPower: realCustomer.netStatus === "online" ? "Normal (+2.5 dBm nominal)" : "—",
+        distance: realCustomer.cableMetre ? `${realCustomer.cableMetre}m drop cable` : "Auto-Ranged",
         currentStatus: (realCustomer.netStatus === "online" || realCustomer.status === "active" ? "online" : "offline") as any,
         uptimeSeconds: upSec,
         uptime: formatTickingUptime(upSec),
-        package: realCustomer.profile || "20 Mbps Fiber Standard",
-        packagePrice: realCustomer.price || realCustomer.monthlyBill || 1200,
+        package: realCustomer.profile || "35M",
+        packagePrice: pkgPrice,
         billingDate: 1,
         dueDate: 10,
         discount: 0,
@@ -378,10 +342,70 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         currentBalance: realCustomer.dueAmount || 0,
         previousDue: 0,
         lastPaidDate: "01 Aug 2026",
-        lastPaidAmount: realCustomer.price || realCustomer.monthlyBill || 1200,
+        lastPaidAmount: pkgPrice,
       });
     }
   }, [realCustomer]);
+
+  // Real-time crmStore integration for customer support tickets
+  const [allTickets, setAllTickets] = useState<SupportTicket[]>(() => crmStore.getTickets());
+  useEffect(() => {
+    return crmStore.subscribe(() => {
+      setAllTickets(crmStore.getTickets());
+    });
+  }, []);
+
+  const custTickets = useMemo(() => {
+    const cId = (customer.id || "").toLowerCase();
+    const cName = (customer.name || "").toLowerCase();
+    return allTickets.filter(t =>
+      (t.custId && t.custId.toLowerCase() === cId) ||
+      (t.customerName && t.customerName.toLowerCase() === cName)
+    );
+  }, [allTickets, customer.id, customer.name]);
+
+  const displayMessages = useMemo(() => {
+    const pkgPrice = customer.packagePrice || 500;
+    return [
+      {
+        date: "01 Aug 2026",
+        msg: `Dear ${customer.name}, payment of ৳${pkgPrice.toLocaleString()} received for ${customer.package}. Internet service is active. Thank you! — MAA BEST NETWORK`,
+        type: "auto" as const,
+      },
+      {
+        date: "28 Jul 2026",
+        msg: `Dear ${customer.name}, your bill of ৳${pkgPrice.toLocaleString()} is due on 10th. Please pay on time to avoid disconnection. — MAA BEST NETWORK`,
+        type: "auto" as const,
+      },
+    ];
+  }, [customer.name, customer.package, customer.packagePrice]);
+
+  const displayActivityLog = useMemo(() => {
+    const pkgPrice = customer.packagePrice || 500;
+    return [
+      {
+        time: "01 Aug 2026, 09:14",
+        event: `Payment received ৳${pkgPrice.toLocaleString()} via bKash Online Gateway`,
+        type: "payment",
+        icon: CreditCard,
+        color: "#16A34A",
+      },
+      {
+        time: customer.currentStatus === "online" ? "Active Now" : "01 Aug 2026, 09:15",
+        event: customer.currentStatus === "online" ? "Active PPPoE session verified on MikroTik Core" : "PPPoE session offline / idle",
+        type: "network",
+        icon: customer.currentStatus === "online" ? Wifi : WifiOff,
+        color: customer.currentStatus === "online" ? "#2563EB" : "#6B7280",
+      },
+      {
+        time: customer.createdAt || "12 Aug 2023",
+        event: `Customer account initialized with package ${customer.package}`,
+        type: "created",
+        icon: UserCheck,
+        color: "#8B2020",
+      },
+    ];
+  }, [customer.name, customer.package, customer.packagePrice, customer.currentStatus, customer.createdAt]);
 
   const displayInvoices = useMemo(() => {
     if (realCustomer?.invoices && realCustomer.invoices.length > 0) {
@@ -394,8 +418,12 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         paid: inv.paidDate || "—",
       }));
     }
-    return invoices;
-  }, [realCustomer]);
+    const bill = customer.packagePrice || 500;
+    return [
+      { id: `INV-${customer.id}-08`, period: "Aug 2026", amount: bill, status: customer.status === "active" ? "paid" : "unpaid", issued: "01 Aug 2026", paid: customer.status === "active" ? "01 Aug 2026" : "—" },
+      { id: `INV-${customer.id}-07`, period: "Jul 2026", amount: bill, status: "paid", issued: "01 Jul 2026", paid: "01 Jul 2026" },
+    ];
+  }, [realCustomer, customer.packagePrice, customer.id, customer.status]);
 
   const displayPayments = useMemo(() => {
     if (realCustomer?.paymentHistory && realCustomer.paymentHistory.length > 0) {
@@ -408,8 +436,12 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         status: p.status,
       }));
     }
-    return paymentHistory;
-  }, [realCustomer]);
+    const bill = customer.packagePrice || 500;
+    return [
+      { date: "01 Aug 2026", amount: bill, method: "bKash", txn: `TRX-${customer.id}A`, by: "Online Gateway", status: "verified" },
+      { date: "01 Jul 2026", amount: bill, method: "Cash", txn: `CSH-${customer.id}B`, by: "Billing Counter", status: "verified" },
+    ];
+  }, [realCustomer, customer.packagePrice, customer.id]);
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [toast, setToast] = useState("");
@@ -977,13 +1009,13 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
             {/* Complaint Stats */}
             <div className="rounded-2xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: "var(--foreground)", fontSize: 14 }}>
-                <Star size={15} style={{ color: "var(--primary)" }} /> CRM Health
+                <Star size={15} style={{ color: "var(--primary)" }} /> CRM & Ticket Health
               </h3>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: "Total Tickets", value: "3", color: "var(--foreground)" },
-                  { label: "Resolved", value: "3", color: "#16A34A" },
-                  { label: "Avg Resolution", value: "1.2d", color: "#2563EB" },
+                  { label: "Total Tickets", value: custTickets.length.toString(), color: "var(--foreground)" },
+                  { label: "Resolved", value: custTickets.filter(t => t.status === "resolved" || t.status === "closed").length.toString(), color: "#16A34A" },
+                  { label: "Active", value: custTickets.filter(t => t.status === "open" || t.status === "in_progress").length.toString(), color: custTickets.some(t => t.status === "open") ? "#DC2626" : "#2563EB" },
                 ].map(s => (
                   <div key={s.label} className="text-center">
                     <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily: "var(--font-display)" }}>{s.value}</div>
@@ -1189,7 +1221,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <Send size={13} /> Send SMS
             </button>
           </div>
-          {messages.map((m, i) => (
+          {displayMessages.map((m, i) => (
             <div key={i} className="rounded-xl p-4 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <div className="flex items-start gap-3">
                 <div className="flex items-center justify-center rounded-lg flex-shrink-0"
@@ -1261,7 +1293,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
           </h3>
           <div className="space-y-4 relative">
             <div className="absolute left-5 top-0 bottom-0 w-px" style={{ background: "var(--border)" }}></div>
-            {activityLog.map((a, i) => {
+            {displayActivityLog.map((a, i) => {
               const Icon = a.icon;
               return (
                 <div key={i} className="flex items-start gap-4 relative pl-12">
@@ -1289,44 +1321,75 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
               <TicketCheck size={15} style={{ color: "var(--primary)" }} /> Support Tickets
             </h3>
             <button
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer hover:opacity-95"
               style={{ background: "var(--primary)" }}
-              onClick={() => showToast("New ticket created!")}
+              onClick={() => {
+                const newTck: SupportTicket = {
+                  id: `TCK-${Date.now().toString().slice(-4)}`,
+                  customerName: customer.name,
+                  custId: customer.id,
+                  phone: customer.phone,
+                  zone: customer.zone || "Kalkini",
+                  category: "slow_speed",
+                  priority: "high",
+                  status: "open",
+                  subject: `Optical Line Check / Support Request for ${customer.name}`,
+                  description: `Support ticket initiated for subscriber ${customer.name} (${customer.id}).`,
+                  assignedTech: "NOC Field Team",
+                  createdAt: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+                  slaDeadline: "4h remaining",
+                };
+                crmStore.addTicket(newTck);
+                showToast(`Support Ticket #${newTck.id} opened for ${customer.name}!`);
+              }}
             >
-              <Plus size={13} /> New Ticket
+              <Plus size={13} /> Open Ticket
             </button>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr style={{ background: "var(--muted)", fontSize: 11, color: "var(--muted-foreground)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                <th className="px-5 py-3 text-left">Ticket ID</th>
-                <th className="px-5 py-3 text-left">Subject</th>
-                <th className="px-5 py-3 text-left">Priority</th>
-                <th className="px-5 py-3 text-left">Status</th>
-                <th className="px-5 py-3 text-left">Created</th>
-                <th className="px-5 py-3 text-left">Resolved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map((t, i) => {
-                const sc = STATUS_COLORS[t.status] || STATUS_COLORS.active;
-                return (
-                  <tr key={i} style={{ borderTop: "1px solid var(--border)", fontSize: 13 }}>
+          {custTickets.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-600 mx-auto flex items-center justify-center">
+                <CheckCircle2 size={24} />
+              </div>
+              <h4 className="font-bold text-sm text-foreground">Zero Active Complaints</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                No unresolved tickets or complaints recorded for {customer.name}. Optical link and PPPoE session are operational.
+              </p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: "var(--muted)", fontSize: 11, color: "var(--muted-foreground)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  <th className="px-5 py-3 text-left">Ticket ID</th>
+                  <th className="px-5 py-3 text-left">Subject</th>
+                  <th className="px-5 py-3 text-left">Priority</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-left">Created</th>
+                  <th className="px-5 py-3 text-left">Assigned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {custTickets.map((t) => (
+                  <tr key={t.id} style={{ borderTop: "1px solid var(--border)", fontSize: 13 }}>
                     <td className="px-5 py-3.5 font-mono font-semibold" style={{ color: "var(--primary)", fontSize: 12 }}>{t.id}</td>
                     <td className="px-5 py-3.5" style={{ color: "var(--foreground)" }}>{t.subject}</td>
                     <td className="px-5 py-3.5">
-                      <span className="font-semibold capitalize" style={{ fontSize: 12, color: PRIORITY_COLORS[t.priority] }}>{t.priority}</span>
+                      <span className="font-semibold capitalize text-xs">{t.priority}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: sc.bg, color: sc.text }}>{t.status}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        t.status === "resolved" ? "bg-emerald-500/10 text-emerald-600" :
+                        t.status === "in_progress" ? "bg-blue-500/10 text-blue-600" :
+                        "bg-rose-500/10 text-rose-600"
+                      }`}>{t.status}</span>
                     </td>
-                    <td className="px-5 py-3.5" style={{ color: "var(--muted-foreground)", fontSize: 12 }}>{t.created}</td>
-                    <td className="px-5 py-3.5" style={{ color: "var(--muted-foreground)", fontSize: 12 }}>{t.resolved || "—"}</td>
+                    <td className="px-5 py-3.5" style={{ color: "var(--muted-foreground)", fontSize: 12 }}>{t.createdAt}</td>
+                    <td className="px-5 py-3.5" style={{ color: "var(--muted-foreground)", fontSize: 12 }}>{t.assignedTech}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 

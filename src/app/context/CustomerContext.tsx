@@ -592,7 +592,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             name: newCustomer.name,
             phone: newCustomer.phone,
             dropMeters: typeof newCustomer.cableMetre === "number" ? newCustomer.cableMetre : 45,
-            rxPowerDbm: newCustomer.onuSignal ? parseFloat(newCustomer.onuSignal) : -27.5,
+            rxPowerDbm: newCustomer.onuSignal ? parseFloat(newCustomer.onuSignal) : -19.0,
           });
         }
       } catch (err) {

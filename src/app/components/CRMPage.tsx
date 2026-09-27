@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   TicketCheck, MessageSquare, Clock, Circle, Plus, Search,
   ChevronRight, User, AlertTriangle, CheckCircle2, Pause, X,
   Zap, Send, Phone, ChevronLeft, ArrowLeft
 } from "lucide-react";
+import { crmStore, type SupportTicket, type TimelineEvent } from "./crm/crmData";
+import { useCustomerContext } from "../context/CustomerContext";
 
 interface Ticket {
   id: string; subject: string; customer: string; custId: string;
@@ -12,16 +14,6 @@ interface Ticket {
   assigned: string; created: string; updated: string; category: string;
   description?: string;
 }
-
-const initialTickets: Ticket[] = [
-  { id: "TKT-1041", subject: "No internet since morning", customer: "Nasrin Begum", custId: "CUST-10003", zone: "Uttara", priority: "critical", status: "in-progress", assigned: "Tanvir Ahmed", created: "19 Aug, 9:14 AM", updated: "19 Aug, 11:22 AM", category: "Connectivity", description: "Customer called in saying internet stopped working around 7 AM. PPPoE shows connected on MikroTik but no traffic passing. OLT port checked — signal OK." },
-  { id: "TKT-1040", subject: "Speed very slow — 2 Mbps on 20 Mbps plan", customer: "Rahim Uddin", custId: "CUST-10001", zone: "Mirpur", priority: "high", status: "assigned", assigned: "Rafiqul Islam", created: "19 Aug, 8:30 AM", updated: "19 Aug, 9:00 AM", category: "Speed Issue", description: "Customer reports sustained speed of only 2 Mbps. Speed test confirms issue. MikroTik queue policy under investigation." },
-  { id: "TKT-1039", subject: "Cannot login to customer portal", customer: "Fatema Begum", custId: "CUST-10005", zone: "Gulshan", priority: "medium", status: "open", assigned: "Unassigned", created: "18 Aug, 7:41 PM", updated: "18 Aug, 7:41 PM", category: "Account", description: "Portal login fails with incorrect password message. Password reset email not received. Account exists and is active." },
-  { id: "TKT-1038", subject: "Wrong invoice amount charged", customer: "Jamal Uddin", custId: "CUST-10004", zone: "Dhanmondi", priority: "medium", status: "waiting", assigned: "Billing Team", created: "18 Aug, 3:12 PM", updated: "19 Aug, 10:00 AM", category: "Billing", description: "Customer charged ৳3,000 instead of ৳2,500. Billing team reviewing transaction logs. Refund may be issued." },
-  { id: "TKT-1037", subject: "ONU blinking orange light", customer: "Karim Hossain", custId: "CUST-10002", zone: "Mirpur", priority: "high", status: "in-progress", assigned: "Field Team-02", created: "17 Aug, 11:55 AM", updated: "19 Aug, 8:00 AM", category: "Hardware", description: "ONU device showing abnormal orange blink pattern. Field team dispatched. Possible fiber break on drop cable." },
-  { id: "TKT-1036", subject: "Request to change billing date", customer: "Shirin Akter", custId: "CUST-10010", zone: "Mohammadpur", priority: "low", status: "resolved", assigned: "Billing Team", created: "16 Aug, 2:30 PM", updated: "17 Aug, 11:00 AM", category: "Billing", description: "Customer requested billing date change from 1st to 15th of month. Approved and updated in system." },
-  { id: "TKT-1035", subject: "WiFi router provided by ISP not working", customer: "Monir Ahmed", custId: "CUST-10009", zone: "Uttara", priority: "medium", status: "closed", assigned: "Field Team-01", created: "15 Aug, 10:00 AM", updated: "16 Aug, 4:00 PM", category: "Hardware", description: "ISP-provided router stopped responding. Field team replaced unit with new device. Customer confirmed working." },
-];
 
 const CATEGORIES = ["Connectivity", "Speed Issue", "Account", "Billing", "Hardware", "OLT/GPON", "Other"];
 const AGENTS = ["Tanvir Ahmed", "Rafiqul Islam", "Billing Team", "Field Team-01", "Field Team-02", "Support Team"];
@@ -42,29 +34,14 @@ const statusCfg = {
   "closed": { bg: "#F3F4F6", color: "#374151", label: "Closed", icon: X },
 };
 
-const timeline = [
-  { event: "Customer Created", time: "12 Jan 2024", color: "#8B2020", fill: true },
-  { event: "Package Changed: 10 Mbps → 20 Mbps", time: "3 Apr 2024", color: "#2563EB", fill: true },
-  { event: "Invoice #INV-10050 Generated", time: "1 May 2024", color: "#6B7280", fill: false },
-  { event: "SMS: Bill reminder sent", time: "4 May 2024", color: "#D97706", fill: false },
-  { event: "Payment Received: ৳1,200 via bKash", time: "4 May 2024", color: "#16A34A", fill: true },
-  { event: "Internet Enabled (auto reconnect)", time: "4 May 2024", color: "#16A34A", fill: true },
-  { event: "Ticket #TKT-0981 Created: Speed issue", time: "12 Jun 2024", color: "#DC2626", fill: true },
-  { event: "Ticket Resolved by Tanvir Ahmed", time: "12 Jun 2024", color: "#16A34A", fill: true },
-  { event: "Invoice #INV-10111 Generated", time: "1 Jul 2024", color: "#6B7280", fill: false },
-  { event: "Payment Received: ৳1,200 via bKash", time: "2 Jul 2024", color: "#16A34A", fill: true },
-  { event: "Invoice #INV-10204 Generated", time: "1 Aug 2024", color: "#6B7280", fill: false },
-  { event: "Ticket #TKT-1040 Created: Speed very slow", time: "19 Aug 2024", color: "#D97706", fill: true },
-];
-
 function PriorityBadge({ priority }: { priority: Ticket["priority"] }) {
-  const cfg = priorityConfig[priority];
+  const cfg = priorityConfig[priority] || priorityConfig.medium;
   const Icon = cfg.icon;
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: cfg.bg, fontSize: 10, fontWeight: 700, color: cfg.color, letterSpacing: "0.03em" }}><Icon size={9} />{cfg.label.toUpperCase()}</span>;
 }
 
 function StatusBadge({ status }: { status: Ticket["status"] }) {
-  const cfg = statusCfg[status];
+  const cfg = statusCfg[status] || statusCfg.open;
   const Icon = cfg.icon;
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: cfg.bg, fontSize: 11, fontWeight: 600, color: cfg.color }}><Icon size={10} />{cfg.label}</span>;
 }
@@ -81,10 +58,37 @@ function Toast({ msg, onClose }: { msg: string; onClose: () => void }) {
 }
 
 export function CRMPage({ initialTab = "tickets" }: { initialTab?: "tickets" | "timeline" }) {
+  const { customers } = useCustomerContext();
   const [tab, setTab] = useState<"tickets" | "timeline">(initialTab === "timeline" ? "timeline" : "tickets");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  
+  // Real-time sync with crmStore
+  const [rawTickets, setRawTickets] = useState<SupportTicket[]>(() => crmStore.getTickets());
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(() => crmStore.getTimeline());
+
+  useEffect(() => {
+    return crmStore.subscribe(() => {
+      setRawTickets(crmStore.getTickets());
+      setTimelineEvents(crmStore.getTimeline());
+    });
+  }, []);
+
+  const tickets: Ticket[] = rawTickets.map(t => ({
+    id: t.id,
+    subject: t.subject,
+    customer: t.customerName,
+    custId: t.custId,
+    zone: t.zone,
+    priority: t.priority,
+    status: (t.status === "in_progress" ? "in-progress" : t.status) as Ticket["status"],
+    assigned: t.assignedTech,
+    created: t.createdAt,
+    updated: t.createdAt,
+    category: t.category,
+    description: t.description,
+  }));
+
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showNewTicket, setShowNewTicket] = useState(false);
   const [toast, setToast] = useState("");
@@ -106,19 +110,35 @@ export function CRMPage({ initialTab = "tickets" }: { initialTab?: "tickets" | "
 
   const createTicket = () => {
     if (!newTkt.subject || !newTkt.customer) return;
-    const id = `TKT-${(tickets.length + 1042).toString()}`;
-    const now = `${new Date().getDate()} Aug, ${new Date().toLocaleTimeString("en-BD",{hour:"2-digit",minute:"2-digit"})}`;
-    const ticket: Ticket = { ...newTkt, id, zone: "—", status: "open", created: now, updated: now };
-    setTickets(prev => [ticket, ...prev]);
+    const assigned = newTkt.assigned.trim() || "NOC Support Desk";
+    const now = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const newSupportTicket: SupportTicket = {
+      id: `TKT-${(rawTickets.length + 1042).toString()}`,
+      customerName: newTkt.customer,
+      custId: newTkt.custId || "CUST-000",
+      phone: "—",
+      zone: "Madaripur",
+      category: "no_internet",
+      priority: newTkt.priority,
+      status: "open",
+      subject: newTkt.subject,
+      description: newTkt.description || `Customer ${newTkt.customer} reported issue.`,
+      assignedTech: assigned,
+      createdAt: now,
+      slaDeadline: "4h remaining",
+    };
+    crmStore.addTicket(newSupportTicket);
     setShowNewTicket(false);
-    setNewTkt({ subject:"",customer:"",custId:"",category:"Connectivity",priority:"medium",description:"",assigned:"Unassigned" });
-    showToast(`Ticket ${id} created`);
+    setNewTkt({ subject: "", customer: "", custId: "", category: "Connectivity", priority: "medium", description: "", assigned: "Unassigned" });
+    showToast(`Ticket ${newSupportTicket.id} created`);
   };
 
   const updateStatus = (t: Ticket, status: Ticket["status"]) => {
-    setTickets(prev => prev.map(x => x.id===t.id?{...x,status}:x));
-    setSelectedTicket(prev => prev?{...prev,status}:null);
-    showToast(`Ticket ${t.id} marked as ${statusCfg[status].label}`);
+    if (status === "resolved" || status === "closed") {
+      crmStore.resolveTicket(t.id);
+    }
+    setSelectedTicket(prev => prev ? { ...prev, status } : null);
+    showToast(`Ticket ${t.id} marked as ${statusCfg[status]?.label || status}`);
   };
 
   const sendReply = () => {
@@ -229,7 +249,7 @@ export function CRMPage({ initialTab = "tickets" }: { initialTab?: "tickets" | "
                   </div>
                   <div className="rounded-xl p-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.05em", marginBottom: 8 }}>ASSIGNED TO</p>
-                    <select value={selectedTicket.assigned} onChange={e => { setTickets(prev=>prev.map(x=>x.id===selectedTicket.id?{...x,assigned:e.target.value}:x)); setSelectedTicket(prev=>prev?{...prev,assigned:e.target.value}:null); showToast(`Assigned to ${e.target.value}`); }} className="w-full px-3 py-2.5 rounded-lg outline-none" style={inputStyle}>
+                    <select value={selectedTicket.assigned} onChange={e => { setRawTickets(prev=>prev.map(x=>x.id===selectedTicket.id?{...x,assignedTech:e.target.value}:x)); setSelectedTicket(prev=>prev?{...prev,assigned:e.target.value}:null); showToast(`Assigned to ${e.target.value}`); }} className="w-full px-3 py-2.5 rounded-lg outline-none" style={inputStyle}>
                       <option>Unassigned</option>
                       {AGENTS.map(a => <option key={a}>{a}</option>)}
                     </select>
@@ -307,23 +327,38 @@ export function CRMPage({ initialTab = "tickets" }: { initialTab?: "tickets" | "
       {tab === "timeline" && (
         <div className="rounded-xl p-6" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="flex items-center justify-center rounded-full text-white" style={{ width: 40, height: 40, background: "var(--primary)", fontSize: 14, fontWeight: 700 }}>RU</div>
+            <div className="flex items-center justify-center rounded-full text-white" style={{ width: 40, height: 40, background: "var(--primary)", fontSize: 14, fontWeight: 700 }}>
+              {(customers[0]?.name || "MBN").slice(0, 2).toUpperCase()}
+            </div>
             <div>
-              <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 16, color: "var(--foreground)" }}>Rahim Uddin</h3>
-              <p style={{ fontSize: 12, color: "var(--muted-foreground)" }}>CUST-10001 · 20 Mbps Plus · Member since Jan 2024</p>
+              <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 16, color: "var(--foreground)" }}>
+                {customers[0]?.name || "Md. Tanvir Hossain"}
+              </h3>
+              <p style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+                {customers[0]?.clientCode || "MBN0001"} · {customers[0]?.profile || "35M"} · Active Subscriber ({customers[0]?.zone || "Kalkini"})
+              </p>
             </div>
           </div>
           <div className="relative pl-6">
             <div className="absolute left-2 top-0 bottom-0 w-0.5" style={{ background: "var(--border)" }} />
-            {timeline.map((item, i) => (
-              <div key={i} className="flex items-start gap-4 py-2.5 relative">
-                <div className="absolute left-0 top-3.5 -translate-x-[5px] z-10" style={{ width: 10, height: 10, borderRadius: "50%", background: item.fill?item.color:"white", border: `2px solid ${item.color}` }} />
-                <div className="flex-1 flex items-start justify-between">
-                  <p style={{ fontSize: 13, color: "var(--foreground)", fontWeight: item.fill?500:400 }}>{item.event}</p>
-                  <span style={{ fontSize: 11, color: "var(--muted-foreground)", flexShrink: 0, marginLeft: 16 }}>{item.time}</span>
-                </div>
+            {timelineEvents.length === 0 ? (
+              <div className="py-6 text-xs text-muted-foreground">
+                No recent timeline incidents or tickets. Subscriber network connection is active and stable.
               </div>
-            ))}
+            ) : (
+              timelineEvents.map((item, i) => (
+                <div key={i} className="flex items-start gap-4 py-2.5 relative">
+                  <div className="absolute left-0 top-3.5 -translate-x-[5px] z-10" style={{ width: 10, height: 10, borderRadius: "50%", background: "#16A34A", border: `2px solid #16A34A` }} />
+                  <div className="flex-1 flex items-start justify-between">
+                    <div>
+                      <p style={{ fontSize: 13, color: "var(--foreground)", fontWeight: 500 }}>{item.title}</p>
+                      <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{item.details}</p>
+                    </div>
+                    <span style={{ fontSize: 11, color: "var(--muted-foreground)", flexShrink: 0, marginLeft: 16 }}>{item.timestamp}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
