@@ -153,7 +153,7 @@ let cachedTelemetry = {
     host: "103.12.173.136",
     port: 1896,
     vendor: "BDCOM",
-    type: "EPON",
+    type: "GPON",
     status: "unknown",
     latencyMs: null,
     webService: "NetX Cloud API (Real-Time)",
