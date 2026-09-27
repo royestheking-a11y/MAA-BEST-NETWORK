@@ -50,7 +50,7 @@ export interface MapCustomer {
   lat: number;
   lng: number;
   dueAmount: number;
-  opticalPower: number; // dBm
+  opticalPower: number | null; // dBm
   txPower: number;
   temperature: number;
   voltage: number;
@@ -262,25 +262,25 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
         zone: c.zone || targetHub.zone,
         subzone: c.subzone || targetHub.zone,
         package: c.package || `${c.downloadSpeedMbps || 20} Mbps`,
-        monthlyFee: c.price || 800,
+        monthlyFee: c.price || c.monthlyBill || 500,
         status: (c.status === "due" ? "overdue" : c.status === "offline" ? "disconnected" : c.status) as CustomerStatus,
         onuStatus,
         onuFaultReason: faultReason,
-        onuSerial: c.deviceSerial || `ONU-${(c.clientCode || c.id)}`,
-        onuMac: liveMatch?.live_mac || c.mac || "44:D9:E7:55:01",
+        onuSerial: c.deviceSerial || `MBN-ONU-${(c.clientCode || c.id)}`,
+        onuMac: liveMatch?.live_mac || c.mac || "—",
         onuVendor: c.deviceVendor || "XPON ONU",
         lat,
         lng,
         dueAmount,
-        opticalPower: opticalRx !== null ? Number(opticalRx.toFixed(1)) : 0,
-        txPower: 2.4,
-        temperature: 36 + (i % 9),
+        opticalPower: isOnline && opticalRx !== null ? Number(opticalRx.toFixed(1)) : null,
+        txPower: isOnline ? 2.5 : 0,
+        temperature: isOnline ? 38 : 0,
         voltage: isOnline ? 3.3 : 0,
-        fiberDistanceMeters: 280 + ((i * 37) % 850),
+        fiberDistanceMeters: c.cableMetre ? (Number(c.cableMetre) || 45) : 45,
         pppoeUser: c.pppUser || c.clientCode || c.id,
-        ipAddress: liveMatch?.live_ip || (isOnline ? (c.ipAddress || "10.200.201.50") : "—"),
-        oltNode: c.olt || "OLT-Dhaka-01 (103.12.173.136)",
-        ponPort: c.ponPort || `EPON0/${(i % 4) + 1}:${(i % 32) + 1}`,
+        ipAddress: liveMatch?.live_ip || (isOnline ? (c.ipAddress || "—") : "—"),
+        oltNode: c.olt || (i < 97 ? "OLT1 (Somitir Hat EPON)" : "OLT2 (Kalkini Hub GPON)"),
+        ponPort: c.ponPort || (i < 97 ? `epon 0/${(i % 4) + 1}` : `gpon 0/${(i % 4) + 1}`),
         splitterId: targetHub.id,
         splitterPort: `Port ${(i % 16) + 1}`,
         splitterBox: c.box || c.splitterBox || targetHub.name,
@@ -591,8 +591,8 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
           html: `
             <div style="display:flex; flex-direction:column; align-items:center; cursor:pointer;">
               ${hasDbmBadges ? `
-                <div style="background:#0F172A; color:#FFFFFF; font-size:9px; font-weight:bold; font-family:monospace; padding:1px 5px; border-radius:4px; border:1px solid #475569; white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.5); margin-bottom:2px;">
-                  ${c.opticalPower} dBm
+                <div style="background:${!isOnline ? '#EF4444' : c.opticalPower !== null && c.opticalPower < -27 ? '#DC2626' : c.opticalPower !== null && c.opticalPower < -24 ? '#D97706' : '#10B981'}; color:#FFFFFF; font-size:9px; font-weight:bold; font-family:monospace; padding:1px 5px; border-radius:4px; border:1px solid rgba(255,255,255,0.3); white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.5); margin-bottom:2px;">
+                  ${isOnline && c.opticalPower !== null ? `${c.opticalPower} dBm` : 'LOS / Down'}
                 </div>
               ` : ""}
               <div style="position:relative; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
@@ -618,7 +618,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
           <div style="font-size:12px; font-family:sans-serif; line-height:1.4;">
             <strong style="color:#0284C7;">${c.name}</strong> (${c.clientCode})<br/>
             <span>Status: <strong style="color:${nodeColor};">${isOnline ? "Online (Active)" : "Offline / Broken"}</strong></span><br/>
-            <span>Signal: <strong>${c.opticalPower} dBm</strong> · Speed: <strong>${c.downloadSpeedMbps} Mbps</strong></span><br/>
+            <span>Signal: <strong>${isOnline && c.opticalPower !== null ? `${c.opticalPower} dBm` : 'LOS (No Light)'}</strong> · Speed: <strong>${c.downloadSpeedMbps} Mbps</strong></span><br/>
             <span style="color:#64748B;">📍 ${c.address}</span>
           </div>
         `, {
@@ -936,17 +936,19 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Optical RX Signal:</span>
                   <span className={`font-mono font-bold text-sm ${
+                    selected.opticalPower === null ? "text-rose-500" :
                     selected.opticalPower >= -24 ? "text-emerald-500" : selected.opticalPower >= -27 ? "text-amber-500" : "text-rose-500"
                   }`}>
-                    {selected.opticalPower} dBm
+                    {selected.opticalPower !== null ? `${selected.opticalPower} dBm` : "LOS / Disconnected"}
                   </span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden border border-border">
                   <div
                     className={`h-full rounded-full transition-all ${
+                      selected.opticalPower === null ? "bg-rose-500" :
                       selected.opticalPower >= -24 ? "bg-emerald-500" : selected.opticalPower >= -27 ? "bg-amber-500" : "bg-rose-500"
                     }`}
-                    style={{ width: `${Math.max(10, Math.min(100, (40 + selected.opticalPower) * 3.5))}%` }}
+                    style={{ width: `${selected.opticalPower !== null ? Math.max(10, Math.min(100, (40 + selected.opticalPower) * 3.5)) : 5}%` }}
                   />
                 </div>
                 <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -1218,7 +1220,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-muted text-foreground block">
-                        {c.opticalPower} dBm
+                        {c.opticalPower !== null ? `${c.opticalPower} dBm` : "LOS / Down"}
                       </span>
                       <span className="text-[10px] font-mono text-muted-foreground mt-0.5 block">
                         {c.downloadSpeedMbps} Mbps

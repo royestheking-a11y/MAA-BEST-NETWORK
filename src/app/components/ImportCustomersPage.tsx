@@ -53,18 +53,18 @@ export interface ValidationIssue {
 
 // ── Realistic Sample Customer Batch for 1-Click Testing ──
 const SAMPLE_CSV_DATA = `Customer ID,Name,Phone,Email,Address,Zone,Subzone,Package,Monthly Bill,Speed,PPPoE Username,PPPoE Password,IP,MAC,MikroTik,OLT,PON Port,Box,NID
-MBN0201,Md. Tanvir Hossain,01712-445566,tanvir@gmail.com,Somitir Hat Central Road,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@tanvir201,123456,10.200.201.71,50:65:F3:11:88:41,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/1,SOMITIR HAT BAZAR,19922614500123
-MBN0202,Sumaiya Rahman,01819-778899,sumaiya@gmail.com,Purbo Bazar Ward 3,DHAKA DIVISION,KALKINI PURBO BAZAR,30 Mbps Fiber Ultra,1200,30/15,mbn@sumaiya202,123456,10.200.201.72,50:65:F3:11:88:42,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/1,TJ-02 PURBO BAZAR,19952614500456
-MBN0203,Kazi Ariful Islam,01611-334455,arif.kazi@outlook.com,Kalkini Municipality Road,DHAKA DIVISION,KALKINI MUNICIPALITY,15 Mbps Fiber Starter,600,15/8,mbn@ariful203,123456,10.200.201.73,50:65:F3:11:88:43,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/2,TJ-03 MUNICIPALITY,19882614500789
-MBN0204,Nusrat Jahan Shimu,01914-889900,nusrat.shimu@gmail.com,Dasar Road Junction,DHAKA DIVISION,DASHAR ROAD,25 Mbps Fiber Gaming,1000,25/12,mbn@nusrat204,123456,10.200.201.74,50:65:F3:11:88:44,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/2,TJ-04 DASAR,19982614500321
-MBN0205,Mahbub Alam,01715-112233,mahbub.alam@yahoo.com,Hospital Road Kalkini,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@mahbub205,123456,10.200.201.75,50:65:F3:11:88:45,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/1,SOMITIR HAT BAZAR,19842614500654
-MBN0206,Farhana Akter,01822-556677,farhana.akter@gmail.com,School Road North,DHAKA DIVISION,KALKINI SOMITIR HAT,10 Mbps Fiber Economy,500,10/5,mbn@farhana206,123456,10.200.201.76,50:65:F3:11:88:46,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/1,BOX-NORTH-01,19932614500987
-MBN0207,Zahid Hasan,01911-223344,zahid.hasan@gmail.com,College Gate Road,DHAKA DIVISION,KALKINI PURBO BAZAR,40 Mbps Corporate Fiber,2000,40/20,mbn@zahid207,123456,10.200.201.77,50:65:F3:11:88:47,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/3,TJ-02 PURBO BAZAR,19802614500112
-MBN0208,Rasheda Begum,01718-990011,rasheda@gmail.com,River Bank Road,DHAKA DIVISION,RAJOIR SOUTH LINK,15 Mbps Fiber Starter,600,15/8,mbn@rasheda208,123456,10.200.201.78,50:65:F3:11:88:48,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/4,TJ-05 RAJOIR,19762614500334
-MBN0209,Kamrul Ahsan,01677-445566,kamrul.ahsan@gmail.com,Puran Bazar Madaripur,DHAKA DIVISION,MADARIPUR SADAR,50 Mbps Dedicated Fiber,2500,50/25,mbn@kamrul209,123456,10.200.201.79,50:65:F3:11:88:49,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/3,TJ-01 SADAR,19892614500556
-MBN0210,Shamim Reza,01723-667788,shamim.reza@gmail.com,Station Road Somitir Hat,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@shamim210,123456,10.200.201.80,50:65:F3:11:88:50,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/1,SOMITIR HAT BAZAR,19912614500778
-MBN0211,Tasnim Ferdous,01844-112233,tasnim.f@gmail.com,Bazar Bypass,DHAKA DIVISION,KALKINI PURBO BAZAR,30 Mbps Fiber Ultra,1200,30/15,mbn@tasnim211,123456,10.200.201.81,50:65:F3:11:88:51,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/2,TJ-02 PURBO BAZAR,19972614500990
-MBN0212,Anowar Hossain,01933-778899,anowar.h@gmail.com,East Trunk Road,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@anowar212,123456,10.200.201.82,50:65:F3:11:88:52,MikroTik-MBN-Core,OLT-Dhaka-01,epon 0/1,SOMITIR HAT BAZAR,19852614500223`;
+MBN0201,Md. Tanvir Hossain,01712-445566,tanvir@gmail.com,Somitir Hat Central Road,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@tanvir201,123456,10.215.35.71,50:65:F3:11:88:41,MikroTik-MBN-Core,OLT-01,epon 0/1,SOMITIR HAT BAZAR,19922614500123
+MBN0202,Sumaiya Rahman,01819-778899,sumaiya@gmail.com,Purbo Bazar Ward 3,DHAKA DIVISION,KALKINI PURBO BAZAR,30 Mbps Fiber Ultra,1200,30/15,mbn@sumaiya202,123456,10.215.35.72,50:65:F3:11:88:42,MikroTik-MBN-Core,OLT-01,epon 0/1,TJ-02 PURBO BAZAR,19952614500456
+MBN0203,Kazi Ariful Islam,01611-334455,arif.kazi@outlook.com,Kalkini Municipality Road,DHAKA DIVISION,KALKINI MUNICIPALITY,15 Mbps Fiber Starter,600,15/8,mbn@ariful203,123456,10.215.35.73,50:65:F3:11:88:43,MikroTik-MBN-Core,OLT-01,epon 0/2,TJ-03 MUNICIPALITY,19882614500789
+MBN0204,Nusrat Jahan Shimu,01914-889900,nusrat.shimu@gmail.com,Dasar Road Junction,DHAKA DIVISION,DASHAR ROAD,25 Mbps Fiber Gaming,1000,25/12,mbn@nusrat204,123456,10.215.35.74,50:65:F3:11:88:44,MikroTik-MBN-Core,OLT-01,epon 0/2,TJ-04 DASAR,19982614500321
+MBN0205,Mahbub Alam,01715-112233,mahbub.alam@yahoo.com,Hospital Road Kalkini,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@mahbub205,123456,10.215.35.75,50:65:F3:11:88:45,MikroTik-MBN-Core,OLT-01,epon 0/1,SOMITIR HAT BAZAR,19842614500654
+MBN0206,Farhana Akter,01822-556677,farhana.akter@gmail.com,School Road North,DHAKA DIVISION,KALKINI SOMITIR HAT,10 Mbps Fiber Economy,500,10/5,mbn@farhana206,123456,10.215.35.76,50:65:F3:11:88:46,MikroTik-MBN-Core,OLT-01,epon 0/1,BOX-NORTH-01,19932614500987
+MBN0207,Zahid Hasan,01911-223344,zahid.hasan@gmail.com,College Gate Road,DHAKA DIVISION,KALKINI PURBO BAZAR,40 Mbps Corporate Fiber,2000,40/20,mbn@zahid207,123456,10.215.35.77,50:65:F3:11:88:47,MikroTik-MBN-Core,OLT-01,epon 0/3,TJ-02 PURBO BAZAR,19802614500112
+MBN0208,Rasheda Begum,01718-990011,rasheda@gmail.com,River Bank Road,DHAKA DIVISION,RAJOIR SOUTH LINK,15 Mbps Fiber Starter,600,15/8,mbn@rasheda208,123456,10.215.35.78,50:65:F3:11:88:48,MikroTik-MBN-Core,OLT-01,epon 0/4,TJ-05 RAJOIR,19762614500334
+MBN0209,Kamrul Ahsan,01677-445566,kamrul.ahsan@gmail.com,Puran Bazar Madaripur,DHAKA DIVISION,MADARIPUR SADAR,50 Mbps Dedicated Fiber,2500,50/25,mbn@kamrul209,123456,10.215.35.79,50:65:F3:11:88:49,MikroTik-MBN-Core,OLT-01,epon 0/3,TJ-01 SADAR,19892614500556
+MBN0210,Shamim Reza,01723-667788,shamim.reza@gmail.com,Station Road Somitir Hat,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@shamim210,123456,10.215.35.80,50:65:F3:11:88:50,MikroTik-MBN-Core,OLT-01,epon 0/1,SOMITIR HAT BAZAR,19912614500778
+MBN0211,Tasnim Ferdous,01844-112233,tasnim.f@gmail.com,Bazar Bypass,DHAKA DIVISION,KALKINI PURBO BAZAR,30 Mbps Fiber Ultra,1200,30/15,mbn@tasnim211,123456,10.215.35.81,50:65:F3:11:88:51,MikroTik-MBN-Core,OLT-01,epon 0/2,TJ-02 PURBO BAZAR,19972614500990
+MBN0212,Anowar Hossain,01933-778899,anowar.h@gmail.com,East Trunk Road,DHAKA DIVISION,KALKINI SOMITIR HAT,20 Mbps Fiber Standard,800,20/10,mbn@anowar212,123456,10.215.35.82,50:65:F3:11:88:52,MikroTik-MBN-Core,OLT-01,epon 0/1,SOMITIR HAT BAZAR,19852614500223`;
 
 export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
   const { customers, addCustomersBulk } = useCustomerContext();
@@ -238,8 +238,8 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
         speed,
         pppoeUser: cleanPpp,
         pppoePass,
-        ipAddress: ip || `10.200.201.${50 + (i % 200)}`,
-        mac: mac || `50:65:F3:11:${String(Math.floor(i / 256)).padStart(2, "0")}:${String(i % 256).padStart(2, "0")}`,
+        ipAddress: ip || "",
+        mac: mac || "",
         serverName: server,
         olt,
         ponPort,

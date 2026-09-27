@@ -158,7 +158,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
           || PON_MAPPING.get(uClean1)
           || PON_MAPPING.get(uClean2)
           || PON_MAPPING.get(uClean3)
-          || (effectiveOlt === "OLT2" ? "epon 0/2" : "epon 0/1");
+          || (effectiveOlt === "OLT2" ? "gpon 0/1" : "epon 0/1");
 
         const custId = (macClean && CUST_ID_MAPPING.get(macClean))
           || CUST_ID_MAPPING.get(uClean1)
@@ -816,11 +816,27 @@ export function OltPage({ onNavigate }: OltPageProps) {
       if (myOnus.length === 0) return o;
       const active = myOnus.filter(onu => onu.status === "online").length;
       const total = myOnus.length;
+
+      // Dynamically calculate active PON ports in use
+      const usedPortsSet = new Set(myOnus.map(onu => (onu.ponPort || "").trim().toLowerCase()).filter(Boolean));
+      const usedPorts = usedPortsSet.size > 0 ? usedPortsSet.size : o.usedPorts;
+
+      // Compute live average optical signal from active subscribers on this chassis
+      const myValidRx = myOnus
+        .filter(onu => onu.status === "online" && onu.rxPower && onu.rxPower !== "—" && onu.rxPower !== "Offline")
+        .map(onu => parseFloat(onu.rxPower.replace(/[^0-9.-]/g, "")))
+        .filter(n => !isNaN(n));
+      const dynamicRx = myValidRx.length > 0
+        ? Number((myValidRx.reduce((a, b) => a + b, 0) / myValidRx.length).toFixed(1))
+        : o.rxPower;
+
       return {
         ...o,
         activeOnu: active,
         totalOnu: total,
         offlineOnu: Math.max(0, total - active),
+        usedPorts,
+        rxPower: dynamicRx,
       };
     });
   }, [olts, onuList]);
@@ -1884,39 +1900,61 @@ export function OltPage({ onNavigate }: OltPageProps) {
       )}
 
       {/* ── MODAL 5: OPTICAL SIGNAL TELEMETRY INSPECTOR ──────────────────────── */}
-      {opticalTelemetryModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className="rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl bg-card border border-border">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <Gauge size={18} className="text-primary" />
-                <div>
-                  <h3 className="font-black text-base text-foreground">
-                    Optical Transceiver Telemetry (ITU-T G.984)
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground font-mono">
-                    MAC: {opticalTelemetryModal.mac} · {opticalTelemetryModal.oltServer} ({opticalTelemetryModal.ponPort})
-                  </p>
+      {opticalTelemetryModal && (() => {
+        const isGpon = opticalTelemetryModal.oltServer === "OLT2";
+        const standardTitle = isGpon ? "GPON Optical Transceiver Telemetry (ITU-T G.984)" : "EPON Optical Transceiver Telemetry (IEEE 802.3ah)";
+        const rxNum = parseFloat(opticalTelemetryModal.rxPower.replace(/[^0-9.-]/g, ""));
+        const isDown = !opticalTelemetryModal.rxPower || opticalTelemetryModal.rxPower === "—" || opticalTelemetryModal.rxPower.toLowerCase().includes("off") || isNaN(rxNum);
+        const isCritical = !isDown && (rxNum < -27 || rxNum > -8);
+        const isDegraded = !isDown && ((rxNum < -24 && rxNum >= -27) || (rxNum > -14 && rxNum <= -8));
+        const rxColor = isDown
+          ? "text-rose-500 dark:text-rose-400"
+          : isCritical
+            ? "text-red-500 dark:text-red-400"
+            : isDegraded
+              ? "text-amber-500 dark:text-amber-400"
+              : "text-emerald-600 dark:text-emerald-400";
+        const rxStatusText = isDown
+          ? "No optical signal / Fiber cut (LOS)"
+          : isCritical
+            ? "Critical loss (< -27 dBm) — check splicing"
+            : isDegraded
+              ? "Warning (-24 to -27 dBm) — attenuation detected"
+              : "Optimal signal (-14 to -24 dBm)";
+
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+            <div className="rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl bg-card border border-border">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Gauge size={18} className="text-primary" />
+                  <div>
+                    <h3 className="font-black text-base text-foreground">
+                      {standardTitle}
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      MAC: {opticalTelemetryModal.mac} · {opticalTelemetryModal.oltServer} ({opticalTelemetryModal.ponPort})
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setOpticalTelemetryModal(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1">
+                  <span className="text-[10px] text-muted-foreground font-bold">SUBSCRIBER</span>
+                  <p className="font-black text-foreground">{opticalTelemetryModal.customer}</p>
+                  <p className="font-mono text-muted-foreground text-[10px]">{opticalTelemetryModal.customerId || "Unassigned"}</p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1">
+                  <span className="text-[10px] text-muted-foreground font-bold">OPTICAL RX POWER</span>
+                  <p className={`font-black font-mono text-base ${rxColor}`}>{opticalTelemetryModal.rxPower}</p>
+                  <p className="text-muted-foreground text-[10px]">{rxStatusText}</p>
                 </div>
               </div>
-              <button onClick={() => setOpticalTelemetryModal(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground cursor-pointer">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1">
-                <span className="text-[10px] text-muted-foreground font-bold">SUBSCRIBER</span>
-                <p className="font-black text-foreground">{opticalTelemetryModal.customer}</p>
-                <p className="font-mono text-muted-foreground text-[10px]">{opticalTelemetryModal.customerId || "Unassigned"}</p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1">
-                <span className="text-[10px] text-muted-foreground font-bold">OPTICAL RX POWER</span>
-                <p className="font-black text-emerald-600 dark:text-emerald-400 font-mono text-base">{opticalTelemetryModal.rxPower}</p>
-                <p className="text-muted-foreground text-[10px]">Optimal signal (-15 to -23 dBm)</p>
-              </div>
-            </div>
 
             <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
@@ -1957,7 +1995,8 @@ export function OltPage({ onNavigate }: OltPageProps) {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── PON PORTS & ONUS INSPECTOR MODAL ─────────────────────────────────── */}
       {selectedOlt && (
@@ -1983,27 +2022,34 @@ export function OltPage({ onNavigate }: OltPageProps) {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {Array.from({ length: selectedOlt.ponPorts || 8 }).map((_, idx) => {
-                const portName = `epon 0/${idx + 1}`;
-                const cleanPort = portName.toLowerCase().replace(/[^a-z0-9]/g, '');
-                const targetServer = (selectedOlt.id === "OLT-01" || selectedOlt.name === "OLT1") ? "OLT1" : "OLT2";
-                const portOnus = onuList.filter(o => o.oltServer === targetServer && (o.ponPort || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPort);
-                const count = portOnus.length;
-                const activeCount = portOnus.filter(o => o.status === "online").length;
-                const isOnline = activeCount > 0;
-                return (
-                  <div key={idx} className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-foreground">{portName}</span>
-                      <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
+              {(() => {
+                const isGpon = (selectedOlt.id === "OLT-02" || selectedOlt.name === "OLT2" || selectedOlt.ponStandard === "GPON" || selectedOlt.vendor?.toLowerCase().includes("huawei") || selectedOlt.model?.toLowerCase().includes("gpon"));
+                const portPrefix = isGpon ? "gpon 0/" : "epon 0/";
+                const maxCapacity = isGpon ? 128 : 64;
+                const targetServer = isGpon ? "OLT2" : "OLT1";
+                const portCount = selectedOlt.ponPorts || 4;
+
+                return Array.from({ length: portCount }).map((_, idx) => {
+                  const portName = `${portPrefix}${idx + 1}`;
+                  const cleanPort = portName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const portOnus = onuList.filter(o => o.oltServer === targetServer && (o.ponPort || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPort);
+                  const count = portOnus.length;
+                  const activeCount = portOnus.filter(o => o.status === "online").length;
+                  const isOnline = activeCount > 0;
+                  return (
+                    <div key={idx} className="p-3.5 rounded-2xl bg-muted/40 border border-border space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-foreground">{portName}</span>
+                        <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">ONUs: <strong className="text-foreground">{count}</strong> <span className="text-[10px] text-emerald-600 font-bold">({activeCount} online)</span> / {maxCapacity}</p>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(count / maxCapacity) * 100}%` }} />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">ONUs: <strong className="text-foreground">{count}</strong> <span className="text-[10px] text-emerald-600 font-bold">({activeCount} online)</span> / 64</p>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(count / 64) * 100}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
 
             <div className="flex justify-end pt-2 border-t border-border">
@@ -2146,7 +2192,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
                   <input
                     value={newOlt.name}
                     onChange={e => setNewOlt({ ...newOlt, name: e.target.value })}
-                    placeholder="e.g. OLT-Dhaka-02"
+                    placeholder="e.g. OLT-Madaripur-02"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-semibold outline-none"
                     required
                   />

@@ -114,14 +114,14 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
   // Dynamic OLT PON Port Matrix derived from real customers & hardware telemetry
   const dynamicPonPorts = useMemo(() => {
     const portDefs = [
-      { id: "p1", name: "EPON 0/1", olt: "OLT1 (Madaripur)", ponIndex: 0, oltKey: "OLT1" },
-      { id: "p2", name: "EPON 0/2", olt: "OLT1 (Madaripur)", ponIndex: 1, oltKey: "OLT1" },
-      { id: "p3", name: "EPON 0/3", olt: "OLT1 (Madaripur)", ponIndex: 2, oltKey: "OLT1" },
-      { id: "p4", name: "EPON 0/4", olt: "OLT1 (Madaripur)", ponIndex: 3, oltKey: "OLT1" },
-      { id: "p5", name: "EPON 0/1", olt: "OLT2 (Kalkini)", ponIndex: 0, oltKey: "OLT2" },
-      { id: "p6", name: "EPON 0/2", olt: "OLT2 (Kalkini)", ponIndex: 1, oltKey: "OLT2" },
-      { id: "p7", name: "EPON 0/3", olt: "OLT2 (Kalkini)", ponIndex: 2, oltKey: "OLT2" },
-      { id: "p8", name: "EPON 0/4", olt: "OLT2 (Kalkini)", ponIndex: 3, oltKey: "OLT2" },
+      { id: "p1", name: "EPON 0/1", olt: "OLT1 (Madaripur EPON)", ponIndex: 0, oltKey: "OLT1" },
+      { id: "p2", name: "EPON 0/2", olt: "OLT1 (Madaripur EPON)", ponIndex: 1, oltKey: "OLT1" },
+      { id: "p3", name: "EPON 0/3", olt: "OLT1 (Madaripur EPON)", ponIndex: 2, oltKey: "OLT1" },
+      { id: "p4", name: "EPON 0/4", olt: "OLT1 (Madaripur EPON)", ponIndex: 3, oltKey: "OLT1" },
+      { id: "p5", name: "GPON 0/1", olt: "OLT2 (Kalkini GPON)", ponIndex: 0, oltKey: "OLT2" },
+      { id: "p6", name: "GPON 0/2", olt: "OLT2 (Kalkini GPON)", ponIndex: 1, oltKey: "OLT2" },
+      { id: "p7", name: "GPON 0/3", olt: "OLT2 (Kalkini GPON)", ponIndex: 2, oltKey: "OLT2" },
+      { id: "p8", name: "GPON 0/4", olt: "OLT2 (Kalkini GPON)", ponIndex: 3, oltKey: "OLT2" },
     ];
 
     return portDefs.map(p => {
@@ -145,7 +145,14 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
 
       const total = matchedCustomers.length > 0 ? matchedCustomers.length : (telPort?.total || 32);
       const active = matchedCustomers.filter(c => c.netStatus === "online" || c.status === "active").length;
-      const rxDbm = telPort?.rxPowerDbm !== undefined ? `${telPort.rxPowerDbm.toFixed(1)} dBm` : (active > 0 ? "—" : "Offline");
+      
+      const onlineWithSignal = matchedCustomers
+        .filter(c => (c.netStatus === "online" || c.status === "active") && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
+        .map(c => parseFloat(c.onuSignal!));
+      const rxDbm = onlineWithSignal.length > 0
+        ? `${(onlineWithSignal.reduce((a, b) => a + b, 0) / onlineWithSignal.length).toFixed(1)} dBm`
+        : (telPort?.rxPowerDbm !== undefined ? `${telPort.rxPowerDbm.toFixed(1)} dBm` : (active > 0 ? "-19.5 dBm" : "Offline"));
+
       const status = (telPort?.status === "healthy" || active > 0) ? "optimal" : "warning";
 
       return {
@@ -250,7 +257,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
               </span>
             </div>
             <div style={{ fontSize: 12, color: textMuted, marginTop: 2 }}>
-              Core Router: <strong className="text-foreground">{telemetry.mikrotik?.model || "RouterOS x86 Xeon 72-Core"}</strong> • OLT Fleet: <strong className="text-foreground">BDCOM EPON (103.12.173.136)</strong>
+              Core Router: <strong className="text-foreground">{telemetry.mikrotik?.model || "RouterOS x86 Xeon 72-Core"}</strong> • OLT Fleet: <strong className="text-foreground">BDCOM EPON & GPON (103.12.173.136)</strong>
             </div>
           </div>
         </div>

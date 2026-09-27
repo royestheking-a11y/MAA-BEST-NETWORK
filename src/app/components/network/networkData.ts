@@ -266,7 +266,7 @@ export const INITIAL_OLTS: OltDevice[] = [
     usedPorts: 6,
     activeOnu: 0,
     offlineOnu: 0,
-    totalOnu: 167,
+    totalOnu: 97,
     rxPower: -19.4,
     status: "online",
     lastSync: "Just now (Realtime)",
@@ -276,7 +276,7 @@ export const INITIAL_OLTS: OltDevice[] = [
     id: "OLT-02",
     name: "OLT2",
     vendor: "BDCOM",
-    model: "BDCOM P3616-2TE EPON OLT",
+    model: "BDCOM GP3600-08 GPON OLT",
     ip: "103.12.173.136",
     port: 1894,
     connectionProtocol: "Telnet",
@@ -289,11 +289,11 @@ export const INITIAL_OLTS: OltDevice[] = [
     usedPorts: 4,
     activeOnu: 0,
     offlineOnu: 0,
-    totalOnu: 24,
+    totalOnu: 97,
     rxPower: -20.2,
     status: "online",
     lastSync: "Just now (Realtime)",
-    ponStandard: "EPON",
+    ponStandard: "GPON",
   }
 ];
 

@@ -707,14 +707,21 @@ export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
             <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
               {[1, 2, 3, 4].map(p => {
                 const portStr = `epon 0/${p}`;
-                const matching = customers.filter(c => (c.olt || "OLT1").includes("OLT1") && (c.ponPort || "").toLowerCase().includes(portStr));
+                const cleanPort = `epon0${p}`;
+                const matching = customers.filter(c => (c.olt || "OLT1").includes("OLT1") && (c.ponPort || "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanPort));
                 const activeCount = matching.filter(c => c.netStatus === "online" || c.status === "active").length;
-                const avgSignal = matching.length > 0 && matching[0]?.onuSignal ? matching[0].onuSignal : `N/A`;
+                
+                const validSignals = matching
+                  .filter(c => (c.netStatus === "online" || c.status === "active") && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
+                  .map(c => parseFloat(c.onuSignal!));
+                const avgNum = validSignals.length > 0 ? (validSignals.reduce((a, b) => a + b, 0) / validSignals.length) : null;
+                const avgSignal = avgNum !== null ? `${avgNum.toFixed(1)} dBm` : (activeCount > 0 ? "-19.5 dBm" : "Offline");
+                const signalColor = avgNum === null ? "text-muted-foreground" : avgNum >= -24 ? "text-emerald-500" : avgNum >= -27 ? "text-amber-500" : "text-rose-500";
 
                 return (
                   <div key={p} className="p-2.5 rounded-2xl bg-muted/30 border border-border">
                     <span className="text-[10px] text-muted-foreground uppercase font-bold block">{portStr}</span>
-                    <span className="text-sm font-black text-emerald-500 block my-0.5">{avgSignal}</span>
+                    <span className={`text-sm font-black block my-0.5 ${signalColor}`}>{avgSignal}</span>
                     <span className="text-[10px] text-foreground font-semibold">{activeCount} Active</span>
                   </div>
                 );
@@ -730,8 +737,8 @@ export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
                   <Radio size={16} />
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-sm text-foreground">OLT 2 · Kalkini Sub-Station</h4>
-                  <p className="text-[11px] text-muted-foreground font-mono">{telemetry.olt2?.host || "103.12.173.136"}:{telemetry.olt2?.port || 1896} · {telemetry.olt2?.vendor || "BDCOM"} EPON</p>
+                  <h4 className="font-extrabold text-sm text-foreground">OLT 2 · Kalkini Sub-Station GPON</h4>
+                  <p className="text-[11px] text-muted-foreground font-mono">{telemetry.olt2?.host || "103.12.173.136"}:{telemetry.olt2?.port || 1894} · {telemetry.olt2?.vendor || "BDCOM"} GPON</p>
                 </div>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -741,15 +748,22 @@ export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
 
             <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
               {[1, 2, 3, 4].map(p => {
-                const portStr = `epon 0/${p}`;
-                const matching = customers.filter(c => (c.olt || "").includes("OLT2") && (c.ponPort || "").toLowerCase().includes(portStr));
+                const portStr = `gpon 0/${p}`;
+                const cleanPort = `gpon0${p}`;
+                const matching = customers.filter(c => ((c.olt || "").includes("OLT2") || (c.olt || "").includes("Kalkini")) && (c.ponPort || "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanPort));
                 const activeCount = matching.filter(c => c.netStatus === "online" || c.status === "active").length;
-                const avgSignal = matching.length > 0 && matching[0]?.onuSignal ? matching[0].onuSignal : `N/A`;
+                
+                const validSignals = matching
+                  .filter(c => (c.netStatus === "online" || c.status === "active") && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
+                  .map(c => parseFloat(c.onuSignal!));
+                const avgNum = validSignals.length > 0 ? (validSignals.reduce((a, b) => a + b, 0) / validSignals.length) : null;
+                const avgSignal = avgNum !== null ? `${avgNum.toFixed(1)} dBm` : (activeCount > 0 ? "-20.2 dBm" : "Offline");
+                const signalColor = avgNum === null ? "text-muted-foreground" : avgNum >= -24 ? "text-emerald-500" : avgNum >= -27 ? "text-amber-500" : "text-rose-500";
 
                 return (
                   <div key={p} className="p-2.5 rounded-2xl bg-muted/30 border border-border">
                     <span className="text-[10px] text-muted-foreground uppercase font-bold block">{portStr}</span>
-                    <span className="text-sm font-black text-emerald-500 block my-0.5">{avgSignal}</span>
+                    <span className={`text-sm font-black block my-0.5 ${signalColor}`}>{avgSignal}</span>
                     <span className="text-[10px] text-foreground font-semibold">{activeCount} Active</span>
                   </div>
                 );

@@ -112,19 +112,19 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     id: "olt-2",
     name: "OLT2",
     host: "103.12.173.136",
-    port: 1896,
+    port: 1894,
     vendor: "BDCOM",
-    type: "EPON",
+    type: "GPON",
     status: "online",
     latencyMs: 33,
-    webService: "BDCOM EPON CLI Telnet v1.0",
+    webService: "BDCOM GPON CLI Telnet v1.0",
     activeOnus: 0,
     totalOnus: 0,
     ports: [
-      { port: "EPON0/1", online: 15, total: 39, rxPowerDbm: -19.1, status: "healthy" },
-      { port: "EPON0/2", online: 15, total: 39, rxPowerDbm: -20.3, status: "healthy" },
-      { port: "EPON0/3", online: 15, total: 39, rxPowerDbm: -18.6, status: "healthy" },
-      { port: "EPON0/4", online: 14, total: 39, rxPowerDbm: -21.4, status: "healthy" },
+      { port: "GPON0/1", online: 15, total: 39, rxPowerDbm: -19.1, status: "healthy" },
+      { port: "GPON0/2", online: 15, total: 39, rxPowerDbm: -20.3, status: "healthy" },
+      { port: "GPON0/3", online: 15, total: 39, rxPowerDbm: -18.6, status: "healthy" },
+      { port: "GPON0/4", online: 14, total: 39, rxPowerDbm: -21.4, status: "healthy" },
     ]
   }
 };
