@@ -2264,14 +2264,22 @@ export function OltPage({ onNavigate }: OltPageProps) {
                     onChange={e => {
                       const val = e.target.value as any;
                       const isNowGpon = val === "GPON" || val === "XG-PON" || val === "XGS-PON";
-                      setNewOlt(prev => ({
-                        ...prev,
-                        ponStandard: val,
-                        model: isNowGpon && prev.model.includes("EPON")
-                          ? "BDCOM GP3600-08 GPON OLT"
-                          : (!isNowGpon && prev.model.includes("GPON") ? "BDCOM P3608B EPON OLT" : prev.model),
-                        port: isNowGpon && prev.port === "1895" ? "1894" : (!isNowGpon && prev.port === "1894" ? "1895" : prev.port)
-                      }));
+                      setNewOlt(prev => {
+                        const v = prev.vendor || "BDCOM";
+                        let autoModel = prev.model;
+                        if (v === "Huawei") autoModel = isNowGpon ? "Huawei SmartAX MA5608T GPON OLT" : "Huawei SmartAX MA5680T EPON OLT";
+                        else if (v === "VSOL") autoModel = isNowGpon ? "VSOL V1600G1 GPON OLT" : "VSOL V1600D4-DP EPON OLT";
+                        else if (v === "ZTE") autoModel = isNowGpon ? "ZTE ZXA10 C320 GPON OLT" : "ZTE C220 EPON OLT";
+                        else if (v === "Fiberhome") autoModel = isNowGpon ? "Fiberhome AN5516-04 GPON OLT" : "Fiberhome AN5116 EPON OLT";
+                        else if (v === "BDCOM") autoModel = isNowGpon ? "BDCOM GP3600-08 GPON OLT" : "BDCOM P3608B EPON OLT";
+
+                        return {
+                          ...prev,
+                          ponStandard: val,
+                          model: autoModel,
+                          port: isNowGpon && prev.port === "1895" ? "1894" : (!isNowGpon && prev.port === "1894" ? "1895" : prev.port)
+                        };
+                      });
                     }}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-semibold outline-none">
                     <option value="EPON">EPON (1.25G IEEE 802.3ah)</option>
