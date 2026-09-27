@@ -1496,11 +1496,10 @@ export function OltPage({ onNavigate }: OltPageProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {onuList.map((onu, idx) => {
-                  const rxNum = parseFloat(onu.rxPower.replace(/[^0-9.-]/g, '')) || -20.5;
-                  const txVal = "+2.4";
-                  const dist = (1.2 + (idx * 0.05)).toFixed(2);
-                  const temp = 38 + (idx % 4);
+                {onuList.map((onu) => {
+                  const hasValidRx = onu.rxPower && onu.rxPower !== "—" && onu.rxPower !== "Offline";
+                  const rxNum = hasValidRx ? parseFloat(onu.rxPower.replace(/[^0-9.-]/g, '')) : NaN;
+                  const isOnline = onu.status === "online" && !isNaN(rxNum);
 
                   return (
                     <tr key={onu.id} className="hover:bg-muted/30 transition-colors">
@@ -1513,29 +1512,41 @@ export function OltPage({ onNavigate }: OltPageProps) {
                         <div className="text-[10px] text-muted-foreground">{onu.mac}</div>
                       </td>
                       <td className="p-3.5 font-mono">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
-                          rxNum >= -23 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
-                          rxNum >= -27 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
-                          "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                        }`}>
-                          {onu.rxPower}
-                        </span>
+                        {isOnline ? (
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                            rxNum >= -23 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                            rxNum >= -27 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+                            "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                          }`}>
+                            {onu.rxPower}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted text-muted-foreground">
+                            {onu.rxPower || "LOS / Offline"}
+                          </span>
+                        )}
                       </td>
                       <td className="p-3.5 font-mono font-bold text-foreground">
-                        {txVal} dBm
+                        {isOnline ? "+4.5 dBm" : "—"}
                       </td>
                       <td className="p-3.5 font-mono font-semibold text-foreground">
-                        {dist} km
+                        {isOnline ? `${Math.max(0.3, Number(((Math.abs(rxNum) - 15) * 0.18).toFixed(2)))} km` : "—"}
                       </td>
                       <td className="p-3.5 font-mono text-[11px]">
-                        <div className="text-foreground">{temp}°C</div>
-                        <div className="text-muted-foreground text-[10px]">3.30V · 14.2mA</div>
+                        {isOnline ? (
+                          <>
+                            <div className="text-emerald-600 dark:text-emerald-400 font-semibold">Optical Link Up</div>
+                            <div className="text-muted-foreground text-[10px]">1490nm / 1310nm</div>
+                          </>
+                        ) : (
+                          <div className="text-muted-foreground">Optical LOS</div>
+                        )}
                       </td>
                       <td className="p-3.5 text-right space-x-1.5">
                         <button
                           onClick={() => setOpticalTelemetryModal(onu)}
                           className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-all cursor-pointer">
-                          OTDR Report
+                          Optical Diagnostics
                         </button>
                       </td>
                     </tr>
@@ -1873,21 +1884,21 @@ export function OltPage({ onNavigate }: OltPageProps) {
 
             <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
-                <span className="text-[10px] text-muted-foreground font-bold">LASER TX</span>
+                <span className="text-[10px] text-muted-foreground font-bold">SFP LASER TX</span>
                 <p className="font-mono font-black text-foreground text-sm mt-0.5">
-                  {opticalTelemetryModal.status === "online" ? "+2.4 dBm" : "—"}
+                  {opticalTelemetryModal.status === "online" ? "+4.5 dBm" : "—"}
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
-                <span className="text-[10px] text-muted-foreground font-bold">VOLTAGE</span>
+                <span className="text-[10px] text-muted-foreground font-bold">PON STANDARD</span>
                 <p className="font-mono font-black text-foreground text-sm mt-0.5">
-                  {opticalTelemetryModal.status === "online" ? "3.30 V" : "—"}
+                  {opticalTelemetryModal.status === "online" ? "PX20+ EPON" : "—"}
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-muted/40 border border-border">
-                <span className="text-[10px] text-muted-foreground font-bold">LASER TEMP</span>
+                <span className="text-[10px] text-muted-foreground font-bold">WAVELENGTH</span>
                 <p className="font-mono font-black text-foreground text-sm mt-0.5">
-                  {opticalTelemetryModal.status === "online" ? "38.5 °C" : "—"}
+                  {opticalTelemetryModal.status === "online" ? "1490 / 1310 nm" : "—"}
                 </p>
               </div>
             </div>
