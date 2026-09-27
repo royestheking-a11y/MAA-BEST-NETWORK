@@ -523,14 +523,14 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
     const newCustomer: Customer = {
       name: data.name || `Mbn@${cleanName}`,
-      phone: data.phone || "01700000000",
+      phone: data.phone || `01712-${String(100000 + ((nextNum * 137) % 900000))}`,
       email: data.email || `${cleanName}@maabestnetwork.com`,
       address: data.address || "Somitir Hat, Kalkini, Madaripur",
       zone: data.zone || "DHAKA DIVISION",
       subzone: data.subzone || "KALKINI SOMITIR HAT",
       box: data.box || "SOMITIR HAT BAZAR",
       package: data.package || (isFree ? "Complimentary Free Tier (No Cutoff)" : "PIONEER_HOME_20Mbps"),
-      profile: data.profile || "PIONEER_HOME_20Mbps",
+      profile: data.profile || (isFree ? "default" : (data.package || "PIONEER_HOME_20Mbps")),
       serverName: data.serverName || "RETAIL_1",
       service: data.service || "pppoe",
       connectionType: data.connectionType || "Optical Fiber",
@@ -547,12 +547,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       daysRemaining: isFree || isUnlimited ? 999 : (data.daysRemaining ?? 30),
       dueAmount: isFree ? 0 : (data.dueAmount ?? data.due ?? 0),
       due: isFree ? 0 : (data.due ?? data.dueAmount ?? 0),
-      ipAddress: data.ipAddress || `10.200.201.${50 + nextNum}`,
-      mac: data.mac || `50:65:F3:11:88:${String(nextNum).padStart(2, "0")}`,
+      ipAddress: data.ipAddress || `10.215.35.${10 + (nextNum % 240)}`,
+      mac: data.mac || `50:65:F3:11:88:${String(nextNum % 100).padStart(2, "0")}`,
       pppUser: data.pppUser || `mbn@${cleanName}`,
       pppPass: data.pppPass || "123456",
-      mikrotik: data.mikrotik || "MikroTik-01",
-      olt: data.olt || "OLT-Dhaka-01",
+      mikrotik: data.mikrotik || "MikroTik-MBN-Core",
+      olt: data.olt || "OLT-01",
       onuSignal: data.onuSignal || "—",
       sessionUptime: data.sessionUptime || "0d 0h 0m",
       monthlyUsageGB: data.monthlyUsageGB ?? 0,
@@ -676,7 +676,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
       const newCustomer: Customer = {
         name: data.name || `Mbn@${cleanName}`,
-        phone: data.phone || "01700000000",
+        phone: data.phone || `01712-${String(100000 + ((nextNum * 137) % 900000))}`,
         email: data.email || `${cleanName}@maabestnetwork.com`,
         address: data.address || "Somitir Hat, Kalkini, Madaripur",
         zone: data.zone || "DHAKA DIVISION",
@@ -700,12 +700,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         daysRemaining: data.daysRemaining ?? 30,
         dueAmount: data.dueAmount ?? data.due ?? 0,
         due: data.due ?? data.dueAmount ?? 0,
-        ipAddress: data.ipAddress || `10.200.201.${50 + (nextNum % 200)}`,
+        ipAddress: data.ipAddress || `10.215.35.${10 + (nextNum % 240)}`,
         mac: data.mac || `50:65:F3:11:${String(Math.floor(nextNum / 256)).padStart(2, "0")}:${String(nextNum % 256).padStart(2, "0")}`,
         pppUser: data.pppUser || `mbn@${cleanName}`,
         pppPass: data.pppPass || "123456",
-        mikrotik: data.mikrotik || "MikroTik-01",
-        olt: data.olt || "OLT-Dhaka-01",
+        mikrotik: data.mikrotik || "MikroTik-MBN-Core",
+        olt: data.olt || "OLT-01",
         onuSignal: data.onuSignal || "—",
         sessionUptime: data.sessionUptime || "0d 0h 0m",
         monthlyUsageGB: data.monthlyUsageGB ?? 0,
@@ -888,10 +888,33 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       deleteCustomerFromFirestore(targetClientCode);
     }
 
-    // ── Auto-Deprovision PPPoE Secret on MikroTik RouterOS ──────────────────
+    // Auto-release any assigned optical splitter port in the ledger
+    try {
+      const splitters = splitterStore.getSplitters();
+      splitters.forEach(box => {
+        box.ports.forEach(p => {
+          if (p.customerId === id || p.customerId === targetDocId || p.customerId === targetClientCode) {
+            splitterStore.releasePort(box.id, p.portNumber);
+          }
+        });
+      });
+    } catch (e) {
+      console.warn("[Splitter De-allocation Notice]:", e);
+    }
+
+    // ── Auto-Deprovision PPPoE Secret & Session on MikroTik RouterOS ────────
     if (targetPppUser) {
       const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
         ? "" : "https://maa-best-network.onrender.com";
+
+      // Disconnect active PPPoE session first
+      fetch(`${gatewayBase}/api/mikrotik/user/disconnect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: targetPppUser }),
+      }).catch(() => {});
+
+      // Remove PPPoE secret
       fetch(`${gatewayBase}/api/mikrotik/user/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -954,30 +977,47 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const grantExtraDays = (customerId: string, extraDays: number) => {
-    const targetCust = customers.find(c => c.id === customerId);
+    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId);
+    let shouldReactivate = false;
+
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id === customerId) {
+        if (c.id === customerId || c.clientCode === customerId) {
           // Calculate new end date
           let currentEnd = c.endDate ? new Date(c.endDate) : new Date();
-          // if invalid date, use now
           if (isNaN(currentEnd.getTime())) {
             currentEnd = new Date();
           }
+          if (currentEnd < new Date()) {
+            currentEnd = new Date();
+          }
           currentEnd.setDate(currentEnd.getDate() + extraDays);
-          
+
           const newEndDateStr = currentEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-          
-          return { 
-            ...c, 
+          const newDays = Math.max(1, (c.daysRemaining && c.daysRemaining > 0 ? c.daysRemaining : 0) + extraDays);
+          const wasSuspended = c.status === "suspended" || c.disabledInMikrotik;
+          if (wasSuspended) {
+            shouldReactivate = true;
+          }
+
+          return {
+            ...c,
             endDate: newEndDateStr,
             expireDate: newEndDateStr,
-            daysRemaining: (c.daysRemaining || 0) + extraDays 
+            daysRemaining: newDays,
+            ...(wasSuspended ? {
+              status: "active" as CustomerStatus,
+              netStatus: "online" as const,
+              disabledInMikrotik: false,
+              disabledInSystem: false,
+              disconnectedAt: undefined,
+              logoutTime: null,
+            } : {})
           };
         }
         return c;
       });
-      const target = updated.find(c => c.id === customerId);
+      const target = updated.find(c => c.id === customerId || c.clientCode === customerId);
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
@@ -986,6 +1026,17 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    if (shouldReactivate && targetCust?.pppUser) {
+      syncMikrotikUserState(targetCust.pppUser, false);
+      activityLogger.log({
+        type: "network",
+        severity: "success",
+        action: "Subscriber Line Auto-Reactivated on MikroTik",
+        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser}) following grace period extension.`,
+        targetId: customerId,
+      });
+    }
 
     activityLogger.log({
       type: "billing",
@@ -1232,20 +1283,24 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const changePackage = (customerId: string, newPackage: string, newSpeed: string, newPrice: number) => {
     const speeds = newSpeed.split("/").map(s => parseInt(s.trim()) || 30);
-    const targetCust = customers.find(c => c.id === customerId);
+    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId);
+    const targetPppUser = targetCust?.pppUser || (targetCust?.name ? `mbn@${targetCust.name.toLowerCase().replace(/[^a-z0-9]/g, "")}` : undefined);
+
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id !== customerId) return c;
+        if (c.id !== customerId && c.clientCode !== customerId) return c;
         return {
           ...c,
           package: newPackage,
+          profile: newPackage,
           speed: newSpeed,
           downloadSpeedMbps: speeds[0] || 30,
           uploadSpeedMbps: speeds[1] || 15,
           price: newPrice,
+          monthlyBill: newPrice,
         };
       });
-      const target = updated.find(c => c.id === customerId);
+      const target = updated.find(c => c.id === customerId || c.clientCode === customerId);
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
@@ -1254,6 +1309,41 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    // ── Propagate new profile & rate limit to MikroTik RouterOS ───────────
+    if (targetPppUser) {
+      const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+        ? "" : "https://maa-best-network.onrender.com";
+
+      let mkProfile = newPackage;
+      const match = newPackage.match(/\d+M/i);
+      if (match) mkProfile = match[0].toUpperCase();
+
+      fetch(`${gatewayBase}/api/mikrotik/user/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: targetPppUser,
+          profile: mkProfile,
+          comment: `${targetCust?.name || customerId} — Rate limit updated to ${newPackage} (${newSpeed} Mbps)`
+        }),
+      })
+      .then(r => r.json())
+      .then(result => {
+        if (result.success) {
+          activityLogger.log({
+            type: "network",
+            severity: "success",
+            action: "MikroTik PPPoE Profile Updated",
+            detail: `RouterOS profile for "${targetPppUser}" updated to ${mkProfile} on MikroTik core router.`,
+            targetId: customerId,
+          });
+        }
+      })
+      .catch(err => {
+        console.warn("[MikroTik Package Sync] Failed to update PPPoE profile on RouterOS:", err.message);
+      });
+    }
 
     activityLogger.log({
       type: "package",

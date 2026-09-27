@@ -167,7 +167,7 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
       const ip = getCol(tokens, ["ipaddress", "staticip", "ip"]);
       const mac = getCol(tokens, ["macaddress", "mac", "onumac"]);
       const server = getCol(tokens, ["mikrotik", "server", "router"]) || "MikroTik-MBN-Core";
-      const olt = getCol(tokens, ["olt", "oltnode"]) || "OLT-Dhaka-01";
+      const olt = getCol(tokens, ["olt", "oltnode"]) || "OLT-01";
       const ponPort = getCol(tokens, ["ponport", "pon", "epon", "gpon"]) || "epon 0/1";
       const box = getCol(tokens, ["box", "splitter", "tjbox", "tj"]) || "SOMITIR HAT BAZAR";
       const nid = getCol(tokens, ["nid", "nidno", "nationalid"]);
