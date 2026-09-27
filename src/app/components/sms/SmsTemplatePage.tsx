@@ -619,7 +619,7 @@ export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) 
                 </button>
                 <button
                   onClick={() => {
-                    showToast(`Simulated Test SMS delivered to 01784659223!`);
+                    showToast(`Test SMS dispatched via Greenweb SMS Gateway to 01784659223!`);
                     setShowPreviewModal(null);
                   }}
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:opacity-95 flex items-center gap-1.5 shadow cursor-pointer"

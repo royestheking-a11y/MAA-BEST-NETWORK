@@ -326,10 +326,7 @@ export function IntegrationsPage({ onNavigate }: { onNavigate?: (page: string) =
     setSelectedConfig(null);
   };
 
-  // Simulate Inbound Webhook
-  const handleSimulateWebhook = (gatewayName: string) => {
-    showToast(`Simulation removed in production.`);
-  };
+
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -468,9 +465,7 @@ export function IntegrationsPage({ onNavigate }: { onNavigate?: (page: string) =
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {/* Simulate IPN Webhook buttons removed for production */}
-          </div>
+          <div className="flex items-center gap-1.5" />
         </div>
 
         <div className="space-y-2 max-h-56 overflow-y-auto pr-1">

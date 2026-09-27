@@ -432,7 +432,7 @@ export function InventoryPage({ onNavigate }: { onNavigate?: (page: string) => v
                 category: "onu",
                 brand: "V-SOL",
                 model: "",
-                serial: `VSOL-${Math.floor(1000 + Math.random() * 9000)}`,
+                serial: "",
                 status: "available",
                 quantity: 1,
                 purchaseDate: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),

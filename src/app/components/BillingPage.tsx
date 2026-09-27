@@ -341,7 +341,7 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
     const now = new Date();
     const formattedDate = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     const formattedTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    const txnGenerated = newPay.txn || `${newPay.method.toUpperCase().slice(0,3)}${Math.floor(1000000 + Math.random() * 9000000)}`;
+    const txnGenerated = newPay.txn || (newPay.method === "Cash" ? `CSH-${Date.now().toString().slice(-6)}` : `${newPay.method.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}`);
 
     const payment: Payment = {
       id: payId,

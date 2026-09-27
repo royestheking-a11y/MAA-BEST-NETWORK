@@ -381,10 +381,10 @@ export function DueCustomersPage({ onNavigate }: DueCustomersPageProps) {
       return;
     }
     setPaymentModalCust(c);
-    const amount = c.dueAmount !== undefined && c.dueAmount > 0 ? c.dueAmount : (c.price || 800);
+    const amount = c.dueAmount !== undefined && c.dueAmount > 0 ? c.dueAmount : (c.price || 500);
     setPaymentAmount(String(amount));
     setPaymentMethod("Cash");
-    setPaymentTrxId(`TRX-${Math.floor(100000 + Math.random() * 900000)}`);
+    setPaymentTrxId(`CSH-${Date.now().toString().slice(-6)}`);
   };
 
   const handleExecutePayment = () => {

@@ -1135,7 +1135,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     customPaymentDate?: Date
   ) => {
     const validAmount = Math.max(1, Math.min(500000, Number(amount) || 0));
-    const trxId = customTrxId || `TRX${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const trxId = customTrxId || (method === "Cash" ? `CSH-${Date.now().toString().slice(-8)}` : `TRX-${Date.now().toString().slice(-8)}`);
     const now = customPaymentDate || new Date();
     
     // Formatting start date as exact payment date
@@ -1147,7 +1147,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const endDate = expiry.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     
     const billingDay = now.getDate();
-    const invoiceId = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${Math.floor(100 + Math.random() * 900)}`;
+    const invoiceId = `INV-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${Date.now().toString().slice(-4)}`;
     const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
     const newPayment: PaymentTransaction = {

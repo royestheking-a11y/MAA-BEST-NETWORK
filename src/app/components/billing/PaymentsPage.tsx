@@ -60,14 +60,14 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
   const handleSelectCustomer = (cust: Customer) => {
     setSelectedCustDetails(cust);
     const existingInvs = billingStore.getInvoices().filter(i => (i.custId === cust.id || i.custId === cust.clientCode) && i.status !== "paid");
-    const targetInvId = existingInvs.length > 0 ? existingInvs[0].id : `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const targetInvId = existingInvs.length > 0 ? existingInvs[0].id : `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
 
     setNewPay(prev => ({
       ...prev,
       customer: cust.name,
       custId: cust.clientCode || cust.id,
       invoice: targetInvId,
-      amount: (cust.dueAmount > 0 ? cust.dueAmount : cust.price || 1200).toString(),
+      amount: (cust.dueAmount > 0 ? cust.dueAmount : cust.price || 500).toString(),
     }));
     setCustSearchQuery(`${cust.name} (${cust.clientCode || cust.id})`);
     setShowCustSuggestions(false);
@@ -84,7 +84,7 @@ export function PaymentsPage({ onNavigate }: PaymentsPageProps) {
     const now = new Date();
     const formattedDate = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     const formattedTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    const txnGenerated = newPay.txn || `${newPay.method.toUpperCase().slice(0,3)}${Math.floor(1000000 + Math.random() * 9000000)}`;
+    const txnGenerated = newPay.txn || (newPay.method === "Cash" ? `CSH-${Date.now().toString().slice(-6)}` : `${newPay.method.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}`);
 
     const payment: Payment = {
       id: payId,

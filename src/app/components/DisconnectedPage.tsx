@@ -316,10 +316,10 @@ export function DisconnectedPage({ onNavigate }: DisconnectedPageProps) {
       return;
     }
     setPaymentModalCust(cust);
-    const due = cust.dueAmount !== undefined && cust.dueAmount > 0 ? cust.dueAmount : (cust.price || 800);
+    const due = cust.dueAmount !== undefined && cust.dueAmount > 0 ? cust.dueAmount : (cust.price || 500);
     setPaymentAmount(String(due));
     setPaymentMethod("Cash");
-    setPaymentTrxId(`TRX-${Math.floor(100000 + Math.random() * 900000)}`);
+    setPaymentTrxId(`CSH-${Date.now().toString().slice(-6)}`);
   };
 
   const handleExecutePayment = () => {

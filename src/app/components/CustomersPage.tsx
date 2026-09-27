@@ -32,30 +32,29 @@ const SUBZONES: Record<string, string[]> = {
   Dashar: ["Dashar Bazar", "Nabagram", "Bakulbari"],
 };
 const PACKAGES = [
-  "10 Mbps — ৳800",
-  "15 Mbps — ৳1,000",
-  "20 Mbps Fiber Standard — ৳1,200",
-  "30 Mbps Home Fiber — ৳1,500",
-  "50 Mbps Ultra Fiber Pro — ৳2,500",
-  "100 Mbps Gigabit Fiber — ৳5,000"
+  "35M — ৳500",
+  "50M — ৳600",
+  "80M — ৳800",
+  "100M — ৳1,000",
+  "10 Mbps — ৳1,000"
 ];
 
 export const BANDWIDTH_TIERS = [
-  { id: "8m", label: "8 Mbps", down: 8, up: 4, price: 600, tag: "8 Bit Economy" },
-  { id: "10m", label: "10 Mbps", down: 10, up: 5, price: 800, tag: "10 Bit Fiber" },
-  { id: "12m", label: "12 Mbps", down: 12, up: 6, price: 900, tag: "12 Bit Stream" },
-  { id: "16m", label: "16 Mbps", down: 16, up: 8, price: 1000, tag: "16 Bit Turbo" },
-  { id: "20m", label: "20 Mbps", down: 20, up: 10, price: 1200, tag: "20 Bit Standard" },
-  { id: "30m", label: "30 Mbps", down: 30, up: 15, price: 1500, tag: "30 Bit Home" },
-  { id: "50m", label: "50 Mbps", down: 50, up: 25, price: 2500, tag: "50 Bit Pro" },
-  { id: "100m", label: "100 Mbps", down: 100, up: 50, price: 4500, tag: "100 Bit Giga" }
+  { id: "35m", label: "35M", down: 35, up: 35, price: 500, tag: "35 Mbps Primary Tier" },
+  { id: "50m", label: "50M", down: 50, up: 50, price: 600, tag: "50 Mbps Gaming & Stream" },
+  { id: "80m", label: "80M", down: 80, up: 80, price: 800, tag: "80 Mbps Power Users" },
+  { id: "100m", label: "100M", down: 100, up: 100, price: 1000, tag: "100 Mbps Gigabit Ready" },
+  { id: "10m", label: "10 Mbps", down: 10, up: 10, price: 1000, tag: "10 Mbps Corporate Lease" }
 ];
 
 export const IP_POOLS = [
-  { id: "pool-madaripur-1", name: "Pool-1: Madaripur City /24 (192.10.10.0/24)", prefix: "192.10.10.", start: 10, startHost: 10 },
-  { id: "pool-kalkini-2", name: "Pool-2: Kalkini Somitir Hat /24 (100.64.10.0/24)", prefix: "100.64.10.", start: 15, startHost: 15 },
-  { id: "pool-shibchar-3", name: "Pool-3: Shibchar Pachchar /24 (103.145.60.0/24)", prefix: "103.145.60.", start: 20, startHost: 20 },
-  { id: "pool-dhaka-4", name: "Pool-4: Dhaka Division Backbone /24 (172.16.20.0/24)", prefix: "172.16.20.", start: 5, startHost: 5 },
+  { id: "pool-35", name: "Pool-35: 10.215.35.0/24 (Subscribers)", prefix: "10.215.35.", start: 2, startHost: 2 },
+  { id: "pool-36", name: "Pool-36: 10.215.36.0/24 (Subscribers)", prefix: "10.215.36.", start: 2, startHost: 2 },
+  { id: "pool-37", name: "Pool-37: 10.215.37.0/24 (Subscribers)", prefix: "10.215.37.", start: 2, startHost: 2 },
+  { id: "pool-38", name: "Pool-38: 10.215.38.0/24 (Subscribers)", prefix: "10.215.38.", start: 2, startHost: 2 },
+  { id: "pool-39", name: "Pool-39: 10.215.39.0/24 (Subscribers)", prefix: "10.215.39.", start: 2, startHost: 2 },
+  { id: "pool-pub", name: "Pool-Public: 103.12.173.128/26 (Static IPs)", prefix: "103.12.173.", start: 130, startHost: 130 },
+  { id: "pool-corp", name: "Pool-Corporate: 172.16.50.0/24 (Corporate Leased)", prefix: "172.16.50.", start: 2, startHost: 2 }
 ];
 
 export const AVAILABLE_PACKAGES: IspPackage[] = billingStore.getPackages();
@@ -538,10 +537,10 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
   const generatePppoeCredentials = (name: string, phone: string) => {
     const cleanName = (name || "user").trim().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 7);
-    const randNum = Math.floor(1000 + Math.random() * 9000);
-    const pppUser = cleanName ? `${cleanName}_${randNum.toString().slice(-2)}` : `mbn_${randNum}`;
-    const pppPass = `mbn@${randNum}`;
-    const passcode = `mbn@${randNum}`;
+    const suffix = phone && phone.length >= 4 ? phone.replace(/\D/g, "").slice(-4) : "01";
+    const pppUser = cleanName ? `${cleanName}_${suffix}` : `mbn_${suffix}`;
+    const pppPass = `mbn@${suffix}`;
+    const passcode = `mbn@${suffix}`;
     return { pppUser, pppPass, passcode };
   };
 

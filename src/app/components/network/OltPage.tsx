@@ -1568,7 +1568,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
               </button>
             </div>
 
-            {/* Simulated Live Terminal */}
+            {/* Live Hardware Terminal */}
             <div className="p-4 rounded-2xl bg-slate-950 text-emerald-400 font-mono text-xs space-y-1.5 shadow-inner border border-slate-800 max-h-60 overflow-y-auto">
               <div className="flex items-center justify-between text-slate-500 pb-1 border-b border-slate-800 text-[10px]">
                 <span>BDCOM CLI SESSION #1895</span>

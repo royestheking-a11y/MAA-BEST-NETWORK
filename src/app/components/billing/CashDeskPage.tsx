@@ -397,8 +397,8 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
 
     // Add to billing store
     const pmt: Payment = {
-      id: `PMT-${(Math.floor(1000 + Math.random() * 9000)).toString()}`,
-      invoice: `INV-${(Math.floor(10000 + Math.random() * 9000)).toString()}`,
+      id: `PMT-${Date.now().toString().slice(-6)}`,
+      invoice: receiptData.receiptNo,
       customer: selectedCust.name,
       custId: selectedCust.id,
       amount: netPaid,

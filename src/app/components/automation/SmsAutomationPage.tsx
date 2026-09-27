@@ -64,7 +64,7 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
     }
     if (!testPhone || !testText) return;
     const newLog: OutboundSmsLog = {
-      id: `SMS-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `SMS-${Date.now().toString().slice(-6)}`,
       recipient: "Test Subscriber",
       customerName: "Test Subscriber",
       phone: testPhone,
@@ -90,16 +90,16 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
     setIsSending(true);
     setTimeout(() => {
       const recipientLabel =
-        targetAudience === "all" ? "All 191 Subscribers" :
-        targetAudience === "due" ? "45 Overdue Subscribers" :
-        targetAudience === "kalkini" ? "Kalkini Somitir Hat Subscribers (164)" :
+        targetAudience === "all" ? "All 194 Subscribers" :
+        targetAudience === "due" ? "Overdue Subscribers" :
+        targetAudience === "kalkini" ? "Kalkini Somitir Hat Subscribers (170)" :
         targetAudience === "sadar" ? "Madaripur Sadar Subscribers" :
         "Custom Recipient List";
 
-      const count = targetAudience === "due" ? 847 : targetAudience === "all" ? 12840 : 420;
+      const count = targetAudience === "due" ? 45 : targetAudience === "all" ? 194 : 170;
 
       const newLog: OutboundSmsLog = {
-        id: `SMS-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: `SMS-${Date.now().toString().slice(-6)}`,
         recipient: recipientLabel,
         customerName: `${count} Recipients`,
         phone: targetAudience === "custom" ? customPhoneList : "Bulk Masking Queue",

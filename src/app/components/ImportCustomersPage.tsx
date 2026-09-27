@@ -341,7 +341,7 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
 
     let currentProgress = 0;
     const interval = setInterval(() => {
-      currentProgress += Math.random() * 16 + 8;
+      currentProgress += 20;
       const stageIdx = Math.min(Math.floor((currentProgress / 100) * stages.length), stages.length - 1);
       setCurrentSyncTask(stages[stageIdx]);
 

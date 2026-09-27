@@ -276,7 +276,7 @@ class ActivityLogStore {
   }): ActivityLog {
     const now = new Date();
     const newLog: ActivityLog = {
-      id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `LOG-${Date.now().toString(36).toUpperCase()}-${this.logs.length + 1}`,
       timestamp: Date.now(),
       dateStr: now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       timeStr: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),

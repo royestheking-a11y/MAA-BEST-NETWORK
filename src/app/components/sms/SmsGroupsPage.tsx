@@ -86,7 +86,7 @@ export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
         name: formName,
         status: formStatus,
         memberTypes: formMemberTypes,
-        memberCount: Math.floor(10 + Math.random() * 80),
+        memberCount: 0,
         description: formDescription
       };
       const updated = [...groups, newGrp];

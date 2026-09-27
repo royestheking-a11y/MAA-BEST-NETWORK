@@ -96,7 +96,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     setPayAmount(inv.amount.toString());
     setPayDiscount("0");
     setPayMethod("Cash");
-    setPayTrxId(`TRX-${Math.floor(1000000 + Math.random() * 9000000)}`);
+    setPayTrxId(`CSH-${Date.now().toString().slice(-6)}`);
     setPayCollectedBy("Admin Cash Counter");
     setPayNotes("");
     setShowPayModal(true);

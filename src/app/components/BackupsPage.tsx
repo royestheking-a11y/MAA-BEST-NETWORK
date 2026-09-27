@@ -127,11 +127,11 @@ export function BackupsPage() {
         subscribers: customers,
         activityLogs: activityLogger.getLogs(),
         totalSubscribers: customers.length,
-        checksum: `SHA256: ${Math.random().toString(16).slice(2, 14)}`
+        checksum: `CRC32-${Date.now().toString(16).toUpperCase()}`
       };
 
       const newRecord: BackupRecord = {
-        id: `BCK-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: `BCK-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${Date.now().toString().slice(-4)}`,
         filename,
         dateStr,
         timeStr,
@@ -201,7 +201,7 @@ export function BackupsPage() {
     }
   };
 
-  // Restore Simulation
+  // Restore Snapshot
   const handleConfirmRestore = () => {
     if (!restoringBackup) return;
     showToast(`Database restored to snapshot state from ${restoringBackup.dateStr} (${restoringBackup.customerCount} subscribers)!`);

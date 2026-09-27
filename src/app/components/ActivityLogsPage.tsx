@@ -59,12 +59,6 @@ export function ActivityLogsPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showSimulateModal, setShowSimulateModal] = useState(false);
-  const [customAction, setCustomAction] = useState("");
-  const [customDetail, setCustomDetail] = useState("");
-  const [customType, setCustomType] = useState<LogType>("system");
-  const [customSeverity, setCustomSeverity] = useState<LogSeverity>("info");
-  const [customTargetId, setCustomTargetId] = useState("");
 
   // Subscribe to live log updates
   useEffect(() => {
@@ -159,80 +153,7 @@ export function ActivityLogsPage() {
     document.body.removeChild(link);
   };
 
-  // Create manual/simulated log
-  const handleSimulateLog = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customAction.trim() || !customDetail.trim()) return;
 
-    activityLogger.log({
-      type: customType,
-      severity: customSeverity,
-      user: "Admin Console",
-      userRole: "Administrator",
-      action: customAction.trim(),
-      detail: customDetail.trim(),
-      targetId: customTargetId.trim() || undefined,
-      ip: "103.145.60.1",
-      metadata: {
-        source: "Manual Audit Dispatch",
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    setCustomAction("");
-    setCustomDetail("");
-    setCustomTargetId("");
-    setShowSimulateModal(false);
-  };
-
-  // Quick preset simulation using real subscriber data when available
-  const handleQuickPreset = (type: "auth" | "payment" | "security" | "network") => {
-    const sampleCust = customers.length > 0 ? customers[Math.floor(Math.random() * customers.length)] : null;
-    const targetId = sampleCust ? sampleCust.id : "CUST-1001";
-    const targetName = sampleCust ? sampleCust.name : "Subscriber";
-
-    if (type === "auth") {
-      activityLogger.log({
-        type: "auth",
-        severity: "info",
-        action: "Subscriber Portal Login Verified",
-        detail: `Subscriber ${targetName} (${targetId}) authenticated successfully via SMS OTP verification.`,
-        targetId,
-        ip: "103.145.60.44",
-        metadata: { client: "Web Client", method: "OTP_SMS" }
-      });
-    } else if (type === "payment") {
-      const amount = sampleCust?.monthlyBill || 1000;
-      activityLogger.log({
-        type: "payment",
-        severity: "success",
-        action: "Nagad Automated Bill Payment",
-        detail: `Collected ৳${amount.toLocaleString()} via Nagad Gateway (TrxID: NGD${Math.floor(100000 + Math.random() * 900000)}) for subscriber ${targetName} (${targetId}).`,
-        targetId,
-        ip: "10.200.1.20",
-        metadata: { amount, method: "Nagad", trxId: `NGD${Math.floor(100000 + Math.random() * 900000)}` }
-      });
-    } else if (type === "security") {
-      activityLogger.log({
-        type: "security",
-        severity: "warning",
-        action: "Suspicious ARP Spoofing Detected",
-        detail: `Duplicate IP response detected on VLAN 100 for device bound to ${targetId}. Port isolation initiated.`,
-        targetId: `Switch-Core-${targetId}`,
-        ip: "10.200.201.99",
-        metadata: { vlan: 100, port: "GigabitEthernet 0/4", action: "PORT_ISOLATION_TRIGGERED" }
-      });
-    } else if (type === "network") {
-      activityLogger.log({
-        type: "network",
-        severity: "info",
-        action: "BGP Peer Route Refresh",
-        detail: "Received 940,210 BGP prefixes from Upstream IIG (Summit Communications). All routing tables updated.",
-        ip: "103.145.60.254",
-        metadata: { bgpPeer: "AS-58717 Summit", prefixes: 940210, status: "ESTABLISHED" }
-      });
-    }
-  };
 
   // Counts by category
   const stats = useMemo(() => {
@@ -271,11 +192,11 @@ export function ActivityLogsPage() {
         {/* Global Actions */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setShowSimulateModal(true)}
+            onClick={() => setLogs(activityLogger.getLogs())}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-primary hover:opacity-95 text-white transition-all shadow-xs active:scale-95 cursor-pointer"
           >
-            <PlusCircle size={14} />
-            <span>Create Log Event</span>
+            <RefreshCw size={14} />
+            <span>Refresh Audit Logs</span>
           </button>
 
           <div className="flex items-center bg-muted/60 rounded-xl border border-border p-0.5">
@@ -363,37 +284,7 @@ export function ActivityLogsPage() {
         </div>
       </div>
 
-      {/* Quick Test Presets Bar */}
-      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-card border border-border overflow-x-auto text-xs shadow-xs">
-        <span className="text-muted-foreground flex items-center gap-1.5 font-medium flex-shrink-0 px-2">
-          <Terminal size={13} className="text-primary" />
-          Test Events Simulator:
-        </span>
-        <button
-          onClick={() => handleQuickPreset("payment")}
-          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 flex-shrink-0 transition-all cursor-pointer font-medium"
-        >
-          + Simulate Payment
-        </button>
-        <button
-          onClick={() => handleQuickPreset("security")}
-          className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/20 flex-shrink-0 transition-all cursor-pointer font-medium"
-        >
-          + Simulate Security Alert
-        </button>
-        <button
-          onClick={() => handleQuickPreset("network")}
-          className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 flex-shrink-0 transition-all cursor-pointer font-medium"
-        >
-          + Simulate BGP Refresh
-        </button>
-        <button
-          onClick={() => handleQuickPreset("auth")}
-          className="px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex-shrink-0 transition-all cursor-pointer font-medium"
-        >
-          + Simulate Subscriber OTP Login
-        </button>
-      </div>
+
 
       {/* Controls Bar: Category Pills */}
       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -545,7 +436,7 @@ export function ActivityLogsPage() {
             </div>
             <h3 className="text-base font-semibold text-foreground">No Matching Audit Records Found</h3>
             <p className="text-xs text-muted-foreground max-w-sm mt-1">
-              Try adjusting your search query, clearing filters, or create a simulated test event.
+              Try adjusting your search query or clearing filters.
             </p>
             <button
               onClick={() => {
@@ -843,112 +734,7 @@ export function ActivityLogsPage() {
         </div>
       )}
 
-      {/* Manual Simulate / Create Log Modal */}
-      {showSimulateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-xs animate-fadeIn">
-          <form
-            onSubmit={handleSimulateLog}
-            className="bg-card border border-border rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl flex flex-col gap-4"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <PlusCircle size={18} className="text-primary" />
-                <h3 className="text-base font-bold text-foreground">Create Custom Activity Log Entry</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSimulateModal(false)}
-                className="text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-foreground font-semibold mb-1">Category & Subsystem</label>
-                <select
-                  value={customType}
-                  onChange={e => setCustomType(e.target.value as LogType)}
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-foreground outline-none focus:border-primary shadow-xs"
-                >
-                  <option value="payment">Payment & Billing Collection</option>
-                  <option value="customer">Customer & Subscriber Profile</option>
-                  <option value="network">Network & OLT Operations</option>
-                  <option value="security">Security & MAC Binding Policy</option>
-                  <option value="auth">Auth & Session Security</option>
-                  <option value="billing">Billing & Grace Days</option>
-                  <option value="package">Package & Bandwidth Queue</option>
-                  <option value="system">System & Database Engine</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-foreground font-semibold mb-1">Severity Level</label>
-                <select
-                  value={customSeverity}
-                  onChange={e => setCustomSeverity(e.target.value as LogSeverity)}
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-foreground outline-none focus:border-primary shadow-xs"
-                >
-                  <option value="info">Info (Standard Event)</option>
-                  <option value="success">Success (Completed Action)</option>
-                  <option value="warning">Warning (Requires Attention)</option>
-                  <option value="error">Error / Security Violation</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-foreground font-semibold mb-1">Action Title</label>
-                <input
-                  required
-                  value={customAction}
-                  onChange={e => setCustomAction(e.target.value)}
-                  placeholder="e.g. Manual Bandwidth Override Applied"
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-foreground outline-none focus:border-primary shadow-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-foreground font-semibold mb-1">Detailed Log Message</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={customDetail}
-                  onChange={e => setCustomDetail(e.target.value)}
-                  placeholder="e.g. Boosted downlink bandwidth temporarily for video conference event."
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-foreground outline-none focus:border-primary shadow-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-foreground font-semibold mb-1">Target Subscriber / Device ID (Optional)</label>
-                <input
-                  value={customTargetId}
-                  onChange={e => setCustomTargetId(e.target.value)}
-                  placeholder="e.g. CUST-1002 or OLT-01"
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border text-foreground outline-none focus:border-primary shadow-xs"
-                />
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowSimulateModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 cursor-pointer shadow-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary hover:opacity-95 text-white transition-all shadow-xs cursor-pointer"
-              >
-                Dispatch Log
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }
