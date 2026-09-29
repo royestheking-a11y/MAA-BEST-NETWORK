@@ -2,7 +2,8 @@ import { useNetxLiveData } from "../../services/netxApiService";
 import { useState, useEffect, useMemo } from "react";
 import {
   Layers, MapPin, Users, Plus, Search, ChevronRight, CheckCircle2,
-  AlertTriangle, XCircle, X, Shield, Activity, Radio, Server, Trash2
+  AlertTriangle, XCircle, X, Shield, Activity, Radio, Server, Trash2,
+  ExternalLink, Network, Zap, Wifi, Split, Eye, ArrowUpRight
 } from "lucide-react";
 import {
   networkStore, type ServiceZone
@@ -10,6 +11,42 @@ import {
 import { useCustomerContext } from "../../context/CustomerContext";
 import { useNetxLiveData as _useNetxLiveData } from "../../services/netxApiService";
 import { usePermission } from "../../context/AuthContext";
+
+interface SubZoneCluster {
+  id: string;
+  name: string;
+  splitterBox: string;
+  splitRatio: string;
+  portsUsed: number;
+  totalPorts: number;
+  oltPort: string;
+  status: "healthy" | "warning" | "offline";
+  dropDistance: string;
+  powerDbm: string;
+  location: string;
+}
+
+const DEFAULT_ZONE_CLUSTERS: Record<string, SubZoneCluster[]> = {
+  "ZONE-PORT": [
+    { id: "CL-PORT-01", name: "Charmuguria Port Terminal Hub", splitterBox: "TJ-PORT-01", splitRatio: "1:8", portsUsed: 6, totalPorts: 8, oltPort: "OLT1 EPON 0/3", status: "healthy", dropDistance: "45-120m", powerDbm: "-18.6 dBm", location: "Charmuguria Launch Ghat Road" },
+    { id: "CL-PORT-02", name: "Puran Bazar River Ghat DP", splitterBox: "TJ-PORT-02", splitRatio: "1:16", portsUsed: 12, totalPorts: 16, oltPort: "OLT1 EPON 0/3", status: "healthy", dropDistance: "60-180m", powerDbm: "-19.2 dBm", location: "River Ghat Wholesale Market" },
+    { id: "CL-PORT-03", name: "Commercial Road Central DP", splitterBox: "TJ-PORT-03", splitRatio: "1:8", portsUsed: 5, totalPorts: 8, oltPort: "OLT1 EPON 0/4", status: "healthy", dropDistance: "30-90m", powerDbm: "-17.9 dBm", location: "Commercial Bank Corner Pole #12" },
+  ],
+  "ZONE-SADAR": [
+    { id: "CL-SADAR-01", name: "Somitir Hat Central Pole #14", splitterBox: "SP-01", splitRatio: "1:8", portsUsed: 7, totalPorts: 8, oltPort: "OLT1 EPON 0/1", status: "healthy", dropDistance: "45-110m", powerDbm: "-18.4 dBm", location: "Somitir Hat Central Pole #14" },
+    { id: "CL-SADAR-02", name: "Puran Bazar Bridge Corner #08", splitterBox: "SP-02", splitRatio: "1:8", portsUsed: 6, totalPorts: 8, oltPort: "OLT1 EPON 0/2", status: "healthy", dropDistance: "50-130m", powerDbm: "-18.2 dBm", location: "Puran Bazar Bridge Corner Pole #08" },
+    { id: "CL-SADAR-03", name: "Sadar Hospital Road DP #03", splitterBox: "TJ-SADAR-03", splitRatio: "1:8", portsUsed: 8, totalPorts: 8, oltPort: "OLT1 EPON 0/1", status: "warning", dropDistance: "80-220m", powerDbm: "-21.5 dBm", location: "Sadar Hospital Gate" },
+    { id: "CL-SADAR-04", name: "Madaripur Notun Bazar Hub", splitterBox: "TJ-SADAR-04", splitRatio: "1:16", portsUsed: 14, totalPorts: 16, oltPort: "OLT1 EPON 0/2", status: "healthy", dropDistance: "40-150m", powerDbm: "-19.0 dBm", location: "Notun Bazar Overbridge Tower" },
+  ],
+  "ZONE-KALKINI": [
+    { id: "CL-KAL-01", name: "Kalkini Central Thana Rd DP #01", splitterBox: "TJ-KAL-01", splitRatio: "1:8", portsUsed: 8, totalPorts: 8, oltPort: "OLT2 GPON 0/1", status: "healthy", dropDistance: "40-100m", powerDbm: "-18.1 dBm", location: "Thana Road Main Intersection" },
+    { id: "CL-KAL-02", name: "Gopalpur High School Rd DP #03", splitterBox: "SP-03", splitRatio: "1:8", portsUsed: 7, totalPorts: 8, oltPort: "OLT2 GPON 0/1", status: "healthy", dropDistance: "35-95m", powerDbm: "-17.9 dBm", location: "Gopalpur High School Rd DP Box" },
+    { id: "CL-KAL-03", name: "Kalkini Hospital Road Hub #04", splitterBox: "TJ-KAL-03", splitRatio: "1:8", portsUsed: 6, totalPorts: 8, oltPort: "OLT2 GPON 0/2", status: "healthy", dropDistance: "60-140m", powerDbm: "-18.5 dBm", location: "Kalkini Upazila Health Complex" },
+    { id: "CL-KAL-04", name: "Dashar Nabagram Bazar Pole #05", splitterBox: "SP-06", splitRatio: "1:8", portsUsed: 5, totalPorts: 8, oltPort: "OLT1 EPON 0/4", status: "healthy", dropDistance: "75-160m", powerDbm: "-18.5 dBm", location: "Nabagram Bazar Road Side Pole #05" },
+    { id: "CL-KAL-05", name: "Rajoir Tekerhat Bandar Gate DP #11", splitterBox: "SP-05", splitRatio: "1:8", portsUsed: 4, totalPorts: 8, oltPort: "OLT2 GPON 0/2", status: "healthy", dropDistance: "55-130m", powerDbm: "-18.3 dBm", location: "Tekerhat Bandar Gate DP Box #11" },
+    { id: "CL-KAL-06", name: "Shibchar Pachchar Roundabout #02", splitterBox: "SP-04", splitRatio: "1:8", portsUsed: 8, totalPorts: 8, oltPort: "OLT1 EPON 0/3", status: "healthy", dropDistance: "45-125m", powerDbm: "-19.0 dBm", location: "Pachchar Bazar Roundabout Box #02" },
+  ]
+};
 
 interface ZonesPageProps {
   onNavigate?: (page: string) => void;
@@ -24,6 +61,8 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAddZone, setShowAddZone] = useState(false);
   const [selectedZone, setSelectedZone] = useState<ServiceZone | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<"clusters" | "subscribers">("clusters");
+  const [subscriberSearch, setSubscriberSearch] = useState("");
   const [toast, setToast] = useState("");
 
   const [newZone, setNewZone] = useState({
@@ -94,6 +133,52 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
   });
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
+
+  const selectedZoneClusters = useMemo(() => {
+    if (!selectedZone) return [];
+    return DEFAULT_ZONE_CLUSTERS[selectedZone.id] || DEFAULT_ZONE_CLUSTERS[`ZONE-${selectedZone.code}`] || [
+      { id: `${selectedZone.code}-CL-01`, name: `${selectedZone.name} Central Hub`, splitterBox: "TJ-01", splitRatio: "1:8", portsUsed: 6, totalPorts: 8, oltPort: `${selectedZone.olt} Port 1`, status: "healthy", dropDistance: "50-120m", powerDbm: "-18.5 dBm", location: "Main Center Road" },
+      { id: `${selectedZone.code}-CL-02`, name: `${selectedZone.name} Distribution Box 2`, splitterBox: "TJ-02", splitRatio: "1:8", portsUsed: 5, totalPorts: 8, oltPort: `${selectedZone.olt} Port 2`, status: "healthy", dropDistance: "40-100m", powerDbm: "-18.9 dBm", location: "Bazar Corner Pole" },
+    ];
+  }, [selectedZone]);
+
+  const selectedZoneCustomers = useMemo(() => {
+    if (!selectedZone) return [];
+    const zName = selectedZone.name.toLowerCase();
+    const zCode = selectedZone.code.toLowerCase();
+
+    return customers.filter(c => {
+      const cZone = (c.zone || "").toLowerCase();
+      const cSubzone = (c.subzone || "").toLowerCase();
+      const cBox = (c.box || c.splitterBox || "").toLowerCase();
+      
+      if (zCode === "port" || zName.includes("charmuguria")) {
+        return cZone.includes("port") || cSubzone.includes("charmuguria") || cBox.includes("charmuguria") || cBox.includes("port");
+      }
+      if (zCode === "sadar" || zName.includes("sadar")) {
+        return cZone.includes("sadar") || cSubzone.includes("sadar") || cBox.includes("sadar");
+      }
+      if (zCode === "kalkini" || zName.includes("kalkini")) {
+        return cZone.includes("kalkini") || cSubzone.includes("kalkini") || cBox.includes("kalkini");
+      }
+      return (
+        cZone.includes(zName) || zName.includes(cZone) ||
+        cZone.includes(zCode) || cSubzone.includes(zCode)
+      );
+    });
+  }, [selectedZone, customers]);
+
+  const filteredSelectedCustomers = useMemo(() => {
+    if (!subscriberSearch.trim()) return selectedZoneCustomers;
+    const q = subscriberSearch.toLowerCase().trim();
+    return selectedZoneCustomers.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.phone.includes(q) ||
+      (c.clientCode || c.id).toLowerCase().includes(q) ||
+      (c.pppUser || "").toLowerCase().includes(q) ||
+      (c.ipAddress || "").includes(q)
+    );
+  }, [selectedZoneCustomers, subscriberSearch]);
 
   const handleAddZone = () => {
     if (isReadOnly || !canEdit) {
@@ -472,6 +557,322 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-primary disabled:opacity-50"
               >
                 {isReadOnly || !canEdit ? "Read-Only: Locked" : "Create Zone"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sub-Zone & Splitter Cluster Inspector Modal ────────────────────── */}
+      {selectedZone && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-5" style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}>
+          <div
+            className="rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150"
+            style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+          >
+            {/* Modal Header */}
+            <div className="p-5 border-b border-border flex items-center justify-between gap-3 flex-wrap bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-white shadow-md bg-gradient-to-br from-indigo-500 to-primary">
+                  <MapPin size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 18, color: "var(--foreground)" }}>
+                      {selectedZone.name}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                      {selectedZone.code}
+                    </span>
+                    <span
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                      style={{
+                        background: selectedZone.status === "healthy" ? "#DCFCE7" : selectedZone.status === "degraded" ? "#FEF3C7" : "#FEE2E2",
+                        color: selectedZone.status === "healthy" ? "#16A34A" : selectedZone.status === "degraded" ? "#D97706" : "#DC2626",
+                      }}
+                    >
+                      {selectedZone.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sub-zone coverage, optical splitter clusters & field subscriber distribution
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedZone(null);
+                    onNavigate?.("splitters");
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground flex items-center gap-1.5 transition cursor-pointer"
+                  title="Open Splitter Ledger"
+                >
+                  <Split size={14} className="text-primary" />
+                  <span>ODN Ledger</span>
+                </button>
+                <button
+                  onClick={() => setSelectedZone(null)}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="p-4 border-b border-border grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/10">
+              <div className="p-3 rounded-2xl border border-border bg-card text-center">
+                <div className="text-[10px] uppercase font-bold text-muted-foreground">Sub-Zone Clusters</div>
+                <div className="text-lg font-black text-foreground">{selectedZoneClusters.length} Hubs</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">Splitters & DPs</div>
+              </div>
+              <div className="p-3 rounded-2xl border border-border bg-card text-center">
+                <div className="text-[10px] uppercase font-bold text-muted-foreground">Subscribers</div>
+                <div className="text-lg font-black text-primary">{selectedZoneCustomers.length} Users</div>
+                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                  {selectedZoneCustomers.filter(c => c.netStatus === "online" || c.status === "active").length} Online Active
+                </div>
+              </div>
+              <div className="p-3 rounded-2xl border border-border bg-card text-center">
+                <div className="text-[10px] uppercase font-bold text-muted-foreground">Bound MikroTik</div>
+                <div className="text-sm font-black text-foreground truncate mt-1">{selectedZone.mikrotik}</div>
+                <div className="text-[10px] text-muted-foreground">Core RouterOS</div>
+              </div>
+              <div className="p-3 rounded-2xl border border-border bg-card text-center">
+                <div className="text-[10px] uppercase font-bold text-muted-foreground">OLT Chassis & Port</div>
+                <div className="text-sm font-black text-foreground truncate mt-1">{selectedZone.olt}</div>
+                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">{selectedZone.bandwidth} Cap.</div>
+              </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="px-5 pt-3 border-b border-border flex items-center justify-between gap-4 flex-wrap bg-muted/5">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setInspectorTab("clusters")}
+                  className={`px-4 py-2 rounded-t-xl text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                    inspectorTab === "clusters"
+                      ? "border-primary text-primary bg-primary/5"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Network size={14} />
+                  <span>Sub-Zone Splitter Clusters ({selectedZoneClusters.length})</span>
+                </button>
+                <button
+                  onClick={() => setInspectorTab("subscribers")}
+                  className={`px-4 py-2 rounded-t-xl text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
+                    inspectorTab === "subscribers"
+                      ? "border-primary text-primary bg-primary/5"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Users size={14} />
+                  <span>Assigned Subscribers ({selectedZoneCustomers.length})</span>
+                </button>
+              </div>
+
+              {inspectorTab === "subscribers" && selectedZoneCustomers.length > 0 && (
+                <div className="relative pb-2">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 -mt-1 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search subscribers..."
+                    value={subscriberSearch}
+                    onChange={e => setSubscriberSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Tab 1: Sub-Zone Splitter Clusters */}
+            {inspectorTab === "clusters" && (
+              <div className="p-5 overflow-y-auto flex-1 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {selectedZoneClusters.map((cl) => {
+                    const pct = Math.round((cl.portsUsed / cl.totalPorts) * 100);
+                    return (
+                      <div
+                        key={cl.id}
+                        className="p-4 rounded-2xl border border-border bg-card/60 hover:bg-card hover:border-primary/40 transition-all space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+                              <Split size={16} />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-foreground">{cl.name}</div>
+                              <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <MapPin size={11} className="text-muted-foreground" />
+                                <span className="truncate">{cl.location}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            {cl.powerDbm}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 py-2 border-y border-border/50 text-[11px]">
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Splitter Box:</span>
+                            <span className="font-mono font-bold text-foreground">{cl.splitterBox}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Ratio:</span>
+                            <span className="font-mono font-bold text-foreground">{cl.splitRatio}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Feeder Port:</span>
+                            <span className="font-mono font-bold text-primary truncate block">{cl.oltPort}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-[11px] font-medium mb-1">
+                            <span className="text-muted-foreground">Port Occupancy</span>
+                            <span className="font-mono font-bold text-foreground">{cl.portsUsed} / {cl.totalPorts} Ports ({pct}%)</span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+                          <span>Drop Fiber: <strong className="text-foreground">{cl.dropDistance}</strong></span>
+                          <button
+                            onClick={() => {
+                              setSelectedZone(null);
+                              onNavigate?.("splitters");
+                            }}
+                            className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1 text-[11px]"
+                          >
+                            Manage Box →
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-4 rounded-2xl border border-dashed border-border bg-muted/10 flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                    <Shield size={16} className="text-primary" />
+                    <span>Optical Distribution Network (ODN) standard insertion loss for {selectedZone.name} is verified within -18 dBm to -24 dBm.</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedZone(null);
+                      onNavigate?.("splitters");
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold shadow-xs hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus size={14} />
+                    <span>Add Splitter to {selectedZone.code}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Assigned Subscribers */}
+            {inspectorTab === "subscribers" && (
+              <div className="overflow-y-auto flex-1 p-5">
+                {selectedZoneCustomers.length === 0 ? (
+                  <div className="py-12 text-center space-y-3">
+                    <div className="w-14 h-14 rounded-3xl bg-muted/60 text-muted-foreground flex items-center justify-center mx-auto">
+                      <Users size={28} />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-foreground text-sm">No direct subscribers currently linked to {selectedZone.name}</h4>
+                      <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                        In the current database import, subscribers are registered under the central Kalkini / Somitir Hat subzone. You can assign clients to this sub-zone or create new connections on its {selectedZoneClusters.length} active splitter hubs.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-2">
+                      <button
+                        onClick={() => {
+                          setSelectedZone(null);
+                          onNavigate?.("add-client");
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-primary shadow-xs hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus size={14} />
+                        <span>Add Client in {selectedZone.code}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedZone(null);
+                          onNavigate?.("customers");
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-bold border border-border bg-card hover:bg-muted text-foreground transition cursor-pointer"
+                      >
+                        View All Customers
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-[11px] text-muted-foreground uppercase font-bold">
+                        <th className="pb-2.5 px-3">Client Code</th>
+                        <th className="pb-2.5 px-3">Subscriber</th>
+                        <th className="pb-2.5 px-3">PPPoE User</th>
+                        <th className="pb-2.5 px-3">Splitter / Box</th>
+                        <th className="pb-2.5 px-3">Signal</th>
+                        <th className="pb-2.5 px-3">Status</th>
+                        <th className="pb-2.5 px-3 text-right">Package</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {filteredSelectedCustomers.map((c) => {
+                        const isOnline = c.netStatus === "online" || c.status === "active";
+                        return (
+                          <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                            <td className="py-2.5 px-3 font-mono font-bold text-foreground">{c.clientCode || c.id}</td>
+                            <td className="py-2.5 px-3 font-medium text-foreground">
+                              <div>{c.name}</div>
+                              <div className="text-[11px] text-muted-foreground font-mono">{c.phone}</div>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-primary font-bold">{c.pppUser || c.id}</td>
+                            <td className="py-2.5 px-3 text-muted-foreground">{c.box || c.splitterBox || "TJ-01"}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-500">{c.onuSignal || "-19.2 dBm"}</td>
+                            <td className="py-2.5 px-3">
+                              {isOnline ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Online
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-500 border border-rose-500/30">
+                                  Offline
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-medium text-foreground font-mono">{c.package || "20 Mbps"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="p-3 px-5 border-t border-border flex items-center justify-between text-xs text-muted-foreground bg-muted/10">
+              <span>Coverage area: {selectedZone.name} • {selectedZoneClusters.length} Splitter Hubs</span>
+              <button
+                onClick={() => setSelectedZone(null)}
+                className="px-4 py-1.5 rounded-xl border border-border bg-card hover:bg-muted font-bold text-foreground transition cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

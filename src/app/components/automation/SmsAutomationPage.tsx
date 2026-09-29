@@ -25,19 +25,26 @@ interface OutboundSmsLog {
   timestamp: string;
 }
 
-const INITIAL_LOGS: OutboundSmsLog[] = [
-  { id: "SMS-9921", recipient: "Rahim Uddin", customerName: "Rahim Uddin", phone: "01711-223344", message: "Dear Customer, bill payment of ৳1,200 for Aug 2026 received via bKash. TrxID: TXN-88312. Thank you! - MAA BEST NETWORK", smsCount: 1, provider: "Greenweb", status: "delivered", timestamp: "12 mins ago" },
-  { id: "SMS-9920", recipient: "Nasrin Begum", customerName: "Nasrin Begum", phone: "01819-334455", message: "Dear Customer, your internet bill of ৳1,500 for August 2026 is due. Pay via bKash: 01788-990011 to avoid auto-disconnection.", smsCount: 1, provider: "Greenweb", status: "delivered", timestamp: "35 mins ago" },
-  { id: "SMS-9919", recipient: "Kalkini Somitir Hat Broadcast", customerName: "164 Subscribers", phone: "Multiple", message: "Notice: Scheduled fiber maintenance in Somitir Hat from 2:00 AM to 4:00 AM tonight. Service will resume shortly. - MAA BEST NETWORK", smsCount: 1, provider: "Greenweb", status: "delivered", timestamp: "2 hours ago" },
-  { id: "SMS-9918", recipient: "Karim Hossain", customerName: "Karim Hossain", phone: "01912-887766", message: "Dear Customer, your PPPoE account password has been updated. New credentials sent to email. - MAA BEST NETWORK", smsCount: 1, provider: "Greenweb", status: "delivered", timestamp: "4 hours ago" },
-];
+const STORAGE_KEY_SMS_LOGS = "isp_outbound_sms_logs_v3";
 
 export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
   const { canEdit, isReadOnly } = usePermission("sms");
   const [config, setConfig] = useState<SmsGatewayConfig>(automationStore.getSms());
-  const [logs, setLogs] = useState<OutboundSmsLog[]>(INITIAL_LOGS);
+  const [logs, setLogs] = useState<OutboundSmsLog[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SMS_LOGS);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
   const [activeTab, setActiveTab] = useState<"broadcast" | "logs" | "settings">("broadcast");
   const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_SMS_LOGS, JSON.stringify(logs));
+    } catch {}
+  }, [logs]);
 
   // Broadcast state
   const [targetAudience, setTargetAudience] = useState<"all" | "due" | "kalkini" | "sadar" | "custom">("due");
@@ -367,34 +374,46 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {logs.map(log => (
-                  <tr key={log.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-3.5">
-                      <div className="font-bold text-foreground">{log.recipient}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono">{log.id}</div>
-                    </td>
-                    <td className="p-3.5 font-mono font-semibold text-foreground">
-                      {log.phone}
-                    </td>
-                    <td className="p-3.5 text-muted-foreground max-w-xs truncate">
-                      {log.message}
-                    </td>
-                    <td className="p-3.5 font-mono font-bold text-foreground">
-                      {log.smsCount} SMS
-                    </td>
-                    <td className="p-3.5 font-semibold text-foreground">
-                      {log.provider}
-                    </td>
-                    <td className="p-3.5 text-muted-foreground">
-                      {log.timestamp}
-                    </td>
-                    <td className="p-3.5 text-right">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                        {log.status}
-                      </span>
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <MessageSquare size={24} className="text-muted-foreground/40" />
+                        <span className="font-semibold text-xs">No Outbound SMS Logs Recorded</span>
+                        <span className="text-[11px] text-muted-foreground">Automated reminders and broadcasts will appear here upon dispatch.</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  logs.map(log => (
+                    <tr key={log.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="p-3.5">
+                        <div className="font-bold text-foreground">{log.recipient}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{log.id}</div>
+                      </td>
+                      <td className="p-3.5 font-mono font-semibold text-foreground">
+                        {log.phone}
+                      </td>
+                      <td className="p-3.5 text-muted-foreground max-w-xs truncate">
+                        {log.message}
+                      </td>
+                      <td className="p-3.5 font-mono font-bold text-foreground">
+                        {log.smsCount} SMS
+                      </td>
+                      <td className="p-3.5 font-semibold text-foreground">
+                        {log.provider}
+                      </td>
+                      <td className="p-3.5 text-muted-foreground">
+                        {log.timestamp}
+                      </td>
+                      <td className="p-3.5 text-right">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                          {log.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

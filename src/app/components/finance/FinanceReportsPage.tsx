@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FileText, Download, BarChart3, TrendingUp, TrendingDown,
   DollarSign, CheckCircle2, Calendar, Filter, RefreshCw
@@ -6,30 +6,47 @@ import {
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend
 } from "recharts";
-
-const MONTHLY_PL_DATA = [
-  { month: "Mar 2026", revenue: 1120000, opex: 540000, profit: 580000 },
-  { month: "Apr 2026", revenue: 1180000, opex: 560000, profit: 620000 },
-  { month: "May 2026", revenue: 1240000, opex: 590000, profit: 650000 },
-  { month: "Jun 2026", revenue: 1310000, opex: 610000, profit: 700000 },
-  { month: "Jul 2026", revenue: 1380000, opex: 630000, profit: 750000 },
-  { month: "Aug 2026", revenue: 1460000, opex: 650000, profit: 810000 },
-];
+import { useCustomerContext } from "../../context/CustomerContext";
+import { financeStore } from "./financeData";
 
 interface FinanceReportsPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function FinanceReportsPage({ onNavigate }: FinanceReportsPageProps) {
+  const { customers } = useCustomerContext();
   const [period, setPeriod] = useState("Last 6 Months");
   const [toast, setToast] = useState("");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  const totalRev = MONTHLY_PL_DATA.reduce((a, b) => a + b.revenue, 0);
-  const totalExp = MONTHLY_PL_DATA.reduce((a, b) => a + b.opex, 0);
+  const monthlySubscriberRev = useMemo(() => {
+    const rev = customers.reduce((sum, c) => sum + (c.monthlyBill || c.price || 0), 0);
+    return rev > 0 ? rev : 118000;
+  }, [customers]);
+
+  const monthlyRecordedExp = useMemo(() => {
+    const expenses = financeStore.getExpenses();
+    const totalExp = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    return totalExp > 0 ? totalExp : Math.round(monthlySubscriberRev * 0.42);
+  }, [monthlySubscriberRev]);
+
+  const monthlyPlData = useMemo(() => {
+    const months = ["Apr 2026", "May 2026", "Jun 2026", "Jul 2026", "Aug 2026", "Sep 2026"];
+    const growthFactors = [0.88, 0.91, 0.94, 0.96, 0.98, 1.0];
+    return months.map((month, idx) => {
+      const factor = growthFactors[idx];
+      const revenue = Math.round(monthlySubscriberRev * factor);
+      const opex = Math.round(monthlyRecordedExp * factor);
+      const profit = Math.max(0, revenue - opex);
+      return { month, revenue, opex, profit };
+    });
+  }, [monthlySubscriberRev, monthlyRecordedExp]);
+
+  const totalRev = monthlyPlData.reduce((a, b) => a + b.revenue, 0);
+  const totalExp = monthlyPlData.reduce((a, b) => a + b.opex, 0);
   const totalNet = totalRev - totalExp;
-  const netMargin = Math.round((totalNet / totalRev) * 100);
+  const netMargin = totalRev > 0 ? Math.round((totalNet / totalRev) * 100) : 0;
 
   return (
     <div className="p-3 sm:p-6">
@@ -119,7 +136,7 @@ export function FinanceReportsPage({ onNavigate }: FinanceReportsPageProps) {
 
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={MONTHLY_PL_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <BarChart data={monthlyPlData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={11} />
               <YAxis stroke="var(--muted-foreground)" fontSize={11} tickFormatter={v => `৳${v / 1000}k`} />
@@ -152,12 +169,12 @@ export function FinanceReportsPage({ onNavigate }: FinanceReportsPageProps) {
               </tr>
             </thead>
             <tbody>
-              {MONTHLY_PL_DATA.map((row, i) => {
-                const margin = Math.round((row.profit / row.revenue) * 100);
+              {monthlyPlData.map((row, i) => {
+                const margin = row.revenue > 0 ? Math.round((row.profit / row.revenue) * 100) : 0;
                 return (
                   <tr
                     key={row.month}
-                    style={{ borderBottom: i < MONTHLY_PL_DATA.length - 1 ? "1px solid var(--border)" : "none" }}
+                    style={{ borderBottom: i < monthlyPlData.length - 1 ? "1px solid var(--border)" : "none" }}
                     className="hover:bg-muted/40 transition-colors"
                   >
                     <td className="px-5 py-4 font-bold text-foreground">{row.month}</td>

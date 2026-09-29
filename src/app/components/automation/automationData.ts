@@ -31,8 +31,8 @@ export interface WebhookNotification {
 
 export const INITIAL_SMS_CONFIG: SmsGatewayConfig = {
   provider: "greenweb",
-  apiKey: "gw_live_8849201994",
-  senderId: "ISP-ALERT",
+  apiKey: "",
+  senderId: "MBN-NET",
   balance: 0,
   currency: "BDT",
   ratePerSms: 0.35,

@@ -22,7 +22,7 @@ export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
 
   const [newExp, setNewExp] = useState({
     vendor: "", category: "upstream_bw" as ExpenseItem["category"],
-    amount: "15000", paidFrom: "EBL Principal Current A/C", invoiceNo: ""
+    amount: "15000", paidFrom: "Company Primary Account / Cash Drawer", invoiceNo: ""
   });
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
     financeStore.addExpense(exp);
     setShowAddModal(false);
     showToast(`Expense ৳${exp.amount.toLocaleString()} recorded under ${exp.category.replace("_", " ")}!`);
-    setNewExp({ vendor: "", category: "upstream_bw", amount: "15000", paidFrom: "EBL Principal Current A/C", invoiceNo: "" });
+    setNewExp({ vendor: "", category: "upstream_bw", amount: "15000", paidFrom: "Company Primary Account / Cash Drawer", invoiceNo: "" });
   };
 
   const filtered = expenses.filter(e => {
@@ -182,30 +182,42 @@ export function ExpensesPage({ onNavigate }: ExpensesPageProps) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e, i) => (
-                <tr
-                  key={e.id}
-                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
-                  className="hover:bg-muted/40 transition-colors"
-                >
-                  <td className="px-5 py-3.5 font-mono font-bold text-red-600">{e.id}</td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{e.date}</td>
-                  <td className="px-5 py-3.5 font-bold text-foreground">{e.vendor}</td>
-                  <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted text-muted-foreground">
-                      {e.category.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{e.paidFrom}</td>
-                  <td className="px-5 py-3.5 font-mono text-muted-foreground">{e.invoiceNo}</td>
-                  <td className="px-5 py-3.5 font-mono font-bold text-foreground">৳{e.amount.toLocaleString()}</td>
-                  <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700">
-                      {e.status}
-                    </span>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-12 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <TrendingDown size={28} className="text-muted-foreground/40" />
+                      <p className="font-semibold text-sm">No Recorded Expenses</p>
+                      <p className="text-xs text-muted-foreground">Log upstream bandwidth invoices, fiber maintenance costs, or staff expenses.</p>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((e, i) => (
+                  <tr
+                    key={e.id}
+                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
+                    className="hover:bg-muted/40 transition-colors"
+                  >
+                    <td className="px-5 py-3.5 font-mono font-bold text-red-600">{e.id}</td>
+                    <td className="px-5 py-3.5 text-muted-foreground">{e.date}</td>
+                    <td className="px-5 py-3.5 font-bold text-foreground">{e.vendor}</td>
+                    <td className="px-5 py-3.5">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted text-muted-foreground">
+                        {e.category.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-muted-foreground">{e.paidFrom}</td>
+                    <td className="px-5 py-3.5 font-mono text-muted-foreground">{e.invoiceNo}</td>
+                    <td className="px-5 py-3.5 font-mono font-bold text-foreground">৳{e.amount.toLocaleString()}</td>
+                    <td className="px-5 py-3.5">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700">
+                        {e.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

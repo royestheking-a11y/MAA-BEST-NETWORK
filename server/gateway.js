@@ -5,7 +5,8 @@ import {
   fetchDeduplicatedMbnUsers, getCachedMbnUsers, executeRouterOsCommand, disconnectPppoeUser,
   setUserDisabledState, mikrotikPing, getMikrotikDetails, createPppoeSecret, updatePppoeSecret,
   deletePppoeSecret, fetchNetxPackages, getCachedNetxPackages, fetchNetxZones, getCachedNetxZones,
-  fetchNetxFullCustomers, getCachedNetxCustomers, fetchNetxDashboard, getCachedNetxDashboard
+  fetchNetxFullCustomers, getCachedNetxCustomers, fetchNetxDashboard, getCachedNetxDashboard,
+  rebootOnuHardware
 } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
@@ -249,6 +250,22 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const result = await disconnectPppoeUser(username);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+    return;
+  }
+
+  // 14b. Real OLT Hardware ONU Reboot via Telnet
+  if (url.pathname === '/api/olt/reboot-onu' && req.method === 'POST') {
+    const body = await readBody();
+    const { oltServer, mac, ponPort } = body;
+    const target = mac || ponPort;
+    if (!target) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'mac or ponPort required' }));
+      return;
+    }
+    const result = await rebootOnuHardware(oltServer || 'OLT1', target);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
     return;

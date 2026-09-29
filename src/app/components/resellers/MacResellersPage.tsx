@@ -19,7 +19,7 @@ export function MacResellersPage({ onNavigate }: MacResellersPageProps) {
   const [toast, setToast] = useState("");
 
   const [newReseller, setNewReseller] = useState({
-    name: "", company: "", phone: "", email: "", zone: "Mirpur-10",
+    name: "", company: "", phone: "", email: "", zone: "Kalkini Hub",
     maxClients: "150", creditLimit: "20000", commission: "20"
   });
 
@@ -48,13 +48,13 @@ export function MacResellersPage({ onNavigate }: MacResellersPageProps) {
       id: `RSL-${(resellers.length + 101).toString()}`,
       name: newReseller.name,
       company: newReseller.company,
-      phone: newReseller.phone || "01700-000000",
-      email: newReseller.email || "partner@isp.bd",
+      phone: newReseller.phone || "01788-990011",
+      email: newReseller.email || "partner@maabestnetwork.com",
       zone: newReseller.zone,
       clients: 0,
       maxClients: Number(newReseller.maxClients),
       creditLimit: Number(newReseller.creditLimit),
-      balance: 5000,
+      balance: 0,
       commission: Number(newReseller.commission),
       status: "active",
       joinedDate: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
@@ -62,7 +62,7 @@ export function MacResellersPage({ onNavigate }: MacResellersPageProps) {
     resellersStore.addMacReseller(rsl);
     setShowAddModal(false);
     showToast(`MAC Reseller "${rsl.company}" registered successfully!`);
-    setNewReseller({ name: "", company: "", phone: "", email: "", zone: "Mirpur-10", maxClients: "150", creditLimit: "20000", commission: "20" });
+    setNewReseller({ name: "", company: "", phone: "", email: "", zone: "Kalkini Hub", maxClients: "150", creditLimit: "20000", commission: "20" });
   };
 
   const totalClients = resellers.reduce((a, b) => a + b.clients, 0);
@@ -201,51 +201,63 @@ export function MacResellersPage({ onNavigate }: MacResellersPageProps) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r, i) => (
-              <tr
-                key={r.id}
-                style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
-                className="hover:bg-muted/40 transition-colors"
-              >
-                <td className="px-5 py-4">
-                  <div>
-                    <span className="font-bold text-foreground block text-sm">{r.company}</span>
-                    <span className="text-muted-foreground text-[11px]">{r.name} · {r.phone}</span>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-5 py-12 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Users size={28} className="text-muted-foreground/40" />
+                    <p className="font-semibold text-sm">No MAC Resellers Found</p>
+                    <p className="text-xs text-muted-foreground">Register your first sub-ISP partner or adjust your search filter.</p>
                   </div>
                 </td>
-                <td className="px-5 py-4 font-medium text-foreground">{r.zone}</td>
-                <td className="px-5 py-4">
-                  <span className="font-mono font-bold text-foreground">{r.clients}</span>
-                  <span className="text-muted-foreground"> / {r.maxClients} max</span>
-                </td>
-                <td className="px-5 py-4 font-mono font-bold" style={{ color: r.balance < 3000 ? "#DC2626" : "#16A34A" }}>
-                  ৳{r.balance.toLocaleString()}
-                </td>
-                <td className="px-5 py-4 font-mono font-semibold text-purple-600">{r.commission}%</td>
-                <td className="px-5 py-4 font-mono text-muted-foreground">৳{r.creditLimit.toLocaleString()}</td>
-                <td className="px-5 py-4">
-                  <span
-                    className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
-                    style={{
-                      background: r.status === "active" ? "#DCFCE7" : r.status === "low_balance" ? "#FEF3C7" : "#FEE2E2",
-                      color: r.status === "active" ? "#16A34A" : r.status === "low_balance" ? "#D97706" : "#DC2626",
-                    }}
-                  >
-                    {r.status.replace("_", " ")}
-                  </span>
-                </td>
-                <td className="px-5 py-4">
-                  <button
-                    onClick={() => {
-                      if (onNavigate) onNavigate("reseller-wallets");
-                    }}
-                    className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                  >
-                    Top-Up <ChevronRight size={13} />
-                  </button>
-                </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((r, i) => (
+                <tr
+                  key={r.id}
+                  style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
+                  className="hover:bg-muted/40 transition-colors"
+                >
+                  <td className="px-5 py-4">
+                    <div>
+                      <span className="font-bold text-foreground block text-sm">{r.company}</span>
+                      <span className="text-muted-foreground text-[11px]">{r.name} · {r.phone}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 font-medium text-foreground">{r.zone}</td>
+                  <td className="px-5 py-4">
+                    <span className="font-mono font-bold text-foreground">{r.clients}</span>
+                    <span className="text-muted-foreground"> / {r.maxClients} max</span>
+                  </td>
+                  <td className="px-5 py-4 font-mono font-bold" style={{ color: r.balance < 3000 ? "#DC2626" : "#16A34A" }}>
+                    ৳{r.balance.toLocaleString()}
+                  </td>
+                  <td className="px-5 py-4 font-mono font-semibold text-purple-600">{r.commission}%</td>
+                  <td className="px-5 py-4 font-mono text-muted-foreground">৳{r.creditLimit.toLocaleString()}</td>
+                  <td className="px-5 py-4">
+                    <span
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                      style={{
+                        background: r.status === "active" ? "#DCFCE7" : r.status === "low_balance" ? "#FEF3C7" : "#FEE2E2",
+                        color: r.status === "active" ? "#16A34A" : r.status === "low_balance" ? "#D97706" : "#DC2626",
+                      }}
+                    >
+                      {r.status.replace("_", " ")}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => {
+                        if (onNavigate) onNavigate("reseller-wallets");
+                      }}
+                      className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Top-Up <ChevronRight size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
         </div>

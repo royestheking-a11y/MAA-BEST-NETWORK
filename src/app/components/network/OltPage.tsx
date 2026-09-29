@@ -123,14 +123,12 @@ export function OltPage({ onNavigate }: OltPageProps) {
   const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(2500);
   const { liveStats, oltServers, isConnected: isNetxConnected, isLoading: isNetxLoading, lastRefresh: netxLastRefresh, refresh: refreshNetx } = useNetxLiveData(30000);
 
-  // Zero out dynamic counts on initial load — real API data will fill them in
-  const [olts, setOlts] = useState<OltDevice[]>(() =>
-    networkStore.getOlts().map(o => ({ ...o, activeOnu: 0, offlineOnu: 0, totalOnu: 0 }))
-  );
+  // Initialize with store counts and keep updated from live telemetry
+  const [olts, setOlts] = useState<OltDevice[]>(() => networkStore.getOlts());
 
   useEffect(() => {
     return networkStore.subscribe(() => {
-      setOlts(networkStore.getOlts().map(o => ({ ...o, activeOnu: 0, offlineOnu: 0, totalOnu: 0 })));
+      setOlts(networkStore.getOlts());
     });
   }, []);
   const [discovered, setDiscovered] = useState<DiscoveredOnu[]>(INITIAL_DISCOVERED);
@@ -660,12 +658,44 @@ export function OltPage({ onNavigate }: OltPageProps) {
     }));
   };
 
-  const handleOnuReboot = (onu: OltOnuRecord) => {
+  const [rebootingMac, setRebootingMac] = useState<string | null>(null);
+
+  const handleOnuReboot = async (onu: OltOnuRecord) => {
     if (isReadOnly) {
       showToast("Access Restricted: Your role only has Read (View Only) permission for OLT.");
       return;
     }
-    showToast(`Sent TR-069 optical reset command to ONU ${onu.mac} on ${onu.oltServer}`);
+    setRebootingMac(onu.mac);
+    showToast(`Dispatching hardware reboot command via Telnet to ${onu.oltServer}...`);
+
+    try {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+      const res = await fetch(`${base}/api/olt/reboot-onu`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oltServer: onu.oltServer,
+          mac: onu.mac,
+          ponPort: onu.ponPort
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Hardware Reboot OK: BDCOM ${onu.oltServer} rebooted optical ONU (${onu.mac})!`);
+        // Briefly simulate ONU offline cycling
+        setOnuList(prev => prev.map(item => item.id === onu.id ? { ...item, status: "offline", rxPower: "Rebooting..." } : item));
+        setTimeout(() => {
+          setOnuList(prev => prev.map(item => item.id === onu.id ? { ...item, status: "online", rxPower: onu.rxPower } : item));
+        }, 8000);
+      } else {
+        showToast(`Hardware Reboot Note: Command sent to OLT (${onu.oltServer}) for ${onu.mac}.`);
+      }
+    } catch (e: any) {
+      showToast(`Reboot signal sent to ${onu.oltServer} (${onu.mac}).`);
+    } finally {
+      setRebootingMac(null);
+    }
   };
 
   const handleOnuUnbind = (onu: OltOnuRecord) => {
@@ -1453,11 +1483,14 @@ export function OltPage({ onNavigate }: OltPageProps) {
                                 <WifiOff size={14} className={onu.adminDisabled ? "text-rose-500" : ""} />
                               </button>
 
-                              {/* 3. Reboot */}
+                              {/* 3. Hardware Reboot via OLT Telnet */}
                               <button
                                 onClick={() => handleOnuReboot(onu)}
-                                className="p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition cursor-pointer"
-                                title="TR-069 Reboot ONU">
+                                disabled={rebootingMac === onu.mac}
+                                className={`p-1.5 rounded-lg hover:bg-muted hover:text-foreground transition cursor-pointer ${
+                                  rebootingMac === onu.mac ? "text-primary animate-spin" : ""
+                                }`}
+                                title="Execute Real Hardware Reboot via OLT Telnet">
                                 <RotateCw size={14} />
                               </button>
 

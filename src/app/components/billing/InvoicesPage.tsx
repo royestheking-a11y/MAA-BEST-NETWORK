@@ -524,6 +524,18 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   {selectedInvoice.paidAt && (
                     <p className="text-emerald-600 font-medium"><strong>Paid On:</strong> {selectedInvoice.paidAt}</p>
                   )}
+                  {selectedInvoice.status === "paid" && (
+                    <p className="text-foreground">
+                      <strong className="text-muted-foreground">Payment Mode:</strong>{" "}
+                      <span className="font-bold font-mono text-primary">
+                        {selectedInvoice.method
+                          ? selectedInvoice.method.toUpperCase().includes("CASH")
+                            ? "CASH (WALK-IN COUNTER)"
+                            : selectedInvoice.method.toUpperCase()
+                          : "CASH (WALK-IN COUNTER)"}
+                      </span>
+                    </p>
+                  )}
                   {selectedInvoice.trxId && (
                     <p className="text-foreground font-mono text-[11px]"><strong>Trx ID:</strong> {selectedInvoice.trxId}</p>
                   )}
@@ -886,13 +898,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-muted-foreground block mb-1.5">SELECT PAYMENT METHOD</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {[
-                    { id: "Cash", label: "Cash Desk", icon: DollarSign },
-                    { id: "bKash", label: "bKash Direct", icon: Smartphone },
-                    { id: "Nagad", label: "Nagad Pay", icon: Smartphone },
-                    { id: "Rocket", label: "DBBL Rocket", icon: Smartphone },
-                    { id: "Bank", label: "Card / Bank", icon: CreditCard },
+                    { id: "Cash", label: "Cash (Walk-In Counter)", icon: DollarSign },
+                    { id: "bKash", label: "bKash (MFS)", icon: Smartphone },
+                    { id: "Nagad", label: "Nagad (MFS)", icon: Smartphone },
+                    { id: "Rocket", label: "Rocket (DBBL)", icon: Smartphone },
+                    { id: "Bank", label: "Bank Transfer / Card", icon: CreditCard },
                   ].map(m => (
                     <button
                       key={m.id}

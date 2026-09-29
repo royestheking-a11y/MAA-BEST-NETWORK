@@ -3,7 +3,7 @@ import {
   CreditCard, Search, Printer, CheckCircle2, QrCode, Phone,
   User, DollarSign, RefreshCw, Send, Check, X, Building2,
   Receipt, ArrowRight, ShieldCheck, Sparkles, Download, FileText,
-  MessageCircle, Share2
+  MessageCircle, Share2, Smartphone
 } from "lucide-react";
 import { billingStore, type Payment } from "./billingData";
 import { useCustomerContext } from "../../context/CustomerContext";
@@ -45,6 +45,8 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCust, setSelectedCust] = useState<QuickCustomer | null>(() => cashCustomers[0] || null);
+  const [payMode, setPayMode] = useState<"CASH (WALK-IN COUNTER)" | "bKash" | "Nagad" | "Rocket" | "Bank Transfer">("CASH (WALK-IN COUNTER)");
+  const [trxId, setTrxId] = useState("");
   const [collectAmount, setCollectAmount] = useState(() => (cashCustomers[0]?.dueAmount || cashCustomers[0]?.monthlyFee || 1200).toString());
   const [discountAmount, setDiscountAmount] = useState("0");
   const [collectedBy, setCollectedBy] = useState("Cashier - Kalkini Main Branch");
@@ -69,6 +71,8 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
         discount: Number(discountAmount) || 0,
         netPaid: Math.max(0, (Number(collectAmount) || selectedCust.monthlyFee) - (Number(discountAmount) || 0)),
         collectedBy: collectedBy || "Cashier - Kalkini Main Branch",
+        paymentMode: payMode,
+        trxId: trxId,
         isDraft: true,
       };
     }
@@ -84,9 +88,11 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
       discount: 0,
       netPaid: 1200,
       collectedBy: "Cashier - Kalkini Main Branch",
+      paymentMode: "CASH (WALK-IN COUNTER)",
+      trxId: "",
       isDraft: true,
     };
-  }, [printedReceipt, selectedCust, collectAmount, discountAmount, collectedBy]);
+  }, [printedReceipt, selectedCust, collectAmount, discountAmount, collectedBy, payMode, trxId]);
 
   const handleDownloadPng = (rc: any) => {
     const canvas = document.createElement("canvas");
@@ -189,7 +195,8 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
     ctx.font = "10px 'Courier New', monospace";
     ctx.fillStyle = "#64748B";
     ctx.textAlign = "center";
-    ctx.fillText("Payment Mode: CASH (WALK-IN COUNTER)", 200, y);
+    const modeStr = `Payment Mode: ${rc.paymentMode || "CASH (WALK-IN COUNTER)"}${rc.trxId ? ` (${rc.trxId})` : ""}`;
+    ctx.fillText(modeStr, 200, y);
     y += 16;
     ctx.fillText(`Collected by: ${rc.collectedBy || "Counter Executive"}`, 200, y);
     y += 22;
@@ -251,7 +258,7 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
     <div class="row total-box"><span>NET PAID:</span><span>৳${rc.netPaid}</span></div>
   </div>
   <div class="footer">
-    <div>Payment Mode: CASH (WALK-IN COUNTER)</div>
+    <div>Payment Mode: ${rc.paymentMode || "CASH (WALK-IN COUNTER)"}${rc.trxId ? ` · Trx: ${rc.trxId}` : ''}</div>
     <div>Collected by: ${rc.collectedBy || "Counter-01"}</div>
     <div style="font-weight: bold; margin-top: 6px;">THANK YOU FOR CHOOSING MAA BEST NETWORK!</div>
   </div>
@@ -276,7 +283,8 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
       `Customer: ${rc.customer} (${rc.custId})\n` +
       `Package: ${rc.pkgName}\n` +
       `Amount Paid: ৳${rc.netPaid}\n` +
-      `Status: PAID (CASH COUNTER)\n` +
+      `Payment Mode: ${rc.paymentMode || "CASH (WALK-IN COUNTER)"}${rc.trxId ? ` (Trx: ${rc.trxId})` : ''}\n` +
+      `Status: PAID\n` +
       `Collected by: ${rc.collectedBy}\n\n` +
       `Thank you for staying with MAA BEST NETWORK!\nHotline: 01788-990011`;
     window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -330,7 +338,7 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
     <div class="row total-box"><span>NET PAID:</span><span>৳${rc.netPaid}</span></div>
   </div>
   <div class="footer">
-    <div>Payment Mode: CASH (WALK-IN)</div>
+    <div>Payment Mode: ${rc.paymentMode || "CASH (WALK-IN COUNTER)"}${rc.trxId ? ` · Trx: ${rc.trxId}` : ''}</div>
     <div>Collected by: ${rc.collectedBy}</div>
     <div style="font-weight: bold; margin-top: 4px;">THANK YOU FOR STAYING WITH US!</div>
   </div>
@@ -389,11 +397,23 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
       subtotal: Number(collectAmount),
       discount: Number(discountAmount),
       netPaid: netPaid,
-      method: "Cash Desk (Walk-In)",
+      method: payMode,
+      paymentMode: payMode,
+      trxId: trxId,
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
       collectedBy: collectedBy,
-      qrPayload: `MBN-REC|${selectedCust.id}|${netPaid}|${Date.now()}`
+      qrPayload: `MBN-REC|${selectedCust.id}|${netPaid}|${payMode}|${Date.now()}`
     };
+
+    const pmtMethod: Payment["method"] = payMode.includes("bKash")
+      ? "bKash"
+      : payMode.includes("Nagad")
+      ? "Nagad"
+      : payMode.includes("Rocket")
+      ? "Rocket"
+      : payMode.includes("Bank")
+      ? "Bank"
+      : "Cash";
 
     // Add to billing store
     const pmt: Payment = {
@@ -402,18 +422,26 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
       customer: selectedCust.name,
       custId: selectedCust.id,
       amount: netPaid,
-      method: "Cash",
-      txn: receiptData.receiptNo,
+      method: pmtMethod,
+      txn: trxId || receiptData.receiptNo,
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
       addedBy: collectedBy,
-      channel: "Walk-In Counter",
+      channel: payMode === "CASH (WALK-IN COUNTER)" ? "Walk-In Counter" : `${payMode} Counter POS`,
       status: "verified"
     };
 
     billingStore.addPayment(pmt);
+
+    // Sync with CustomerContext to update subscriber due balance, active dates & auto-reconnect PPPoE
+    if (processPayment) {
+      const mappedMethod: "Cash" | "bKash" | "Nagad" | "Rocket" | "Card" =
+        pmtMethod === "Bank" ? "Card" : (pmtMethod as any);
+      processPayment(selectedCust.id, netPaid, mappedMethod, trxId || receiptData.receiptNo, new Date());
+    }
+
     setPrintedReceipt(receiptData);
-    showToast(`✓ Payment of ৳${netPaid.toLocaleString()} collected for ${selectedCust.name}! ${sendSms ? "SMS confirmation sent." : ""}`);
+    showToast(`✓ Payment of ৳${netPaid.toLocaleString()} collected via ${payMode} for ${selectedCust.name}! ${sendSms ? "SMS confirmation sent." : ""}`);
   };
 
   const filtered = cashCustomers.filter(c =>
@@ -532,7 +560,48 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
               </div>
 
               <div>
-                <label className="font-bold text-muted-foreground block mb-1">CASH AMOUNT TO COLLECT (BDT)</label>
+                <label className="font-bold text-muted-foreground block mb-1.5">PAYMENT MODE</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {[
+                    { id: "CASH (WALK-IN COUNTER)", label: "Cash (Walk-In)", icon: DollarSign },
+                    { id: "bKash", label: "bKash (MFS)", icon: Smartphone },
+                    { id: "Nagad", label: "Nagad (MFS)", icon: Smartphone },
+                    { id: "Rocket", label: "Rocket (DBBL)", icon: Smartphone },
+                    { id: "Bank Transfer", label: "Bank / Card", icon: Building2 },
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPayMode(m.id as any)}
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        payMode === m.id
+                          ? "bg-primary text-white border-primary font-bold shadow-xs"
+                          : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"
+                      }`}>
+                      <m.icon size={13} />
+                      <span className="text-[11px] font-bold">{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {payMode !== "CASH (WALK-IN COUNTER)" && (
+                <div>
+                  <label className="font-bold text-muted-foreground block mb-1">
+                    TRANSACTION ID / REFERENCE (OPTIONAL)
+                  </label>
+                  <input
+                    type="text"
+                    value={trxId}
+                    onChange={e => setTrxId(e.target.value)}
+                    placeholder="e.g. 9JK83M10 / Bank Slip Ref"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-mono font-bold outline-none"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-muted-foreground block mb-1">AMOUNT TO COLLECT (BDT)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">৳</span>
                   <input
@@ -663,7 +732,7 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
                 </div>
 
                 <div className="text-center text-[10px] text-gray-600 pt-1 space-y-1">
-                  <div>Payment Mode: CASH (WALK-IN COUNTER)</div>
+                  <div>Payment Mode: {activeReceipt.paymentMode || "CASH (WALK-IN COUNTER)"}{activeReceipt.trxId ? ` · Trx: ${activeReceipt.trxId}` : ""}</div>
                   <div>Collected by: {activeReceipt.collectedBy}</div>
                   <div className="font-bold text-black mt-2">THANK YOU FOR CHOOSING MAA BEST NETWORK!</div>
                 </div>

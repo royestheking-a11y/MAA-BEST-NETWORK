@@ -254,6 +254,30 @@ function realtimeTelemetryPlugin() {
         }
       });
 
+      // Real OLT Hardware ONU Reboot via Telnet
+      server.middlewares.use('/api/olt/reboot-onu', async (req: any, res: any) => {
+        try {
+          const body = await readBody(req);
+          const { oltServer, mac, ponPort } = body;
+          const target = mac || ponPort;
+          if (!target) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'mac or ponPort required' }));
+            return;
+          }
+          const { rebootOnuHardware } = await import('./server/telemetry-service.js');
+          const result = await rebootOnuHardware(oltServer || 'OLT1', target);
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(result));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+
       // MikroTik delete / terminate subscriber secret
       server.middlewares.use('/api/mikrotik/user/delete', async (req: any, res: any) => {
         try {

@@ -109,56 +109,75 @@ export function AccountsPage({ onNavigate }: AccountsPageProps) {
       </div>
 
       {/* ── Account Cards Grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        {accounts.map(acc => (
-          <div
-            key={acc.id}
-            className="rounded-xl p-5 border border-border bg-card shadow-sm space-y-4 flex flex-col justify-between"
+      {accounts.length === 0 ? (
+        <div className="rounded-2xl p-12 text-center border border-dashed border-border bg-card space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+            <Building2 size={24} />
+          </div>
+          <h3 className="text-base font-bold text-foreground">No Financial Accounts Configured</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            Add your company bank accounts, bKash/Nagad merchant wallets, or branch cash drawers to start tracking ISP collections and expenses.
+          </p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            disabled={isReadOnly || !canEdit}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-primary shadow-sm hover:opacity-90 inline-flex items-center gap-2 mt-2"
           >
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                    {getAccountIcon(acc.type)}
+            <Plus size={14} /> Add First Account
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {accounts.map(acc => (
+            <div
+              key={acc.id}
+              className="rounded-xl p-5 border border-border bg-card shadow-sm space-y-4 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                      {getAccountIcon(acc.type)}
+                    </div>
+                    <div>
+                      <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15, color: "var(--foreground)" }}>
+                        {acc.name}
+                      </h3>
+                      <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{acc.bankName}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 15, color: "var(--foreground)" }}>
-                      {acc.name}
-                    </h3>
-                    <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>{acc.bankName}</p>
-                  </div>
+
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted text-muted-foreground">
+                    {acc.type.replace("_", " ")}
+                  </span>
                 </div>
 
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-muted text-muted-foreground">
-                  {acc.type.replace("_", " ")}
-                </span>
+                <div className="pt-4 space-y-2">
+                  <span className="text-xs text-muted-foreground block">AVAILABLE BALANCE</span>
+                  <p className="font-mono text-2xl font-bold text-foreground">
+                    ৳{acc.balance.toLocaleString()}
+                  </p>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    A/C: <span className="text-foreground font-semibold">{acc.accountNumber}</span>
+                  </p>
+                </div>
               </div>
 
-              <div className="pt-4 space-y-2">
-                <span className="text-xs text-muted-foreground block">AVAILABLE BALANCE</span>
-                <p className="font-mono text-2xl font-bold text-foreground">
-                  ৳{acc.balance.toLocaleString()}
-                </p>
-                <p className="font-mono text-xs text-muted-foreground">
-                  A/C: <span className="text-foreground font-semibold">{acc.accountNumber}</span>
-                </p>
+              <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                <span>Reconciled: {acc.lastReconciled}</span>
+                <button
+                  onClick={() => {
+                    if (onNavigate) onNavigate("transactions");
+                  }}
+                  className="text-primary font-semibold hover:underline"
+                >
+                  Statement →
+                </button>
               </div>
             </div>
-
-            <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-              <span>Reconciled: {acc.lastReconciled}</span>
-              <button
-                onClick={() => {
-                  if (onNavigate) onNavigate("transactions");
-                }}
-                className="text-primary font-semibold hover:underline"
-              >
-                Statement →
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Add Account Modal ────────────────────────────────────────────────── */}
       {showAddModal && (

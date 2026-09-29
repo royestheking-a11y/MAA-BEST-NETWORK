@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   MessageSquare, Search, Send, CheckCircle2, Clock, Phone,
   User, Check, X, RefreshCw, MessageCircle
@@ -6,15 +6,17 @@ import {
 import {
   crmStore, type CustomerMessage
 } from "./crmData";
+import { useCustomerContext } from "../../context/CustomerContext";
 
 interface MessagesPageProps {
   onNavigate?: (page: string) => void;
 }
 
 export function MessagesPage({ onNavigate }: MessagesPageProps) {
+  const { customers } = useCustomerContext();
   const [messages, setMessages] = useState<CustomerMessage[]>(crmStore.getMessages());
   const [search, setSearch] = useState("");
-  const [selectedCust, setSelectedCust] = useState<string>("CUST-10001");
+  const [selectedCust, setSelectedCust] = useState<string>(() => customers[0]?.id || "MBN0001");
   const [newText, setNewText] = useState("");
   const [toast, setToast] = useState("");
 
@@ -26,13 +28,49 @@ export function MessagesPage({ onNavigate }: MessagesPageProps) {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
+  const conversations = useMemo(() => {
+    const list = customers.map(c => {
+      const custMsgs = messages.filter(m => m.custId === c.id || m.custId === c.clientCode);
+      const lastMsgObj = custMsgs[custMsgs.length - 1];
+      return {
+        custId: c.id,
+        clientCode: c.clientCode || c.id,
+        name: c.name,
+        phone: c.phone,
+        unread: 0,
+        lastMsg: lastMsgObj ? lastMsgObj.text : `Plan: ${c.package} (${c.speed} Mbps) · ${c.subzone || c.zone}`,
+      };
+    });
+
+    if (!search.trim()) return list.slice(0, 25);
+    const q = search.toLowerCase();
+    return list.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.phone.includes(q) ||
+      c.custId.toLowerCase().includes(q) ||
+      c.clientCode.toLowerCase().includes(q)
+    );
+  }, [customers, messages, search]);
+
+  const activeCustomer = useMemo(() => {
+    return conversations.find(c => c.custId === selectedCust) || conversations[0] || {
+      custId: selectedCust,
+      clientCode: selectedCust,
+      name: "Subscriber",
+      phone: "01788-990011",
+      unread: 0,
+      lastMsg: "No previous message"
+    };
+  }, [conversations, selectedCust]);
+
   const handleSend = () => {
     if (!newText.trim()) return;
+    const targetCust = customers.find(c => c.id === selectedCust || c.clientCode === selectedCust);
     const msg: CustomerMessage = {
       id: `MSG-${Date.now().toString().slice(-4)}`,
-      customerName: "Rahim Uddin",
+      customerName: targetCust?.name || activeCustomer.name,
       custId: selectedCust,
-      phone: "01712-345678",
+      phone: targetCust?.phone || activeCustomer.phone,
       type: "outbound",
       channel: "sms",
       text: newText.trim(),
@@ -41,17 +79,10 @@ export function MessagesPage({ onNavigate }: MessagesPageProps) {
     };
     crmStore.sendMessage(msg);
     setNewText("");
-    showToast("SMS transmitted via Teletalk / Greenweb Gateway!");
+    showToast(`✓ SMS transmitted to ${targetCust?.name || activeCustomer.name} (${targetCust?.phone || activeCustomer.phone})!`);
   };
 
-  const conversations = [
-    { custId: "CUST-10001", name: "Rahim Uddin", phone: "01712-345678", unread: 0, lastMsg: "Dear Rahim, Ticket #TCK-4421 has been assigned..." },
-    { custId: "CUST-10004", name: "Fatema Begum", phone: "01911-556677", unread: 1, lastMsg: "Can you change my wifi name to Fatema_Home?" },
-    { custId: "CUST-10002", name: "Karim Hossain", phone: "01819-112233", unread: 0, lastMsg: "Thank you for the quick bill payment confirmation." },
-  ];
-
   const currentChatMessages = messages.filter(m => m.custId === selectedCust);
-  const activeCustomer = conversations.find(c => c.custId === selectedCust) || conversations[0];
 
   return (
     <div className="p-6">
