@@ -6,7 +6,7 @@ import {
   setUserDisabledState, mikrotikPing, getMikrotikDetails, createPppoeSecret, updatePppoeSecret,
   deletePppoeSecret, fetchNetxPackages, getCachedNetxPackages, fetchNetxZones, getCachedNetxZones,
   fetchNetxFullCustomers, getCachedNetxCustomers, fetchNetxDashboard, getCachedNetxDashboard,
-  rebootOnuHardware
+  rebootOnuHardware, runServerBillingCutoff
 } from './telemetry-service.js';
 
 const PORT = process.env.PORT || 5050;
@@ -418,6 +418,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 24. Manual or Cron-Triggered Billing Auto-Cutoff Run
+  if ((url.pathname === '/api/billing/cutoff/run' || url.pathname === '/api/billing/cutoff') && (req.method === 'POST' || req.method === 'GET')) {
+    const report = await runServerBillingCutoff();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(report));
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Endpoint not found' }));
 });
@@ -428,10 +436,11 @@ server.listen(PORT, () => {
   console.log(`  Live Status:  http://localhost:${PORT}/api/realtime/live-status`);
   console.log(`  Live Stats:   http://localhost:${PORT}/api/netx/live-stats`);
   console.log(`  OLT Servers:  http://localhost:${PORT}/api/netx/olt-servers`);
+  console.log(`  Billing Cutoff: http://localhost:${PORT}/api/billing/cutoff/run`);
 
-  // Autonomous Self-Ping Keep-Alive (every 8 minutes)
+  // Autonomous Self-Ping Keep-Alive (every 4 minutes to guarantee Render stay-awake)
   const SELF_URL = process.env.RENDER_EXTERNAL_URL || "https://maa-best-network.onrender.com";
-  console.log(`[Self-Ping Engine] Initialized keep-alive loop for ${SELF_URL}/health`);
+  console.log(`[Self-Ping Engine] Initialized keep-alive loop for ${SELF_URL}/health (4m interval)`);
 
   setInterval(async () => {
     try {
@@ -442,5 +451,5 @@ server.listen(PORT, () => {
     } catch (err) {
       console.log(`[Self-Ping Keep-Alive] Ping notice:`, err.message);
     }
-  }, 8 * 60 * 1000);
+  }, 4 * 60 * 1000);
 });

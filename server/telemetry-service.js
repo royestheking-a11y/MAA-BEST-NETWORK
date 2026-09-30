@@ -1055,23 +1055,27 @@ export async function netxCreateCustomer(data = {}) {
   const token = await getNetxAuthToken();
   if (!token) return { success: false, error: 'NetX authentication failed' };
 
-  let username = data.username || data.pppUser || '';
+  let username = (data.username || data.pppUser || '').toLowerCase().replace(/[^a-z0-9_@.-]/g, '');
   if (!username) return { success: false, error: 'PPPoE username is required' };
-  if (!username.toLowerCase().startsWith('mbn@')) {
+  if (!username.startsWith('mbn@')) {
     username = `mbn@${username.replace(/^mbn/i, '')}`;
   }
 
   const password = data.password || data.pppPass || '123456';
   const name = data.name || data.full_name || username.replace(/^mbn@/i, '');
-  const phone = data.phone || '01700000000';
+  let phone = String(data.phone || '01700000000').replace(/\D/g, '');
+  if (phone.length === 10 && phone.startsWith('1')) phone = '0' + phone;
+  if (!phone.startsWith('01') || phone.length !== 11) phone = '01700000000';
+
   const address = data.address || 'Kalkini';
   const requestedPkg = (data.package || data.profile || '35M').trim();
+  const cleanPkg = requestedPkg.split(/[—\-]/)[0].trim();
   const requestedZone = (data.zone || 'Default').trim();
 
   const packages = cachedNetxPackages || await fetchNetxPackages();
-  let matchedPkg = packages?.find(p => p.name.toLowerCase() === requestedPkg.toLowerCase());
+  let matchedPkg = packages?.find(p => p.name.toLowerCase() === cleanPkg.toLowerCase() || p.name.toLowerCase() === requestedPkg.toLowerCase());
   if (!matchedPkg) {
-    matchedPkg = packages?.find(p => requestedPkg.toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(requestedPkg.toLowerCase()));
+    matchedPkg = packages?.find(p => cleanPkg.toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(cleanPkg.toLowerCase()));
   }
   const packageId = matchedPkg?.id || '5115324c-7177-4baf-bffb-b14e0f5a6f1b';
 
@@ -1788,4 +1792,70 @@ setTimeout(() => {
   fetchNetxFullCustomers().catch(() => {});
   fetchNetxZones().catch(() => {});
 }, 5000);
+
+// ─── 24/7 Autonomous Server-Side Billing Cutoff Engine ────────────────────────
+export async function runServerBillingCutoff() {
+  try {
+    const customers = await fetchNetxFullCustomers();
+    if (!Array.isArray(customers) || customers.length === 0) {
+      return { success: false, cutoffs: 0, reason: 'No customers retrieved from NetX pool' };
+    }
+
+    const now = new Date();
+    let cutoffCount = 0;
+    const cutoffs = [];
+
+    for (const c of customers) {
+      // Exclude already disabled subscribers
+      if (c.status === 'disabled' || c.connection_status === 'disabled') continue;
+
+      // Check due amount & expiry status
+      const rawDue = Number(c.due_amount || 0);
+      const isDue = Boolean(c.is_due || rawDue > 0);
+      let isExpired = false;
+      if (c.expiry_date) {
+        const expDate = new Date(c.expiry_date);
+        if (!isNaN(expDate.getTime()) && expDate < now) {
+          isExpired = true;
+        }
+      }
+
+      if (isDue && isExpired) {
+        console.log(`[Auto-Billing Cutoff Engine] Enforcing cutoff on MikroTik for overdue customer "${c.pppoe_username}" (Due: ৳${rawDue}, Expired: ${c.expiry_date})`);
+        const toggleRes = await netxToggleCustomer(c.id, true);
+        if (toggleRes.success) {
+          cutoffCount++;
+          cutoffs.push({
+            id: c.id,
+            username: c.pppoe_username,
+            customerCode: c.customer_code,
+            due: rawDue,
+            expiryDate: c.expiry_date
+          });
+        }
+      }
+    }
+
+    if (cutoffCount > 0) {
+      console.log(`[Auto-Billing Cutoff Engine] Cycle completed: ${cutoffCount} overdue subscriber(s) suspended on MikroTik.`);
+    }
+    return { success: true, cutoffs: cutoffCount, details: cutoffs, timestamp: new Date().toISOString() };
+  } catch (err) {
+    console.error(`[Auto-Billing Cutoff Engine] Execution error:`, err.message);
+    return { success: false, error: err.message, cutoffs: 0 };
+  }
+}
+
+// Background Auto-Billing Cutoff Engine (runs every 5 minutes 24/7)
+setInterval(() => {
+  runServerBillingCutoff().catch(err => {
+    console.error('[Auto-Billing Cutoff Engine Worker] Error:', err.message);
+  });
+}, 5 * 60 * 1000);
+
+// Initial cutoff check 45s after gateway startup
+setTimeout(() => {
+  runServerBillingCutoff().catch(() => {});
+}, 45000);
+
 

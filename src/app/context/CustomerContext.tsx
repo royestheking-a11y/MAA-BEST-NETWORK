@@ -170,6 +170,7 @@ interface CustomerContextType {
   loginAsCustomer: (identifier: string, passcode?: string) => { success: boolean; customer?: Customer; error?: string };
   logoutCustomer: () => void;
   addCustomer: (newCustomer: Partial<Customer>) => Customer;
+  addCustomerAsync: (newCustomer: Partial<Customer>) => Promise<{ success: boolean; customer: Customer; error?: string; alreadyExists?: boolean }>;
   addCustomersBulk: (newCustomers: Partial<Customer>[]) => Customer[];
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
@@ -309,6 +310,18 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // ── Frontend Keep-Alive Heartbeat (Pings Render /health every 4 mins to keep server awake) ──
+  useEffect(() => {
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    if (isLocal) return;
+    const heartbeat = () => {
+      fetch("https://maa-best-network.onrender.com/health", { signal: AbortSignal.timeout(10000) }).catch(() => {});
+    };
+    heartbeat();
+    const timer = setInterval(heartbeat, 4 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // ── Sync Live Telemetry & Authentic Billing from NetX API (Optical Power, Real IP, Dues, Expiry, Status) ──
   useEffect(() => {
     let mounted = true;
@@ -318,8 +331,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           ? "" : "https://maa-best-network.onrender.com";
 
         const [statsRes, custsRes] = await Promise.all([
-          fetch(`${gatewayBase}/api/netx/live-stats`, { signal: AbortSignal.timeout(8000) }).catch(() => null),
-          fetch(`${gatewayBase}/api/netx/customers`, { signal: AbortSignal.timeout(8000) }).catch(() => null),
+          fetch(`${gatewayBase}/api/netx/live-stats`, { signal: AbortSignal.timeout(25000) }).catch(() => null),
+          fetch(`${gatewayBase}/api/netx/customers`, { signal: AbortSignal.timeout(25000) }).catch(() => null),
         ]);
 
         const liveList = statsRes && statsRes.ok ? (await statsRes.json()).data : [];
@@ -401,8 +414,22 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             const liveDown = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.downloadSpeedMbps))));
             const liveUp = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.uploadSpeedMbps))));
 
-            // Live Authentic Billing Fields from MikroTik
-            const liveDueAmount = netxMatch?.due_amount !== undefined ? Number(netxMatch.due_amount) : c.dueAmount;
+            // Harmonized due amounts: Prevent NetX from reviving due for subscribers who just paid locally
+            const rawNetxDue = netxMatch?.due_amount !== undefined ? Number(netxMatch.due_amount) : undefined;
+            let liveDueAmount = c.dueAmount;
+            if (c.userType === "free" || c.userType === "unlimited") {
+              liveDueAmount = 0;
+            } else if (rawNetxDue !== undefined && rawNetxDue > 0) {
+              // If local status is already active with 0 due (e.g. recent payment), retain 0 due
+              if (c.status === "active" && (c.dueAmount === 0 || c.due === 0) && (c.daysRemaining !== undefined && c.daysRemaining > 0)) {
+                liveDueAmount = 0;
+              } else {
+                liveDueAmount = rawNetxDue;
+              }
+            } else if (rawNetxDue === 0 && (c.dueAmount === 0 || c.status === "active")) {
+              liveDueAmount = 0;
+            }
+
             const liveMonthlyBill = netxMatch?.monthly_bill !== undefined ? Number(netxMatch.monthly_bill) : (livePrice || c.monthlyBill);
 
             // Compute subscriber lifecycle status
@@ -411,7 +438,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               computedStatus = "suspended";
             } else if (netxMatch?.is_due && liveDueAmount > 0) {
               computedStatus = "due";
-            } else if (netxMatch?.status === "active") {
+            } else if (netxMatch?.status === "active" && liveDueAmount === 0) {
               computedStatus = "active";
             }
 
@@ -821,6 +848,58 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     });
 
     return newCustomer;
+  };
+
+  const addCustomerAsync = async (data: Partial<Customer>): Promise<{ success: boolean; customer: Customer; error?: string; alreadyExists?: boolean }> => {
+    const newCustomer = addCustomer(data);
+    const srv = (newCustomer.service || "").toLowerCase();
+    const shouldProvision = Boolean(newCustomer.pppUser) || srv === "pppoe" || srv === "hotspot" || !srv;
+    if (!shouldProvision) {
+      return { success: true, customer: newCustomer };
+    }
+
+    const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+      ? "" : "https://maa-best-network.onrender.com";
+    let pppUser = newCustomer.pppUser || `mbn@${(newCustomer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+    if (!pppUser.toLowerCase().startsWith("mbn@")) {
+      pppUser = `mbn@${pppUser.replace(/^mbn/i, "")}`;
+    }
+    const pppPass = newCustomer.pppPass || "123456";
+    const profile = (newCustomer.package || newCustomer.profile || "35M").split(/[—\-]/)[0].trim();
+    const comment = `${newCustomer.name} (${newCustomer.id}) — Created via ISP Portal`;
+
+    try {
+      const res = await fetch(`${gatewayBase}/api/mikrotik/user/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          username: pppUser, 
+          password: pppPass, 
+          profile, 
+          comment,
+          name: newCustomer.name,
+          phone: newCustomer.phone,
+          address: newCustomer.address,
+          package: profile,
+          zone: newCustomer.zone
+        }),
+        signal: AbortSignal.timeout(35000), // 35s to allow for Render cold wake up if asleep
+      });
+      const result = await res.json();
+      if (result.success) {
+        return { success: true, customer: newCustomer, alreadyExists: result.alreadyExists };
+      } else {
+        return { success: false, customer: newCustomer, error: result.error || "MikroTik rejected the request" };
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        customer: newCustomer,
+        error: err.name === "TimeoutError"
+          ? "MikroTik Gateway timed out while waking up. Please retry in 10 seconds."
+          : (err.message || "Failed to reach MikroTik Gateway")
+      };
+    }
   };
 
   const addCustomersBulk = (newCustomersData: Partial<Customer>[]): Customer[] => {
@@ -1405,9 +1484,17 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
     const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
 
-    // Auto-reconnect subscriber on MikroTik RouterOS
+    // Auto-reconnect subscriber on MikroTik RouterOS & drop stale session
     if (targetCust) {
       syncMikrotikUserState(targetCust.pppUser || targetCust.id, false, targetCust);
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+      fetch(`${base}/api/mikrotik/user/disconnect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: targetCust.pppUser || targetCust.id })
+      }).catch(() => {});
+
       activityLogger.log({
         type: "network",
         severity: "success",
@@ -1780,6 +1867,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         loginAsCustomer,
         logoutCustomer,
         addCustomer,
+        addCustomerAsync,
         addCustomersBulk,
         updateCustomer,
         deleteCustomer,

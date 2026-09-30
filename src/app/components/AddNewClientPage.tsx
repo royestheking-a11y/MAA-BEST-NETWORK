@@ -6,7 +6,7 @@ import {
   HardDrive, Server, Layers, FileText, Sparkles, Image,
   Eye, EyeOff, Key, Copy, ArrowRight, ShieldCheck, Zap,
   Radio, Laptop, Wifi, Hash, Tag, Award, CheckCircle,
-  Home, Building2, Globe2, Landmark, RefreshCw
+  Home, Building2, Globe2, Landmark, RefreshCw, Loader2
 } from "lucide-react";
 import { useCustomerContext, Customer } from "../context/CustomerContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -19,9 +19,11 @@ interface AddNewClientPageProps {
 }
 
 export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
-  const { customers, addCustomer } = useCustomerContext();
+  const { customers, addCustomer, addCustomerAsync } = useCustomerContext();
   const { canEdit, isReadOnly } = usePermission("add-client");
   const { t } = useLanguage();
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Active step / tab in studio
   const [activeTab, setActiveTab] = useState<"profile" | "network" | "service">("profile");
@@ -145,8 +147,10 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [billingStartMonth, setBillingStartMonth] = useState("09/2026");
-  const [monthlyBill, setMonthlyBill] = useState("1200");
+  const [monthlyBill, setMonthlyBill] = useState(() => {
+    const pkgs = billingStore.getPackages();
+    return pkgs[0] ? String(pkgs[0].price) : "500";
+  });
   const [isEditingBill, setIsEditingBill] = useState(false);
   const [clientType, setClientType] = useState<"Home" | "Commercial" | "Reseller" | "Corporate">("Home");
   const [billingStatus, setBillingStatus] = useState<"Prepaid" | "Postpaid" | "Daily" | "Monthly">("Monthly");
@@ -233,7 +237,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   }, [packagesList]);
 
   // Form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly) {
       showToast("Access Restricted: Your account role has Read-Only access.");
@@ -343,12 +347,22 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       paymentHistory: [],
     };
 
-    addCustomer(newCust);
-
-    showToast(`✓ Subscriber "${clientName}" (${finalClientCode}) [${userType.toUpperCase()}] provisioned successfully!`);
-    setTimeout(() => {
-      if (onNavigate) onNavigate("online-clients");
-    }, 1800);
+    setIsSubmitting(true);
+    try {
+      const res = await addCustomerAsync(newCust);
+      if (res.success) {
+        showToast(`✓ Subscriber "${clientName}" (${finalClientCode}) [${userType.toUpperCase()}] successfully provisioned on MikroTik RouterOS!`);
+        setTimeout(() => {
+          if (onNavigate) onNavigate("online-clients");
+        }, 1800);
+      } else {
+        showToast(`⚠️ MikroTik Notice: ${res.error || "Created in local system, but RouterOS rejected provisioning."}`);
+      }
+    } catch (err: any) {
+      showToast(`❌ Provisioning Failed: ${err.message || "Failed to reach gateway"}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1529,15 +1543,24 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
 
               <button
                 type="submit"
-                disabled={isReadOnly}
+                disabled={isReadOnly || isSubmitting}
                 className={`w-full py-3.5 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 uppercase tracking-wider ${
-                  isReadOnly
+                  isReadOnly || isSubmitting
                     ? "bg-muted text-muted-foreground border border-border cursor-not-allowed"
                     : "bg-gradient-to-r from-primary via-rose-600 to-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:opacity-95 cursor-pointer"
                 }`}
               >
-                <Zap size={16} />
-                <span>{isReadOnly ? "Read-Only: Registration Disabled" : "Provision & Register Subscriber"}</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Provisioning on MikroTik RouterOS...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} />
+                    <span>{isReadOnly ? "Read-Only: Registration Disabled" : "Provision & Register Subscriber"}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
