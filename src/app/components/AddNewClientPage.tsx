@@ -147,6 +147,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [billingStartMonth, setBillingStartMonth] = useState("09/2026");
   const [monthlyBill, setMonthlyBill] = useState(() => {
     const pkgs = billingStore.getPackages();
     return pkgs[0] ? String(pkgs[0].price) : "500";
