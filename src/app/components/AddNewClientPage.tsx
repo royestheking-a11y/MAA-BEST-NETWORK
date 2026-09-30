@@ -137,7 +137,10 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [device, setDevice] = useState("ONU Dual Band XPON (Gigabit)");
   const [deviceSerial, setDeviceSerial] = useState("");
   const [deviceVendor, setDeviceVendor] = useState("BDCOM");
-  const [purchaseDate, setPurchaseDate] = useState("04/09/2026");
+  const [purchaseDate, setPurchaseDate] = useState(() => {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  });
   const [splitterBox, setSplitterBox] = useState("SOMITIR HAT BAZAR - Splitter 1 (1:8)");
   const [splitterPort, setSplitterPort] = useState("Port 1");
 
@@ -147,7 +150,10 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [billingStartMonth, setBillingStartMonth] = useState("09/2026");
+  const [billingStartMonth, setBillingStartMonth] = useState(() => {
+    const d = new Date();
+    return `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  });
   const [monthlyBill, setMonthlyBill] = useState(() => {
     const pkgs = billingStore.getPackages();
     return pkgs[0] ? String(pkgs[0].price) : "500";
@@ -155,8 +161,15 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [isEditingBill, setIsEditingBill] = useState(false);
   const [clientType, setClientType] = useState<"Home" | "Commercial" | "Reseller" | "Corporate">("Home");
   const [billingStatus, setBillingStatus] = useState<"Prepaid" | "Postpaid" | "Daily" | "Monthly">("Monthly");
-  const [expireDate, setExpireDate] = useState("10/10/2026");
-  const [joiningDate, setJoiningDate] = useState("04/09/2026");
+  const [expireDate, setExpireDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  });
+  const [joiningDate, setJoiningDate] = useState(() => {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  });
   const [sendGreetingsSms, setSendGreetingsSms] = useState(true);
 
   // Auto generate username based on client name if blank

@@ -6,7 +6,7 @@ import {
   X, Check, Clock, CheckCircle2, XCircle, Send, RefreshCw, Zap, FileText,
   Copy, Lock, Unlock, ExternalLink, Key, Smartphone, Sliders, Sparkles,
   Network, Server, Shield, Radio, CheckCheck, Save, ShieldAlert, ArrowRight,
-  Edit2, Edit3, Tag, UserCheck, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, Trash2
+  Edit2, Edit3, Tag, UserCheck, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, Trash2, Calendar
 } from "lucide-react";
 import { useCustomerContext, Customer, CustomerStatus } from "../context/CustomerContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -360,12 +360,12 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
         disabledInSystem: selectedCustomer.disabledInSystem || false,
         pppUser: selectedCustomer.pppUser || "",
         pppPass: selectedCustomer.pppPass || "",
-        billingStartMonth: selectedCustomer.billingStartMonth || "08/2026",
+        billingStartMonth: selectedCustomer.billingStartMonth || (() => { const d = new Date(); return `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
         monthlyBill: selectedCustomer.monthlyBill || selectedCustomer.price || 1200,
         clientType: selectedCustomer.clientType || "Home",
         billingStatus: selectedCustomer.billingStatus || "Monthly",
-        expireDate: selectedCustomer.expireDate || "10/09/2026",
-        joinDate: selectedCustomer.joinDate || "28/08/2026",
+        expireDate: selectedCustomer.expireDate || selectedCustomer.endDate || (() => { const d = new Date(); d.setMonth(d.getMonth()+1); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
+        joinDate: selectedCustomer.joinDate || (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
       });
     }
   }, [selectedCustomer]);
@@ -1618,25 +1618,40 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                         ) : c.userType === "unlimited" ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[9px] font-black tracking-wider uppercase border border-amber-500/20">VIP PERMANENT</span>
                         ) : (() => {
+                          const endDateStr = c.endDate || c.expireDate;
                           let isExpired = false;
+                          let expDateObj: Date | null = null;
                           if (c.expireDate) {
                             const expParts = c.expireDate.split('/');
                             if (expParts.length === 3) {
-                              const expDate = new Date(`${expParts[2]}-${expParts[1]}-${expParts[0]}`);
-                              if (!isNaN(expDate.getTime()) && expDate < new Date()) {
+                              expDateObj = new Date(`${expParts[2]}-${expParts[1]}-${expParts[0]}`);
+                              if (!isNaN(expDateObj.getTime()) && expDateObj < new Date()) {
                                 isExpired = true;
                               }
                             }
                           } else if (c.endDate) {
-                             const expDate = new Date(c.endDate);
-                             if (!isNaN(expDate.getTime()) && expDate < new Date()) {
+                             expDateObj = new Date(c.endDate);
+                             if (!isNaN(expDateObj.getTime()) && expDateObj < new Date()) {
                                isExpired = true;
                              }
                           }
-                          if (isExpired) {
-                            return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black tracking-widest uppercase shadow-sm">EXPIRED</span>;
-                          }
-                          return null;
+                          return (
+                            <>
+                              {isExpired && (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black tracking-widest uppercase shadow-sm">EXPIRED</span>
+                              )}
+                              {endDateStr && endDateStr !== "Permanent / Lifetime" && (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                                  isExpired
+                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                }`}>
+                                  <Calendar size={8} />
+                                  {endDateStr}
+                                </span>
+                              )}
+                            </>
+                          );
                         })()}
                       </div>
                     </td>

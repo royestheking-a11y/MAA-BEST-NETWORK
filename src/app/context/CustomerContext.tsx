@@ -209,6 +209,34 @@ export function normalizeCustomerPackage(c: Customer): Customer {
   const up = pkg === "35M" ? 35 : (pkg === "50M" ? 50 : (pkg === "80M" ? 80 : (pkg === "100M" ? 100 : (c.uploadSpeedMbps || 35))));
   const signal = c.onuSignal === "-18.5 dBm" ? "—" : (c.onuSignal || "—");
 
+  // ── STALE-DATE MIGRATION (runs for every customer from every source) ──────
+  // If endDate is expired but dueAmount is 0 (paid up), the date is stale data
+  // (e.g. hardcoded "30 Sep 2026" in realIspData.ts). Auto-extend to today+30
+  // so the billing engine never suspends paid-up customers due to old dates.
+  let endDate = c.endDate;
+  let expireDate = c.expireDate;
+  let daysRemaining = c.daysRemaining;
+  if (
+    c.userType !== "free" && c.userType !== "unlimited" &&
+    endDate && endDate !== "Permanent / Lifetime"
+  ) {
+    const end = new Date(endDate);
+    if (!isNaN(end.getTime())) {
+      const rawDue = (c.dueAmount ?? c.due ?? 0);
+      const diffDays = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 0 && rawDue === 0 && c.status !== "suspended" && c.disabledInSystem !== true) {
+        // Extend stale expired date to today+30
+        const newEnd = new Date();
+        newEnd.setMonth(newEnd.getMonth() + 1);
+        endDate = newEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+        expireDate = endDate;
+        daysRemaining = 30;
+      } else {
+        daysRemaining = diffDays;
+      }
+    }
+  }
+
   return {
     ...c,
     package: pkg,
@@ -219,7 +247,10 @@ export function normalizeCustomerPackage(c: Customer): Customer {
     price: c.price || 500,
     monthlyBill: c.monthlyBill || 500,
     serverName: "DC-CA",
-    onuSignal: signal
+    onuSignal: signal,
+    endDate,
+    expireDate,
+    daysRemaining,
   };
 }
 
@@ -238,9 +269,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // normalizeCustomerPackage handles stale-date migration and daysRemaining recalculation
           const clean = parsed
             .filter((c: any) => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
             .map((c: any) => normalizeCustomerPackage(c));
+
           if (clean.length > 0) return clean;
         }
       }
@@ -278,21 +311,52 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       if (cloudCustomers && cloudCustomers.length > 0) {
         const clean = cloudCustomers.filter(c => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"));
         if (clean.length > 0) {
-          // Recalculate daysRemaining from endDate so stale cloud values are corrected
-          const now = new Date();
-          const refreshed = clean.map(c => {
-            const base = normalizeCustomerPackage(c);
-            if (base.userType === "free" || base.userType === "unlimited") return base;
-            if (!base.endDate || base.endDate === "Permanent / Lifetime") return base;
-            const end = new Date(base.endDate);
-            if (!isNaN(end.getTime())) {
-              const diffMs = end.getTime() - now.getTime();
-              const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-              return { ...base, daysRemaining: diffDays };
-            }
-            return base;
+          // normalizeCustomerPackage already handles stale-date migration,
+          // daysRemaining recalculation, and package normalization.
+          const refreshed = clean.map(c => normalizeCustomerPackage(c));
+
+          // ── SMART MERGE: cloud data + local state, local wins for critical fields ──
+          // Problem: Firestore listener fires with OLD data during the 1-2s write lag
+          // after payment/enable. A full replacement would revert local state to
+          // stale Firestore data, causing the "enable→offline" / "recharge→sudden off"
+          // visible within 1-2 seconds. Fix: merge and let local paid/enabled state win.
+          setCustomers(prev => {
+            return refreshed.map(cloudCust => {
+              const local = prev.find(p =>
+                p.id === cloudCust.id ||
+                p.clientCode === cloudCust.clientCode ||
+                (p.pppUser && p.pppUser === cloudCust.pppUser)
+              );
+              if (!local) return cloudCust; // New customer from cloud — accept as-is
+
+              // Priority guards: local wins when admin enabled or payment cleared balance
+              const locallyPaid  = local.status === "active" && (local.dueAmount === 0 || local.due === 0);
+              const adminEnabled = local.disabledInMikrotik === false;
+              const localWins    = locallyPaid || adminEnabled;
+
+              // Determine the better endDate (the later one wins)
+              const localEndDate = local.endDate ? new Date(local.endDate) : null;
+              const cloudEndDate = cloudCust.endDate ? new Date(cloudCust.endDate) : null;
+              const localEndLater = localEndDate && cloudEndDate && !isNaN(localEndDate.getTime()) && !isNaN(cloudEndDate.getTime()) && localEndDate > cloudEndDate;
+              const bestEndDate = localEndLater ? local.endDate : cloudCust.endDate;
+              const bestDaysRemaining = bestEndDate ? Math.ceil((new Date(bestEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : cloudCust.daysRemaining;
+
+              if (localWins) {
+                // Local state is fresh (just paid or just enabled) — use cloud for non-critical
+                // fields (signal, mac, ip, server, etc.) but keep local for status/billing
+                return {
+                  ...cloudCust,            // cloud fields as base (pkg, signal, server, etc.)
+                  ...local,               // overlay ALL local fields
+                  endDate: bestEndDate,    // then apply the better endDate
+                  expireDate: bestEndDate,
+                  daysRemaining: bestDaysRemaining,
+                };
+              }
+
+              // Cloud wins — but still use the later endDate
+              return { ...cloudCust, endDate: bestEndDate, expireDate: bestEndDate, daysRemaining: bestDaysRemaining };
+            });
           });
-          setCustomers(refreshed);
         }
       }
     });
@@ -395,10 +459,23 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Connection & Line State
-            const isLineDisabled = netxMatch?.status === "disabled" || c.disabledInMikrotik;
+            // CRITICAL: If admin manually enabled the customer (disabledInMikrotik: false),
+            // the NetX API still shows "disabled" for up to 20–60s while MikroTik syncs.
+            // We must NOT let the stale API response re-disable the customer.
+            // Rule: local admin override (disabledInMikrotik: false) wins over stale API data.
+            const apiSaysDisabled = netxMatch?.status === "disabled";
+            const isLineDisabled = c.disabledInMikrotik === true ||
+              (apiSaysDisabled && c.disabledInMikrotik !== false);
+            // IMPORTANT: Only flip to offline if API *explicitly* confirms offline.
+            // If there's no live signal, preserve current status to prevent flicker
+            // (e.g. after payment or manual enable, API takes time to reflect new state).
             const newNetStatus: "online" | "offline" = isLineDisabled
               ? "offline"
-              : ((liveMatch?.connection_status === "online" || netxMatch?.connection_status === "online") ? "online" : "offline");
+              : (liveMatch?.connection_status === "online" || netxMatch?.connection_status === "online")
+                ? "online"
+                : liveMatch?.connection_status === "offline"
+                  ? "offline"
+                  : c.netStatus; // Preserve existing status — no explicit API signal
 
             const newSignal = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
               ? `${liveMatch.onu_rx_power} dBm`
@@ -414,42 +491,76 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             const liveDown = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.downloadSpeedMbps))));
             const liveUp = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.uploadSpeedMbps))));
 
-            // Harmonized due amounts: Prevent NetX from reviving due for subscribers who just paid locally
+            // ── HYBRID DUE AMOUNT ─────────────────────────────────────────────────
+            // PRIORITY: local paid state always beats stale API due balance.
+            // Case A: free/unlimited            → always 0
+            // Case B: API due > 0              → only use if local ALSO confirms unpaid
+            //   Guard 1: locally paid (amt=0+active) → preserve 0
+            //   Guard 2: admin just enabled (disabledInMikrotik:false) → preserve 0
+            // Case C: API explicitly says 0    → 0
+            // Case D: API has no due field     → keep local c.dueAmount (preserve, don't reset)
             const rawNetxDue = netxMatch?.due_amount !== undefined ? Number(netxMatch.due_amount) : undefined;
-            let liveDueAmount = c.dueAmount;
+            let liveDueAmount: number;
             if (c.userType === "free" || c.userType === "unlimited") {
               liveDueAmount = 0;
             } else if (rawNetxDue !== undefined && rawNetxDue > 0) {
-              // If local status is already active with 0 due (e.g. recent payment), retain 0 due
-              if (c.status === "active" && (c.dueAmount === 0 || c.due === 0) && (c.daysRemaining !== undefined && c.daysRemaining > 0)) {
-                liveDueAmount = 0;
-              } else {
-                liveDueAmount = rawNetxDue;
-              }
-            } else if (rawNetxDue === 0 && (c.dueAmount === 0 || c.status === "active")) {
-              liveDueAmount = 0;
+              const locallyPaid      = (c.dueAmount === 0 || c.due === 0) && c.status === "active";
+              const adminJustEnabled = c.disabledInMikrotik === false;
+              liveDueAmount = (locallyPaid || adminJustEnabled) ? 0 : rawNetxDue;
+            } else if (rawNetxDue === 0) {
+              liveDueAmount = 0; // API explicitly cleared
+            } else {
+              liveDueAmount = c.dueAmount ?? c.due ?? 0; // No API data — preserve local
             }
 
             const liveMonthlyBill = netxMatch?.monthly_bill !== undefined ? Number(netxMatch.monthly_bill) : (livePrice || c.monthlyBill);
 
-            // Compute subscriber lifecycle status
+            // ── HYBRID LIFECYCLE STATUS ───────────────────────────────────────────
+            // Status is DERIVED from actual state, NOT blindly from API status string.
+            // Priority: disabled > due+balance > balance=0 resolve > API confirms active > keep
             let computedStatus: CustomerStatus = c.status;
             if (isLineDisabled) {
-              computedStatus = "suspended";
-            } else if (netxMatch?.is_due && liveDueAmount > 0) {
-              computedStatus = "due";
+              computedStatus = "suspended"; // Line is definitely disabled
+            } else if (liveDueAmount > 0 && netxMatch?.is_due) {
+              computedStatus = "due"; // API confirms unpaid and we have real balance
+            } else if (liveDueAmount === 0) {
+              if (c.status === "due") {
+                computedStatus = "active"; // Balance cleared → upgrade
+              } else if (c.status === "suspended" && (c.disabledInSystem === false || c.disabledInMikrotik === false)) {
+                computedStatus = "active"; // Admin manually re-enabled → clear suspended
+              } else if ((netxMatch?.status === "active" || newNetStatus === "online") && c.status !== "active" && c.status !== "disconnected") {
+                computedStatus = "active"; // API/live confirms line is up → sync
+              }
+              // else: keep current (already active, or intentionally disconnected)
             } else if (netxMatch?.status === "active" && liveDueAmount === 0) {
               computedStatus = "active";
             }
 
-            // Expiry date & days remaining
+            // ── HYBRID EXPIRY DATE & DAYS REMAINING ──────────────────────────────
+            // PRIORITY: always trust the LATER date (never undo a recent payment/renewal).
+            // KEY: Always recalculate daysRemaining from the final endDate so the billing
+            // engine has FRESH values — never relies on stale cached daysRemaining field.
             let newEndDate = c.endDate;
             let newDaysRemaining = c.daysRemaining;
             if (netxMatch?.expiry_date) {
-              const expDate = new Date(netxMatch.expiry_date);
-              if (!isNaN(expDate.getTime())) {
-                newEndDate = expDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-                newDaysRemaining = Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              const apiExpiry = new Date(netxMatch.expiry_date);
+              if (!isNaN(apiExpiry.getTime())) {
+                const localExpiry = c.endDate ? new Date(c.endDate) : null;
+                if (!localExpiry || isNaN(localExpiry.getTime()) || apiExpiry > localExpiry) {
+                  // API date is further in future — accept it
+                  newEndDate       = apiExpiry.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                  newDaysRemaining = Math.ceil((apiExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                } else {
+                  // Local date is later (post-payment) — keep local, but recalc days from it
+                  newDaysRemaining = Math.ceil((localExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                }
+              }
+            } else if (c.endDate && c.endDate !== "Permanent / Lifetime") {
+              // No API expiry data — always recalculate daysRemaining from local endDate.
+              // This keeps billing engine fresh instead of waiting for hourly batch recalc.
+              const localExpiry = new Date(c.endDate);
+              if (!isNaN(localExpiry.getTime())) {
+                newDaysRemaining = Math.ceil((localExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               }
             }
 
@@ -730,6 +841,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       billingDate: data.billingDate || 1,
       startDate: data.startDate || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       endDate: isFree || isUnlimited ? "Permanent / Lifetime" : (data.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })),
+      expireDate: isFree || isUnlimited ? "Permanent / Lifetime" : (data.expireDate || data.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })),
       daysRemaining: isFree || isUnlimited ? 999 : (data.daysRemaining ?? 30),
       dueAmount: isFree ? 0 : (data.dueAmount ?? data.due ?? 0),
       due: isFree ? 0 : (data.due ?? data.dueAmount ?? 0),
@@ -1208,12 +1320,32 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   
   const bulkUpdateStatus = (customerIds: string[], newStatus: CustomerStatus, newNetStatus: "online" | "offline") => {
+    const isEnabling = newNetStatus === "online";
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (customerIds.includes(c.id)) {
-          return { ...c, status: newStatus, netStatus: newNetStatus };
+        if (!customerIds.includes(c.id)) return c;
+
+        // When enabling (bulk reconnect): also set disabled flags and extend expired endDate.
+        // Without this, the billing engine re-suspends in the next 60s cycle if endDate is past.
+        let endDateExtension: Partial<Customer> = {};
+        if (isEnabling) {
+          const currentEnd = c.endDate ? new Date(c.endDate) : null;
+          const isExpired = !currentEnd || isNaN(currentEnd.getTime()) || currentEnd < new Date();
+          if (isExpired) {
+            const newEnd = new Date();
+            newEnd.setMonth(newEnd.getMonth() + 1);
+            const newEndStr = newEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+            endDateExtension = { endDate: newEndStr, expireDate: newEndStr, daysRemaining: 30 };
+          }
         }
-        return c;
+
+        return {
+          ...c,
+          ...endDateExtension,
+          status: newStatus,
+          netStatus: newNetStatus,
+          ...(isEnabling ? { disabledInMikrotik: false, disabledInSystem: false, disconnectedAt: undefined, logoutTime: null } : { disabledInMikrotik: true, disabledInSystem: true }),
+        };
       });
       // Save all updated targets to firestore
       updated.filter(c => customerIds.includes(c.id)).forEach(target => saveCustomerToFirestore(target));
@@ -1340,23 +1472,42 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     syncMikrotikUserState(targetCust?.pppUser || targetCust?.id || id, !enable, targetCust);
 
     setCustomers(prev => {
-      const updated = prev.map(c =>
-        (c.id === id || c.clientCode === id || c.pppUser === id)
-          ? {
-              ...c,
-              netStatus: enable ? "online" as const : "offline" as const,
-              status: enable ? "active" as CustomerStatus : "suspended" as CustomerStatus,
-              disabledInMikrotik: !enable,
-              disabledInSystem: !enable,
-              disconnectedAt: enable ? undefined : new Date().toISOString(),
-              logoutTime: enable
-                ? null
-                : new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) +
-                  " " +
-                  new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            }
-          : c
-      );
+      const updated = prev.map(c => {
+        if (c.id !== id && c.clientCode !== id && c.pppUser !== id) return c;
+
+        // When enabling: also extend endDate if it's expired, so the billing engine
+        // doesn't immediately re-suspend this customer in the next 60-second cycle.
+        let endDateExtension: Partial<typeof c> = {};
+        if (enable) {
+          const currentEnd = c.endDate ? new Date(c.endDate) : null;
+          const isCurrentlyExpired = !currentEnd || isNaN(currentEnd.getTime()) || currentEnd < new Date();
+          if (isCurrentlyExpired) {
+            const newEnd = new Date();
+            newEnd.setMonth(newEnd.getMonth() + 1);
+            const newEndStr = newEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+            endDateExtension = {
+              endDate: newEndStr,
+              expireDate: newEndStr,
+              daysRemaining: 30,
+            };
+          }
+        }
+
+        return {
+          ...c,
+          ...endDateExtension,
+          netStatus: enable ? "online" as const : "offline" as const,
+          status: enable ? "active" as CustomerStatus : "suspended" as CustomerStatus,
+          disabledInMikrotik: !enable,
+          disabledInSystem: !enable,
+          disconnectedAt: enable ? undefined : new Date().toISOString(),
+          logoutTime: enable
+            ? null
+            : new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) +
+              " " +
+              new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+      });
       const target = updated.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
       if (target) saveCustomerToFirestore(target);
       try {
@@ -1387,9 +1538,15 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         if (c.userType === "free" || c.userType === "unlimited") return c;
 
         const rawDue = c.dueAmount !== undefined ? c.dueAmount : (c.due !== undefined ? c.due : 0);
-        const hasDue = rawDue > 0 || c.status === "due";
-        const isPastDate = c.endDate ? new Date(c.endDate) < now : false;
-        const isExpired = (c.daysRemaining !== undefined && c.daysRemaining <= 0) || isPastDate;
+        // CRITICAL FIX: Only consider a customer "due" if they have an actual positive balance.
+        // Checking c.status === "due" was causing ALL customers with status "due" (even
+        // dueAmount=0 after payment) to be auto-suspended every 60 seconds.
+        const hasDue = rawDue > 0;
+        // CRITICAL FIX 2: Use ONLY the endDate date-comparison — NOT daysRemaining.
+        // daysRemaining is recalculated only every hour so it can be stale.
+        // A customer who just paid (endDate = today+30) could still have daysRemaining = -5
+        // from the old data, causing instant re-suspension right after payment.
+        const isExpired = c.endDate ? (new Date(c.endDate) < now) : false;
 
         if (isExpired && hasDue && c.status !== "suspended") {
           hasChanges = true;
@@ -1536,7 +1693,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           billingDate: billingDay,
           startDate: startDate,
           endDate: endDate,
-          daysRemaining: 30,
+          expireDate: endDate,
+          daysRemaining: Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
           invoices: updatedInvoices,
           paymentHistory: [newPayment, ...c.paymentHistory],
         };
