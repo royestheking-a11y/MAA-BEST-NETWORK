@@ -329,12 +329,6 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               );
               if (!local) return cloudCust; // New customer from cloud — accept as-is
 
-              // Priority guards: local wins when admin enabled/disabled or payment cleared balance
-              const locallyPaid  = local.status === "active" && (local.dueAmount === 0 || local.due === 0);
-              const adminEnabled = local.disabledInMikrotik === false;
-              const adminDisabled = local.disabledInMikrotik === true && local.status === "suspended";
-              const localWins    = locallyPaid || adminEnabled || adminDisabled;
-
               // Determine the better endDate (the later one wins)
               const localEndDate = local.endDate ? new Date(local.endDate) : null;
               const cloudEndDate = cloudCust.endDate ? new Date(cloudCust.endDate) : null;
@@ -342,20 +336,27 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               const bestEndDate = localEndLater ? local.endDate : cloudCust.endDate;
               const bestDaysRemaining = bestEndDate ? Math.ceil((new Date(bestEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : cloudCust.daysRemaining;
 
-              if (localWins) {
-                // Local state is fresh (just paid or just enabled) — use cloud for non-critical
-                // fields (signal, mac, ip, server, etc.) but keep local for status/billing
-                return {
-                  ...cloudCust,            // cloud fields as base (pkg, signal, server, etc.)
-                  ...local,               // overlay ALL local fields
-                  endDate: bestEndDate,    // then apply the better endDate
-                  expireDate: bestEndDate,
-                  daysRemaining: bestDaysRemaining,
-                };
-              }
+              // Intelligent Merge Strategy:
+              // Firestore (cloudCust) is the absolute source of truth for all manual administrative edits 
+              // (name, phone, billing status, toggle states, due amounts, etc.).
+              // However, syncNetx updates *live telemetry* directly in local state without writing to Firestore.
+              // We must preserve these live telemetry fields from `local` while letting `cloudCust` overwrite the rest.
+              return {
+                ...local,
+                ...cloudCust, // Admin edits from any device overwrite local state
 
-              // Cloud wins — but still use the later endDate
-              return { ...cloudCust, endDate: bestEndDate, expireDate: bestEndDate, daysRemaining: bestDaysRemaining };
+                // Preserve live telemetry gathered by the local syncNetx loop
+                onuSignal: local.onuSignal || cloudCust.onuSignal,
+                sessionUptime: local.sessionUptime || cloudCust.sessionUptime,
+                ipAddress: local.ipAddress || cloudCust.ipAddress,
+                mac: local.mac || cloudCust.mac,
+                netStatus: local.netStatus || cloudCust.netStatus,
+
+                // Priority dates (always take the later expiry to prevent regression)
+                endDate: bestEndDate,
+                expireDate: bestEndDate,
+                daysRemaining: bestDaysRemaining,
+              };
             });
           });
         }
