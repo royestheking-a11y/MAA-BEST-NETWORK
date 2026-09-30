@@ -309,37 +309,71 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ── Sync Live Telemetry from NetX API (Optical Power, Real IP, Real Package, Online/Offline) ──
+  // ── Sync Live Telemetry & Authentic Billing from NetX API (Optical Power, Real IP, Dues, Expiry, Status) ──
   useEffect(() => {
     let mounted = true;
     const syncNetx = async () => {
       try {
         const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
           ? "" : "https://maa-best-network.onrender.com";
-        const res = await fetch(`${gatewayBase}/api/netx/live-stats`, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) return;
-        const json = await res.json();
-        const liveList = json.data;
-        if (!Array.isArray(liveList) || liveList.length === 0 || !mounted) return;
 
-        // Index live data
+        const [statsRes, custsRes] = await Promise.all([
+          fetch(`${gatewayBase}/api/netx/live-stats`, { signal: AbortSignal.timeout(8000) }).catch(() => null),
+          fetch(`${gatewayBase}/api/netx/customers`, { signal: AbortSignal.timeout(8000) }).catch(() => null),
+        ]);
+
+        const liveList = statsRes && statsRes.ok ? (await statsRes.json()).data : [];
+        const fullCustList = custsRes && custsRes.ok ? (await custsRes.json()).data : [];
+
+        if (!mounted) return;
+        if ((!Array.isArray(liveList) || liveList.length === 0) && (!Array.isArray(fullCustList) || fullCustList.length === 0)) return;
+
+        // Index live telemetry data (IP, MAC, ONU Optical Power, Uptime)
         const liveMap = new Map<string, any>();
         const macMap = new Map<string, any>();
-        liveList.forEach(ls => {
-          if (ls.pppoe_username) liveMap.set(ls.pppoe_username.toLowerCase(), ls);
-          if (ls.full_name) liveMap.set(ls.full_name.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
-          if (ls.user_id) liveMap.set(ls.user_id.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
-          if (ls.live_mac) macMap.set(ls.live_mac.toLowerCase().trim(), ls);
-        });
+        if (Array.isArray(liveList)) {
+          liveList.forEach(ls => {
+            if (ls.pppoe_username) liveMap.set(ls.pppoe_username.toLowerCase(), ls);
+            if (ls.full_name) liveMap.set(ls.full_name.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
+            if (ls.user_id) liveMap.set(ls.user_id.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
+            if (ls.live_mac) macMap.set(ls.live_mac.toLowerCase().trim(), ls);
+          });
+        }
+
+        // Index authentic billing & customer accounts from NetX/MikroTik
+        const custMap = new Map<string, any>();
+        if (Array.isArray(fullCustList)) {
+          fullCustList.forEach(c => {
+            if (c.pppoe_username) custMap.set(c.pppoe_username.toLowerCase(), c);
+            if (c.customer_code) custMap.set(c.customer_code.toLowerCase(), c);
+            if (c.id) custMap.set(c.id.toLowerCase(), c);
+            if (c.phone) custMap.set(c.phone, c);
+            if (c.full_name) custMap.set(c.full_name.toLowerCase().replace(/[^a-z0-9]/g, ""), c);
+          });
+        }
 
         setCustomers(prev => {
           let hasChange = false;
+          const matchedNetxIds = new Set<string>();
+
+          // 1. Update existing customers with live billing, status, and telemetry
           const updated = prev.map(c => {
             const pppKey = (c.pppUser || "").toLowerCase();
             const nameKey = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
             const macKey = (c.mac || "").toLowerCase().trim();
-            const match = liveMap.get(pppKey) || macMap.get(macKey) || liveMap.get(nameKey);
-            if (!match) {
+            const codeKey = (c.clientCode || "").toLowerCase();
+            const idKey = (c.id || "").toLowerCase();
+
+            const liveMatch = liveMap.get(pppKey) || macMap.get(macKey) || liveMap.get(nameKey);
+            const netxMatch = custMap.get(pppKey) || custMap.get(codeKey) || custMap.get(idKey) || custMap.get(c.phone) || custMap.get(nameKey);
+
+            if (netxMatch && netxMatch.id) {
+              matchedNetxIds.add(netxMatch.id.toLowerCase());
+              if (netxMatch.pppoe_username) matchedNetxIds.add(netxMatch.pppoe_username.toLowerCase());
+              if (netxMatch.customer_code) matchedNetxIds.add(netxMatch.customer_code.toLowerCase());
+            }
+
+            if (!liveMatch && !netxMatch) {
               if (c.onuSignal === "-18.5 dBm") {
                 hasChange = true;
                 return { ...c, onuSignal: "—" };
@@ -347,20 +381,50 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               return c;
             }
 
-            const newNetStatus: "online" | "offline" = match.connection_status === "online" ? "online" : "offline";
-            const newSignal = (match.onu_rx_power !== null && match.onu_rx_power !== undefined)
-              ? `${match.onu_rx_power} dBm`
-              : (newNetStatus === "online" ? "—" : "Offline");
-            const newIp = match.live_ip || c.ipAddress;
-            const newMac = match.live_mac || c.mac;
-            const newUptime = match.live_uptime || c.sessionUptime;
+            // Connection & Line State
+            const isLineDisabled = netxMatch?.status === "disabled" || c.disabledInMikrotik;
+            const newNetStatus: "online" | "offline" = isLineDisabled
+              ? "offline"
+              : ((liveMatch?.connection_status === "online" || netxMatch?.connection_status === "online") ? "online" : "offline");
 
-            // Live MikroTik internet package sync
-            const livePkg = match.package_name || "35M";
-            const livePrice = match.package_price ? Number(match.package_price) : 500;
-            const liveSpeed = livePkg === "35M" ? "35/35" : (livePkg === "50M" ? "50/50" : (livePkg === "80M" ? "80/80" : (livePkg === "100M" ? "100/100" : (livePkg === "10 Mbps" ? "10/10" : "35/35"))));
-            const liveDown = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : 35))));
-            const liveUp = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : 35))));
+            const newSignal = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
+              ? `${liveMatch.onu_rx_power} dBm`
+              : (newNetStatus === "online" ? c.onuSignal || "—" : "Offline");
+            const newIp = liveMatch?.live_ip || c.ipAddress;
+            const newMac = liveMatch?.live_mac || netxMatch?.onu_mac || c.mac;
+            const newUptime = liveMatch?.live_uptime || c.sessionUptime;
+
+            // Live MikroTik package & pricing
+            const livePkg = netxMatch?.package_name || liveMatch?.package_name || c.package || "35M";
+            const livePrice = netxMatch?.package_price ? Number(netxMatch.package_price) : (netxMatch?.monthly_bill ? Number(netxMatch.monthly_bill) : (liveMatch?.package_price ? Number(liveMatch.package_price) : c.price));
+            const liveSpeed = livePkg === "35M" ? "35/35" : (livePkg === "50M" ? "50/50" : (livePkg === "80M" ? "80/80" : (livePkg === "100M" ? "100/100" : (livePkg === "10 Mbps" ? "10/10" : c.speed))));
+            const liveDown = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.downloadSpeedMbps))));
+            const liveUp = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.uploadSpeedMbps))));
+
+            // Live Authentic Billing Fields from MikroTik
+            const liveDueAmount = netxMatch?.due_amount !== undefined ? Number(netxMatch.due_amount) : c.dueAmount;
+            const liveMonthlyBill = netxMatch?.monthly_bill !== undefined ? Number(netxMatch.monthly_bill) : (livePrice || c.monthlyBill);
+
+            // Compute subscriber lifecycle status
+            let computedStatus: CustomerStatus = c.status;
+            if (isLineDisabled) {
+              computedStatus = "suspended";
+            } else if (netxMatch?.is_due && liveDueAmount > 0) {
+              computedStatus = "due";
+            } else if (netxMatch?.status === "active") {
+              computedStatus = "active";
+            }
+
+            // Expiry date & days remaining
+            let newEndDate = c.endDate;
+            let newDaysRemaining = c.daysRemaining;
+            if (netxMatch?.expiry_date) {
+              const expDate = new Date(netxMatch.expiry_date);
+              if (!isNaN(expDate.getTime())) {
+                newEndDate = expDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+                newDaysRemaining = Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              }
+            }
 
             if (
               c.netStatus !== newNetStatus ||
@@ -368,13 +432,26 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               c.ipAddress !== newIp ||
               c.mac !== newMac ||
               c.package !== livePkg ||
-              c.profile !== livePkg ||
-              c.speed !== liveSpeed
+              c.price !== livePrice ||
+              c.monthlyBill !== liveMonthlyBill ||
+              c.dueAmount !== liveDueAmount ||
+              c.due !== liveDueAmount ||
+              c.status !== computedStatus ||
+              c.disabledInMikrotik !== isLineDisabled ||
+              c.daysRemaining !== newDaysRemaining ||
+              c.endDate !== newEndDate
             ) {
               hasChange = true;
               return {
                 ...c,
                 netStatus: newNetStatus,
+                status: computedStatus,
+                disabledInMikrotik: isLineDisabled,
+                disabledInSystem: isLineDisabled,
+                dueAmount: liveDueAmount,
+                due: liveDueAmount,
+                monthlyBill: liveMonthlyBill,
+                price: livePrice,
                 onuSignal: newSignal,
                 ipAddress: newIp,
                 mac: newMac,
@@ -384,20 +461,102 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 speed: liveSpeed,
                 downloadSpeedMbps: liveDown,
                 uploadSpeedMbps: liveUp,
-                price: livePrice,
-                monthlyBill: livePrice,
-                serverName: match.server_name || "DC-CA"
+                endDate: newEndDate,
+                daysRemaining: newDaysRemaining,
+                serverName: netxMatch?.server_name || liveMatch?.server_name || "DC-CA"
               };
             }
             return c;
           });
-          return hasChange ? updated : prev;
+
+          // 2. Discover and ingest newly created MikroTik subscribers that aren't in prev
+          const brandNewSubscribers: Customer[] = [];
+          if (Array.isArray(fullCustList)) {
+            fullCustList.forEach(nc => {
+              const ncId = (nc.id || '').toLowerCase();
+              const ncPpp = (nc.pppoe_username || '').toLowerCase();
+              const ncCode = (nc.customer_code || '').toLowerCase();
+              if (matchedNetxIds.has(ncId) || matchedNetxIds.has(ncPpp) || matchedNetxIds.has(ncCode)) {
+                return; // Already in roster
+              }
+
+              const alreadyExists = prev.some(p =>
+                (p.id && p.id.toLowerCase() === ncId) ||
+                (p.pppUser && p.pppUser.toLowerCase() === ncPpp) ||
+                (p.clientCode && p.clientCode.toLowerCase() === ncCode)
+              );
+              if (alreadyExists) return;
+
+              hasChange = true;
+              const liveMatch = liveMap.get(ncPpp);
+              const isDis = nc.status === 'disabled';
+              const pkgName = nc.package_name || '35M';
+              const price = Number(nc.package_price || nc.monthly_bill || 500);
+              const due = Number(nc.due_amount || 0);
+
+              const expDate = nc.expiry_date ? new Date(nc.expiry_date) : new Date(Date.now() + 30 * 86400000);
+              const daysRem = Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+              brandNewSubscribers.push({
+                id: nc.id || nc.customer_code || `MBN-${Date.now()}`,
+                clientCode: nc.customer_code || nc.id,
+                passcode: nc.pppoe_password || '123456',
+                name: nc.full_name || nc.pppoe_username,
+                phone: nc.phone || '01700000000',
+                email: `${(nc.pppoe_username || 'client').replace(/[^a-z0-9]/gi, '')}@maabestnetwork.com`,
+                address: nc.address || 'Kalkini',
+                zone: nc.zone_name || 'Default',
+                subzone: nc.subzone_name || 'KALKINI SOMITIR HAT',
+                package: pkgName,
+                profile: pkgName,
+                speed: pkgName === '35M' ? '35/35' : (pkgName === '50M' ? '50/50' : '35/35'),
+                downloadSpeedMbps: 35,
+                uploadSpeedMbps: 35,
+                price,
+                monthlyBill: Number(nc.monthly_bill || price),
+                dueAmount: due,
+                due,
+                status: isDis ? 'suspended' : (nc.is_due && due > 0 ? 'due' : 'active'),
+                netStatus: isDis ? 'offline' : (nc.connection_status === 'online' ? 'online' : 'offline'),
+                disabledInMikrotik: isDis,
+                disabledInSystem: isDis,
+                billingDate: expDate.getDate() || 1,
+                startDate: nc.activation_date || new Date().toLocaleDateString('en-GB'),
+                endDate: expDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                daysRemaining: daysRem,
+                ipAddress: liveMatch?.live_ip || '10.200.201.1',
+                mac: liveMatch?.live_mac || nc.onu_mac || '',
+                pppUser: nc.pppoe_username,
+                pppPass: nc.pppoe_password || '123456',
+                mikrotik: 'DC-CA',
+                serverName: 'DC-CA',
+                olt: nc.olt_server || 'OLT1',
+                onuSignal: liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : '—',
+                sessionUptime: liveMatch?.live_uptime || '0d',
+                monthlyUsageGB: 0,
+                joinDate: nc.created_at ? new Date(nc.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
+                clientType: 'Home',
+                billingStatus: 'Monthly',
+                invoices: [],
+                paymentHistory: []
+              });
+            });
+          }
+
+          if (hasChange) {
+            const combined = [...brandNewSubscribers, ...updated];
+            try {
+              localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(combined));
+            } catch (_) {}
+            return combined;
+          }
+          return prev;
         });
       } catch (_) {}
     };
 
     syncNetx();
-    const interval = setInterval(syncNetx, 25000);
+    const interval = setInterval(syncNetx, 20000);
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 
@@ -749,7 +908,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const newId = rawNewId ? rawNewId.trim() : id;
     const isIdChanged = newId !== id && Boolean(newId);
 
-    const target = customers.find(c => c.id === id);
+    const target = customers.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
     const targetName = target ? target.name : id;
     if (updates.userType && target && updates.userType !== target.userType) {
       activityLogger.log({
@@ -764,7 +923,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id === id) {
+        if (c.id === id || c.clientCode === id || c.pppUser === id) {
           const finalUserType = updates.userType !== undefined ? updates.userType : c.userType || "normal";
           const isFree = finalUserType === "free";
           const isUnlimited = finalUserType === "unlimited";
@@ -795,7 +954,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         return c;
       });
 
-      const target = updated.find(c => c.id === newId);
+      const target = updated.find(c => c.id === newId || c.clientCode === newId || c.pppUser === newId);
       if (target) {
         if (isIdChanged) {
           deleteCustomerFromFirestore(id);
@@ -1098,12 +1257,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleNetStatus = (id: string, enable: boolean) => {
-    const targetCust = customers.find(c => c.id === id);
-    syncMikrotikUserState(targetCust?.pppUser || id, !enable, targetCust);
+    const targetCust = customers.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
+    syncMikrotikUserState(targetCust?.pppUser || targetCust?.id || id, !enable, targetCust);
 
     setCustomers(prev => {
       const updated = prev.map(c =>
-        c.id === id
+        (c.id === id || c.clientCode === id || c.pppUser === id)
           ? {
               ...c,
               netStatus: enable ? "online" as const : "offline" as const,
@@ -1119,7 +1278,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             }
           : c
       );
-      const target = updated.find(c => c.id === id);
+      const target = updated.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
@@ -1244,7 +1403,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       invoiceId,
     };
 
-    const targetCust = customers.find(c => c.id === customerId);
+    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
 
     // Auto-reconnect subscriber on MikroTik RouterOS
     if (targetCust) {
@@ -1261,7 +1420,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id !== customerId) return c;
+        if (c.id !== customerId && c.clientCode !== customerId && c.pppUser !== customerId) return c;
 
         const updatedInvoices: Invoice[] = [
           {
@@ -1296,8 +1455,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      const target = updated.find(c => c.id === customerId);
+      const target = updated.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
       if (target) saveCustomerToFirestore(target);
+      try {
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
+      } catch (_) {}
       return updated;
     });
 
@@ -1315,12 +1477,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const changePackage = (customerId: string, newPackage: string, newSpeed: string, newPrice: number) => {
     const speeds = newSpeed.split("/").map(s => parseInt(s.trim()) || 30);
-    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId);
+    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
     const targetPppUser = targetCust?.pppUser || (targetCust?.name ? `mbn@${targetCust.name.toLowerCase().replace(/[^a-z0-9]/g, "")}` : undefined);
 
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id !== customerId && c.clientCode !== customerId) return c;
+        if (c.id !== customerId && c.clientCode !== customerId && c.pppUser !== customerId) return c;
         return {
           ...c,
           package: newPackage,
@@ -1332,7 +1494,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           monthlyBill: newPrice,
         };
       });
-      const target = updated.find(c => c.id === customerId || c.clientCode === customerId);
+      const target = updated.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
@@ -1396,7 +1558,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     requestedPrice: number,
     notes?: string
   ): PlanUpgradeRequest => {
-    const customer = customers.find(c => c.id === customerId);
+    const customer = customers.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
     const currPkg = customer ? customer.package : "Standard Package";
     const currPrice = customer ? customer.price : 800;
     const diff = Math.max(0, requestedPrice - currPrice);
