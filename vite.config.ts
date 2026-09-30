@@ -190,17 +190,18 @@ function realtimeTelemetryPlugin() {
       });
 
       // MikroTik disconnect subscriber
-      server.middlewares.use('/api/mikrotik/disconnect', async (req: any, res: any) => {
+      const handleDisconnect = async (req: any, res: any) => {
         try {
           const body = await readBody(req);
           const { disconnectPppoeUser } = await import('./server/telemetry-service.js');
-          if (!body.username) {
+          const identifier = body.username || body.customerId || body.id;
+          if (!identifier) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: false, error: 'username required' }));
+            res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
             return;
           }
-          const result = await disconnectPppoeUser(body.username);
+          const result = await disconnectPppoeUser(identifier);
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(result));
@@ -208,20 +209,24 @@ function realtimeTelemetryPlugin() {
           res.statusCode = 500;
           res.end(JSON.stringify({ success: false, error: e.message }));
         }
-      });
+      };
+      server.middlewares.use('/api/mikrotik/disconnect', handleDisconnect);
+      server.middlewares.use('/api/mikrotik/user/disconnect', handleDisconnect);
 
       // MikroTik toggle user disabled
       server.middlewares.use('/api/mikrotik/user/toggle', async (req: any, res: any) => {
         try {
           const body = await readBody(req);
           const { setUserDisabledState } = await import('./server/telemetry-service.js');
-          if (!body.username || body.disabled === undefined) {
+          const identifier = body.username || body.customerId || body.id;
+          const disabled = body.disabled !== undefined ? body.disabled : (body.action === 'disable');
+          if (!identifier || disabled === undefined) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: false, error: 'username and disabled boolean required' }));
+            res.end(JSON.stringify({ success: false, error: 'username or customerId and disabled boolean required' }));
             return;
           }
-          const result = await setUserDisabledState(body.username, !!body.disabled);
+          const result = await setUserDisabledState(identifier, !!disabled);
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(result));
@@ -235,15 +240,18 @@ function realtimeTelemetryPlugin() {
       server.middlewares.use('/api/mikrotik/user/create', async (req: any, res: any) => {
         try {
           const body = await readBody(req);
-          const { username, password, profile, comment } = body;
-          if (!username || !password) {
+          const username = body.username || body.pppUser;
+          const password = body.password || body.pppPass || '123456';
+          const profile = body.profile || body.package || 'default';
+          const comment = body.comment || '';
+          if (!username) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ success: false, error: 'username and password are required' }));
             return;
           }
           const { createPppoeSecret } = await import('./server/telemetry-service.js');
-          const result = await createPppoeSecret(username, password, profile || 'default', comment || '');
+          const result = await createPppoeSecret(username, password, profile, comment, body);
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(result));
@@ -282,21 +290,20 @@ function realtimeTelemetryPlugin() {
       server.middlewares.use('/api/mikrotik/user/delete', async (req: any, res: any) => {
         try {
           const body = await readBody(req);
-          const { username } = body;
-          if (!username) {
+          const identifier = body.username || body.customerId || body.id;
+          if (!identifier) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: false, error: 'username required' }));
+            res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
             return;
           }
           const { deletePppoeSecret } = await import('./server/telemetry-service.js');
-          const result = await deletePppoeSecret(username);
+          const result = await deletePppoeSecret(identifier);
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(result));
         } catch (e: any) {
           res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });
@@ -305,15 +312,17 @@ function realtimeTelemetryPlugin() {
       server.middlewares.use('/api/mikrotik/user/update', async (req: any, res: any) => {
         try {
           const body = await readBody(req);
-          const { username, newUsername, password, profile, comment, disabled } = body;
-          if (!username) {
+          const { username, customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone } = body;
+          if (!username && !customerId) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: false, error: 'username required' }));
+            res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
             return;
           }
           const { updatePppoeSecret } = await import('./server/telemetry-service.js');
-          const result = await updatePppoeSecret(username, { newUsername, password, profile, comment, disabled });
+          const result = await updatePppoeSecret(username || customerId, {
+            customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone
+          });
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(result));

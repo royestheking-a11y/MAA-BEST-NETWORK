@@ -610,12 +610,22 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         ? "" : "https://maa-best-network.onrender.com";
       const pppUser = newCustomer.pppUser || `mbn@${(newCustomer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
       const pppPass = newCustomer.pppPass || "123456";
-      const profile = newCustomer.profile || "default";
+      const profile = newCustomer.package || newCustomer.profile || "35M";
       const comment = `${newCustomer.name} (${newId}) — Created via ISP Portal`;
       fetch(`${gatewayBase}/api/mikrotik/user/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: pppUser, password: pppPass, profile, comment }),
+        body: JSON.stringify({ 
+          username: pppUser, 
+          password: pppPass, 
+          profile, 
+          comment,
+          name: newCustomer.name,
+          phone: newCustomer.phone,
+          address: newCustomer.address,
+          package: newCustomer.package,
+          zone: newCustomer.zone
+        }),
       })
       .then(r => r.json())
       .then(result => {
@@ -624,7 +634,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             type: "network",
             severity: "success",
             action: "MikroTik PPPoE Secret Provisioned",
-            detail: `RouterOS PPPoE secret "${pppUser}" created for ${newCustomer.name} (${newId}) with profile: ${profile}.`,
+            detail: `RouterOS PPPoE secret "${pppUser}" created on MikroTik DC-CA for ${newCustomer.name} (${newId}) with profile: ${profile}.`,
             targetId: newId,
           });
         } else if (!result.alreadyExists) {
@@ -844,7 +854,16 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         fetch(`${gatewayBase}/api/mikrotik/user/update`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: pppUser, ...mkUpdates }),
+          body: JSON.stringify({
+            username: pppUser,
+            customerId: newId,
+            phone: updates.phone,
+            name: updates.name,
+            address: updates.address,
+            zone: updates.zone,
+            package: updates.package,
+            ...mkUpdates
+          }),
         })
         .then(r => r.json())
         .then(result => {
@@ -911,14 +930,14 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       fetch(`${gatewayBase}/api/mikrotik/user/disconnect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: targetPppUser }),
+        body: JSON.stringify({ username: targetPppUser, customerId: id }),
       }).catch(() => {});
 
       // Remove PPPoE secret
       fetch(`${gatewayBase}/api/mikrotik/user/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: targetPppUser }),
+        body: JSON.stringify({ username: targetPppUser, customerId: id }),
       })
       .then(r => r.json())
       .then(result => {
@@ -1027,13 +1046,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
-    if (shouldReactivate && targetCust?.pppUser) {
-      syncMikrotikUserState(targetCust.pppUser, false);
+    if (shouldReactivate && targetCust) {
+      syncMikrotikUserState(targetCust.pppUser || targetCust.id, false, targetCust);
       activityLogger.log({
         type: "network",
         severity: "success",
         action: "Subscriber Line Auto-Reactivated on MikroTik",
-        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser}) following grace period extension.`,
+        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser || targetCust.id}) following grace period extension.`,
         targetId: customerId,
       });
     }
@@ -1048,16 +1067,31 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const syncMikrotikUserState = async (pppUser?: string, disabled?: boolean) => {
-    if (!pppUser) return;
+  const syncMikrotikUserState = async (targetIdOrUser?: string, disabled?: boolean, customerObj?: Customer) => {
+    if (!targetIdOrUser) return;
     try {
       const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
       const base = isLocal ? "" : "https://maa-best-network.onrender.com";
-      await fetch(`${base}/api/mikrotik/user/toggle`, {
+      const res = await fetch(`${base}/api/mikrotik/user/toggle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: pppUser, disabled: !!disabled }),
+        body: JSON.stringify({ 
+          username: customerObj?.pppUser || targetIdOrUser, 
+          customerId: customerObj?.id || targetIdOrUser,
+          phone: customerObj?.phone,
+          disabled: !!disabled 
+        }),
       });
+      const data = await res.json();
+      if (data.success) {
+        activityLogger.log({
+          type: "network",
+          severity: disabled ? "warning" : "success",
+          action: disabled ? "MikroTik Line Disabled" : "MikroTik Line Enabled",
+          detail: `PPPoE secret "${customerObj?.pppUser || targetIdOrUser}" (${customerObj?.name || 'Subscriber'}) ${disabled ? "disabled on RouterOS DC-CA / session dropped" : "enabled on RouterOS DC-CA"}.`,
+          targetId: customerObj?.id || targetIdOrUser,
+        });
+      }
     } catch (err) {
       console.warn("[MikroTik API Auto-Sync Notice]:", err);
     }
@@ -1065,9 +1099,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   const toggleNetStatus = (id: string, enable: boolean) => {
     const targetCust = customers.find(c => c.id === id);
-    if (targetCust?.pppUser) {
-      syncMikrotikUserState(targetCust.pppUser, !enable);
-    }
+    syncMikrotikUserState(targetCust?.pppUser || id, !enable, targetCust);
 
     setCustomers(prev => {
       const updated = prev.map(c =>
@@ -1124,8 +1156,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         if (isExpired && hasDue && c.status !== "suspended") {
           hasChanges = true;
           cutoffCount++;
-          if (c.pppUser) {
-            syncMikrotikUserState(c.pppUser, true);
+          if (c.pppUser || c.id) {
+            syncMikrotikUserState(c.pppUser || c.id, true, c);
           }
           activityLogger.log({
             type: "billing",
@@ -1215,13 +1247,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const targetCust = customers.find(c => c.id === customerId);
 
     // Auto-reconnect subscriber on MikroTik RouterOS
-    if (targetCust?.pppUser) {
-      syncMikrotikUserState(targetCust.pppUser, false);
+    if (targetCust) {
+      syncMikrotikUserState(targetCust.pppUser || targetCust.id, false, targetCust);
       activityLogger.log({
         type: "network",
         severity: "success",
         action: "Subscriber Line Auto-Reconnected on MikroTik",
-        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser}) upon payment confirmation.`,
+        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser || targetCust.id}) upon payment confirmation.`,
         targetId: customerId,
         metadata: { pppUser: targetCust.pppUser, status: "active", netStatus: "online" }
       });
@@ -1324,7 +1356,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: targetPppUser,
+          customerId: targetCust?.id,
           profile: mkProfile,
+          package: newPackage,
           comment: `${targetCust?.name || customerId} — Rate limit updated to ${newPackage} (${newSpeed} Mbps)`
         }),
       })

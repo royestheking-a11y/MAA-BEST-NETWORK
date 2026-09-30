@@ -241,15 +241,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 14. Disconnect PPPoE User (kill active session)
-  if (url.pathname === '/api/mikrotik/disconnect' && req.method === 'POST') {
+  if ((url.pathname === '/api/mikrotik/disconnect' || url.pathname === '/api/mikrotik/user/disconnect') && req.method === 'POST') {
     const body = await readBody();
-    const { username } = body;
-    if (!username) {
+    const identifier = body.username || body.customerId || body.id;
+    if (!identifier) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'username required' }));
+      res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
       return;
     }
-    const result = await disconnectPppoeUser(username);
+    const result = await disconnectPppoeUser(identifier);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
     return;
@@ -274,13 +274,14 @@ const server = http.createServer(async (req, res) => {
   // 15. Enable / Disable PPPoE Secret
   if (url.pathname === '/api/mikrotik/user/toggle' && req.method === 'POST') {
     const body = await readBody();
-    const { username, disabled } = body;
-    if (!username || disabled === undefined) {
+    const identifier = body.username || body.customerId || body.id;
+    const disabled = body.disabled !== undefined ? body.disabled : (body.action === 'disable');
+    if (!identifier || disabled === undefined) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'username and disabled (boolean) required' }));
+      res.end(JSON.stringify({ success: false, error: 'username or customerId and disabled (boolean) required' }));
       return;
     }
-    const result = await setUserDisabledState(username, !!disabled);
+    const result = await setUserDisabledState(identifier, !!disabled);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
     return;
@@ -297,13 +298,16 @@ const server = http.createServer(async (req, res) => {
   // 17. Create (provision) a new PPPoE secret on MikroTik
   if (url.pathname === '/api/mikrotik/user/create' && req.method === 'POST') {
     const body = await readBody();
-    const { username, password, profile, comment } = body;
-    if (!username || !password) {
+    const username = body.username || body.pppUser;
+    const password = body.password || body.pppPass || '123456';
+    const profile = body.profile || body.package || 'default';
+    const comment = body.comment || '';
+    if (!username) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'username and password are required' }));
+      res.end(JSON.stringify({ success: false, error: 'username is required' }));
       return;
     }
-    const result = await createPppoeSecret(username, password, profile || 'default', comment || '');
+    const result = await createPppoeSecret(username, password, profile, comment, body);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
     return;
@@ -312,13 +316,13 @@ const server = http.createServer(async (req, res) => {
   // 18. Delete (remove) a PPPoE secret from MikroTik
   if (url.pathname === '/api/mikrotik/user/delete' && req.method === 'POST') {
     const body = await readBody();
-    const { username } = body;
-    if (!username) {
+    const identifier = body.username || body.customerId || body.id;
+    if (!identifier) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'username required' }));
+      res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
       return;
     }
-    const result = await deletePppoeSecret(username);
+    const result = await deletePppoeSecret(identifier);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
     return;
@@ -327,13 +331,15 @@ const server = http.createServer(async (req, res) => {
   // 19. Update (modify) a PPPoE secret on MikroTik
   if (url.pathname === '/api/mikrotik/user/update' && req.method === 'POST') {
     const body = await readBody();
-    const { username, newUsername, password, profile, comment, disabled } = body;
-    if (!username) {
+    const { username, customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone } = body;
+    if (!username && !customerId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'username required' }));
+      res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
       return;
     }
-    const result = await updatePppoeSecret(username, { newUsername, password, profile, comment, disabled });
+    const result = await updatePppoeSecret(username || customerId, {
+      customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone
+    });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
     return;

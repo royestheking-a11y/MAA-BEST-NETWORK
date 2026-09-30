@@ -698,7 +698,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     const q = search.toLowerCase().trim();
     const cleanUser = (c.pppUser || c.name || "").toLowerCase();
     const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
-    const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online");
+    const isCustomerDisabled = c.disabledInMikrotik || c.disabledInSystem || c.netStatus === "offline" || c.status === "suspended";
+    const isOnline = isCustomerDisabled ? false : (liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online"));
     const activeMac = (liveMatch?.live_mac || c.mac || c.callingStationId || "").toLowerCase();
     const isBound = c.macBound !== false && Boolean(activeMac && activeMac.trim() && activeMac !== "—");
 
@@ -746,11 +747,13 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
       const cleanUserA = (a.pppUser || a.name || "").toLowerCase();
       const liveMatchA = liveStatsMap.get(cleanUserA) || liveStatsMap.get((a.name || "").toLowerCase());
-      const isOnlineA = liveMatchA ? (liveMatchA.connection_status === "online") : (a.netStatus === "online");
+      const isDisA = a.disabledInMikrotik || a.disabledInSystem || a.netStatus === "offline" || a.status === "suspended";
+      const isOnlineA = isDisA ? false : (liveMatchA ? (liveMatchA.connection_status === "online") : (a.netStatus === "online"));
 
       const cleanUserB = (b.pppUser || b.name || "").toLowerCase();
       const liveMatchB = liveStatsMap.get(cleanUserB) || liveStatsMap.get((b.name || "").toLowerCase());
-      const isOnlineB = liveMatchB ? (liveMatchB.connection_status === "online") : (b.netStatus === "online");
+      const isDisB = b.disabledInMikrotik || b.disabledInSystem || b.netStatus === "offline" || b.status === "suspended";
+      const isOnlineB = isDisB ? false : (liveMatchB ? (liveMatchB.connection_status === "online") : (b.netStatus === "online"));
 
       switch (sortKey) {
         case "clientCode":
@@ -1461,7 +1464,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               {paginated.map((c, i) => {
                 const cleanUser = (c.pppUser || c.name || "").toLowerCase();
                 const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
-                const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online");
+                const isCustDis = c.disabledInMikrotik || c.disabledInSystem || c.netStatus === "offline" || c.status === "suspended";
+                const isOnline = isCustDis ? false : (liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online"));
                 const displayIp = liveMatch?.live_ip || c.ipAddress || "10.200.201.50";
                 const displayRx = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined) ? `${liveMatch.onu_rx_power} dBm` : c.onuSignal;
                 const realMac = (liveMatch?.live_mac || c.mac || c.callingStationId || c.boundMac || "4c:46:d1:0d:1d:49").toLowerCase();
