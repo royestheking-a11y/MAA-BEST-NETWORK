@@ -448,6 +448,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       price: Number(serviceForm.monthlyBill) || selectedCustomer.price,
       status: serviceForm.disabledInMikrotik ? "suspended" : "active",
       netStatus: serviceForm.disabledInMikrotik ? "offline" : "online",
+      endDate: serviceForm.expireDate || selectedCustomer.endDate,
     };
     updateCustomer(selectedCustomer.id, updates);
     setSelectedCustomer(prev => prev ? { ...prev, ...updates } : null);

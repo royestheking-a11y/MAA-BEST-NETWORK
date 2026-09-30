@@ -1872,16 +1872,9 @@ export async function runServerBillingCutoff() {
   }
 }
 
-// Background Auto-Billing Cutoff Engine (runs every 5 minutes 24/7)
-setInterval(() => {
-  runServerBillingCutoff().catch(err => {
-    console.error('[Auto-Billing Cutoff Engine Worker] Error:', err.message);
-  });
-}, 5 * 60 * 1000);
-
-// Initial cutoff check 45s after gateway startup
-setTimeout(() => {
-  runServerBillingCutoff().catch(() => {});
-}, 45000);
+// Backend Auto-Billing Cutoff Engine has been disabled.
+// The cutoff is now managed by the React frontend to ensure it uses the accurate 
+// billing data from Firestore (post-payment/admin overrides), rather than stale 
+// data from the NetX API which was causing the "recharge after on and sudden off" bug.
 
 
