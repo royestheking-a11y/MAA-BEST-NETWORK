@@ -329,10 +329,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               );
               if (!local) return cloudCust; // New customer from cloud — accept as-is
 
-              // Priority guards: local wins when admin enabled or payment cleared balance
+              // Priority guards: local wins when admin enabled/disabled or payment cleared balance
               const locallyPaid  = local.status === "active" && (local.dueAmount === 0 || local.due === 0);
               const adminEnabled = local.disabledInMikrotik === false;
-              const localWins    = locallyPaid || adminEnabled;
+              const adminDisabled = local.disabledInMikrotik === true && local.status === "suspended";
+              const localWins    = locallyPaid || adminEnabled || adminDisabled;
 
               // Determine the better endDate (the later one wins)
               const localEndDate = local.endDate ? new Date(local.endDate) : null;
@@ -504,9 +505,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             if (c.userType === "free" || c.userType === "unlimited") {
               liveDueAmount = 0;
             } else if (rawNetxDue !== undefined && rawNetxDue > 0) {
-              const locallyPaid      = (c.dueAmount === 0 || c.due === 0) && c.status === "active";
-              const adminJustEnabled = c.disabledInMikrotik === false;
-              liveDueAmount = (locallyPaid || adminJustEnabled) ? 0 : rawNetxDue;
+              const locallyPaid = (c.dueAmount === 0 || c.due === 0) && c.status === "active";
+              liveDueAmount = locallyPaid ? 0 : rawNetxDue;
             } else if (rawNetxDue === 0) {
               liveDueAmount = 0; // API explicitly cleared
             } else {
