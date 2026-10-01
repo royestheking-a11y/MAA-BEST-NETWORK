@@ -72,7 +72,7 @@ export const BillCollectionHistoryPage: React.FC<BillCollectionHistoryPageProps>
           monthlyBill: c.monthlyBill || c.price || 500,
           received: Number(p.amount) || 0,
           moneyReceiptNo: p.trxId || `${c.clientCode || c.id}-RV-${(p.date || "").replace(/[^0-9]/g, "")}`,
-          createdBy: p.by || "maabestnetwork",
+          createdBy: p.collectedBy || (p as any).by || "maabestnetwork",
         });
       });
     });
