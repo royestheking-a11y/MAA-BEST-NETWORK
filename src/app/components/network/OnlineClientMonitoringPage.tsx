@@ -495,8 +495,9 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
       const displayIp = liveMatch?.live_ip || (isConnected ? c.ipAddress : "—");
       const displayDuration = liveMatch?.live_uptime || (isConnected ? (c.duration || "Active") : "—");
+      const cleanCustSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
       const displaySignal = isConnected
-        ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "—"))
+        ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (cleanCustSignal || "—"))
         : "LOS / Offline";
       const displayLogout = liveMatch?.last_seen_online
         ? new Date(liveMatch.last_seen_online).toLocaleString()
@@ -1482,8 +1483,9 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
         const c = selectedClientForTopology;
         const liveMatch = getLiveMatch(c);
         const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+        const cleanCustSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
         const displaySignal = isConnected
-          ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "—"))
+          ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (cleanCustSignal || "—"))
           : "LOS / Offline";
 
         return (
@@ -1599,8 +1601,9 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
           modalOfflineSec = Math.max(1, Math.floor((Date.now() - disconnectMs) / 1000)) + liveTick;
         }
         const displayDuration = isConnected ? (liveMatch?.live_uptime || c.duration || "Active") : `Offline (${formatTickingUptime(modalOfflineSec)})`;
+        const cleanCustSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
         const displaySignal = isConnected
-          ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (c.onuSignal || "—"))
+          ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (cleanCustSignal || "—"))
           : "LOS / Offline";
         const pkgDown = c.downloadSpeedMbps || 35;
         const pkgUp = c.uploadSpeedMbps || 20;

@@ -261,7 +261,7 @@ export function LiveStatusPage() {
           ? Number(liveMatch.onu_rx_power)
           : (c.onuSignal && !isNaN(parseFloat(c.onuSignal)) ? parseFloat(c.onuSignal) : null);
 
-        const rxStr = realRx !== null ? `${realRx.toFixed(1)} dBm` : (isOnline ? "—" : "Offline");
+        const rxStr = realRx !== null ? `${realRx.toFixed(1)} dBm` : "—";
         const pkgDown = c.downloadSpeedMbps || 20;
         const pkgUp = c.uploadSpeedMbps || 10;
         const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || c.sessionUptime || c.duration, idx) : 0;
@@ -316,7 +316,7 @@ export function LiveStatusPage() {
         const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (o.status === "online");
         const realRxPower = (liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null)
           ? `${liveMatch.onu_rx_power} dBm`
-          : (matched?.onuSignal && matched.onuSignal !== "—" ? matched.onuSignal : (isOnline ? "—" : "Offline"));
+          : (matched?.onuSignal && matched.onuSignal !== "—" && matched.onuSignal.toLowerCase() !== "offline" ? matched.onuSignal : "—");
 
         const pkgDown = matched?.downloadSpeedMbps || 20;
         const pkgUp = matched?.uploadSpeedMbps || 10;

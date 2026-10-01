@@ -295,7 +295,7 @@ export function normalizeCustomerPackage(c: Customer): Customer {
   const down = c.downloadSpeedMbps && !isOldPkg ? c.downloadSpeedMbps : (knownSpeed?.down || c.downloadSpeedMbps || 35);
   const up = c.uploadSpeedMbps && !isOldPkg ? c.uploadSpeedMbps : (knownSpeed?.up || c.uploadSpeedMbps || 35);
 
-  const signal = c.onuSignal === "-18.5 dBm" ? "—" : (c.onuSignal || "—");
+  const signal = (c.onuSignal === "-18.5 dBm" || c.onuSignal?.toLowerCase() === "offline") ? "—" : (c.onuSignal || "—");
 
   // ── STALE-DATE MIGRATION (runs for every customer from every source) ──────
   // If endDate is expired but dueAmount is 0 (paid up), the date is stale data
@@ -495,7 +495,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                   endDate: bestEndDate,
                   expireDate: bestEndDate,
                   daysRemaining: bestDaysRemaining,
-                  onuSignal: local.onuSignal || cloudCust.onuSignal,
+                  onuSignal: ((local.onuSignal || cloudCust.onuSignal) && (local.onuSignal || cloudCust.onuSignal)?.toLowerCase() !== "offline" && (local.onuSignal || cloudCust.onuSignal) !== "-18.5 dBm") ? (local.onuSignal || cloudCust.onuSignal) : "—",
                   sessionUptime: local.sessionUptime || cloudCust.sessionUptime,
                   ipAddress: local.ipAddress || cloudCust.ipAddress,
                   mac: local.mac || cloudCust.mac,
@@ -509,7 +509,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 endDate: bestEndDate,
                 expireDate: bestEndDate,
                 daysRemaining: bestDaysRemaining,
-                onuSignal: local.onuSignal || cloudCust.onuSignal,
+                onuSignal: ((local.onuSignal || cloudCust.onuSignal) && (local.onuSignal || cloudCust.onuSignal)?.toLowerCase() !== "offline" && (local.onuSignal || cloudCust.onuSignal) !== "-18.5 dBm") ? (local.onuSignal || cloudCust.onuSignal) : "—",
                 sessionUptime: local.sessionUptime || cloudCust.sessionUptime,
                 ipAddress: local.ipAddress || cloudCust.ipAddress,
                 mac: local.mac || cloudCust.mac,
@@ -655,7 +655,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               if (c.createdAt && (Date.now() - c.createdAt) < 120000) {
                 return c; // Preserve brand new customer as-is
               }
-              if (c.onuSignal === "-18.5 dBm") {
+              if (c.onuSignal === "-18.5 dBm" || c.onuSignal?.toLowerCase() === "offline") {
                 hasChange = true;
                 return { ...c, onuSignal: "—" };
               }
@@ -690,9 +690,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                     ? "offline"
                     : c.netStatus;
 
+            const cleanSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
             const newSignal = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
               ? `${liveMatch.onu_rx_power} dBm`
-              : (newNetStatus === "online" ? c.onuSignal || "—" : "Offline");
+              : (cleanSignal || "—");
             const newIp = liveMatch?.live_ip || c.ipAddress;
             const newMac = liveMatch?.live_mac || netxMatch?.onu_mac || c.mac;
             const newUptime = liveMatch?.live_uptime || c.sessionUptime;

@@ -169,7 +169,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
         const isOnline = c.connection_status === "online";
         const rxVal = (c.onu_rx_power !== null && c.onu_rx_power !== undefined)
           ? `${c.onu_rx_power} dBm`
-          : (isOnline ? "—" : "Offline");
+          : "—";
 
         return {
           id: `onu-live-${c.id || idx}`,
@@ -251,7 +251,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             mac: c.mac && c.mac !== "—" ? c.mac : `50:65:F3:11:88:${(c.clientCode || c.id).replace(/\D/g, "").slice(-2) || "99"}`,
             ponPort: c.ponPort || (effectiveOlt === "OLT2" ? "gpon 0/1" : "epon 0/1"),
             status: isOnline ? "online" : "offline",
-            rxPower: c.onuSignal && c.onuSignal !== "—" ? c.onuSignal : (isOnline ? "-19.2 dBm" : "Offline"),
+            rxPower: c.onuSignal && c.onuSignal !== "—" && c.onuSignal.toLowerCase() !== "offline" ? c.onuSignal : (isOnline ? "-19.2 dBm" : "—"),
             customer: c.name || c.pppUser || "New Subscriber",
             customerId: c.clientCode || c.id,
             oltServer: effectiveOlt,

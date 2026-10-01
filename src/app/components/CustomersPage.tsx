@@ -1878,7 +1878,10 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 const isCustDis = c.disabledInMikrotik || c.disabledInSystem || c.netStatus === "offline" || c.status === "suspended";
                 const isOnline = isCustDis ? false : (liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online"));
                 const displayIp = liveMatch?.live_ip || c.ipAddress || "10.200.201.50";
-                const displayRx = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined) ? `${liveMatch.onu_rx_power} dBm` : c.onuSignal;
+                const rawRx = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
+                  ? `${liveMatch.onu_rx_power} dBm`
+                  : (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—" ? c.onuSignal : "");
+                const displayRx = rawRx && rawRx.toLowerCase() !== "offline" && rawRx !== "—" ? rawRx : "";
                 const realMac = (liveMatch?.live_mac || c.mac || c.callingStationId || c.boundMac || "4c:46:d1:0d:1d:49").toLowerCase();
                 const isBound = c.macBound !== false && Boolean(realMac && realMac.trim() && realMac !== "—");
 
@@ -2050,7 +2053,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                         <span style={{ color: isOnline ? "#16A34A" : "#9CA3AF", fontWeight: 700 }}>
                           {isOnline ? "Online" : "Offline"}
                         </span>
-                        {displayRx && displayRx !== "—" && (
+                        {isOnline && Boolean(displayRx) && displayRx !== "—" && displayRx.toLowerCase() !== "offline" && (
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
                             {displayRx}
                           </span>
@@ -2349,7 +2352,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                         { label: "Real MAC Address", value: activeMac || "—", mono: true, copyKey: "mac" },
                         { label: "MAC Lock Status", value: isBound ? "Bound (Protected)" : "Unbound", mono: false },
                         { label: "Assigned OLT", value: selectedCustomer.olt },
-                        { label: "Optical Rx", value: selectedCustomer.onuSignal },
+                        { label: "Optical Rx", value: (selectedCustomer.onuSignal && selectedCustomer.onuSignal.toLowerCase() !== "offline" && selectedCustomer.onuSignal !== "—") ? selectedCustomer.onuSignal : "—" },
                       ].map(item => (
                         <div key={item.label} className="rounded-xl p-3 bg-muted/40 border border-border/40 flex flex-col justify-between">
                           <div className="flex items-center justify-between">
