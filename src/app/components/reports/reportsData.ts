@@ -29,10 +29,10 @@ export interface NetworkUptimeRow {
 }
 
 export const INITIAL_REVENUE_REPORTS: RevenueReportRow[] = [
+  { period: "Oct 2026", invoicesGenerated: 0, totalBilled: 0, totalCollected: 0, bkashCollected: 0, nagadCollected: 0, cashCollected: 0, unpaidDue: 0, collectionRate: 0 },
+  { period: "Sep 2026", invoicesGenerated: 193, totalBilled: 96500, totalCollected: 0, bkashCollected: 0, nagadCollected: 0, cashCollected: 0, unpaidDue: 96500, collectionRate: 0 },
   { period: "Aug 2026", invoicesGenerated: 193, totalBilled: 115800, totalCollected: 108400, bkashCollected: 64200, nagadCollected: 26800, cashCollected: 17400, unpaidDue: 7400, collectionRate: 93.6 },
   { period: "Jul 2026", invoicesGenerated: 190, totalBilled: 114000, totalCollected: 110200, bkashCollected: 66000, nagadCollected: 27200, cashCollected: 17000, unpaidDue: 3800, collectionRate: 96.7 },
-  { period: "Jun 2026", invoicesGenerated: 184, totalBilled: 110400, totalCollected: 107600, bkashCollected: 63800, nagadCollected: 26500, cashCollected: 17300, unpaidDue: 2800, collectionRate: 97.5 },
-  { period: "May 2026", invoicesGenerated: 178, totalBilled: 106800, totalCollected: 104500, bkashCollected: 61500, nagadCollected: 26000, cashCollected: 17000, unpaidDue: 2300, collectionRate: 97.8 },
 ];
 
 export const INITIAL_CUSTOMER_REPORTS: CustomerReportRow[] = [

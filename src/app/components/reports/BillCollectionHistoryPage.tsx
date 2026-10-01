@@ -27,8 +27,15 @@ export const BillCollectionHistoryPage: React.FC<BillCollectionHistoryPageProps>
 
   const [paymentFrom, setPaymentFrom] = useState("");
   const [paymentTo, setPaymentTo] = useState("");
-  const [receiveFrom, setReceiveFrom] = useState("01-08-2026");
-  const [receiveTo, setReceiveTo] = useState("31-08-2026");
+  const [receiveFrom, setReceiveFrom] = useState(() => {
+    const d = new Date();
+    return `01-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+  });
+  const [receiveTo, setReceiveTo] = useState(() => {
+    const d = new Date();
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    return `${lastDay}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+  });
 
   const [pageSize, setPageSize] = useState(100);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,96 +47,45 @@ export const BillCollectionHistoryPage: React.FC<BillCollectionHistoryPageProps>
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Seeded Collection History Transactions matching Screenshot 3
+  // Build collection rows dynamically from live customer payment histories
   const collectionRows = useMemo(() => {
-    return [
-      {
-        id: "col-1",
-        rDate: "28 Aug 2026",
-        cCode: "MBN0029",
-        idIp: "mbn@siamahmed",
-        name: "Mbn@siamahmed",
-        zone: "DHAKA DIVISION",
-        subZone: "KALKINI SOMITIR HAT",
-        box: "SOMITIR HAT BAZAR",
-        package: "20Mbps",
-        bStatus: "Active",
-        trxId: "TRX-94810291",
-        monthlyBill: 500,
-        received: 500,
-        moneyReceiptNo: "MBN0029-202608-2814-d2207c83RV",
-        createdBy: "maabestnetwork"
-      },
-      {
-        id: "col-2",
-        rDate: "27 Aug 2026",
-        cCode: "MBN0085",
-        idIp: "mbn@khadizabegum",
-        name: "Mbn@khadizabegum",
-        zone: "DHAKA DIVISION",
-        subZone: "KALKINI SOMITIR HAT",
-        box: "SOMITIR HAT BAZAR",
-        package: "20Mbps",
-        bStatus: "Active",
-        trxId: "TRX-81029411",
-        monthlyBill: 500,
-        received: 500,
-        moneyReceiptNo: "MBN0085-202608-2718-2b39eff6RV",
-        createdBy: "maabestnetwork"
-      },
-      {
-        id: "col-3",
-        rDate: "27 Aug 2026",
-        cCode: "MBN0120",
-        idIp: "mbn@khalilhowlader",
-        name: "Mbn@khalilhowlader",
-        zone: "DHAKA DIVISION",
-        subZone: "KALKINI SOMITIR HAT",
-        box: "SOMITIR HAT BAZAR",
-        package: "20Mbps",
-        bStatus: "Active",
-        trxId: "TRX-72910488",
-        monthlyBill: 500,
-        received: 500,
-        moneyReceiptNo: "MBN0120-202608-2720-6928f746RV",
-        createdBy: "maabestnetwork"
-      },
-      {
-        id: "col-4",
-        rDate: "26 Aug 2026",
-        cCode: "MBN0007",
-        idIp: "mbn@sumonbepari",
-        name: "Sumon Bepari",
-        zone: "DHAKA DIVISION",
-        subZone: "KALKINI SOMITIR HAT",
-        box: "SOMITIR HAT BAZAR",
-        package: "PIONEER_HOME_20Mbps",
-        bStatus: "Active",
-        trxId: "TRX-82910381",
-        monthlyBill: 600,
-        received: 600,
-        moneyReceiptNo: "MBN0007-202608-2611-9a41c712RV",
-        createdBy: "maabestnetwork"
-      },
-      {
-        id: "col-5",
-        rDate: "25 Aug 2026",
-        cCode: "MBN0008",
-        idIp: "mbn@mdabubakersiddik",
-        name: "Md Abubaker Siddik",
-        zone: "DHAKA DIVISION",
-        subZone: "KALKINI SOMITIR HAT",
-        box: "SOMITIR HAT BAZAR",
-        package: "PIONEER_HOME_20Mbps",
-        bStatus: "Active",
-        trxId: "TRX-44910283",
-        monthlyBill: 700,
-        received: 700,
-        moneyReceiptNo: "MBN0008-202608-2510-1c88d921RV",
-        createdBy: "maabestnetwork"
-      }
-    ];
-  }, []);
+    const rows: Array<{
+      id: string; rDate: string; cCode: string; idIp: string; name: string;
+      zone: string; subZone: string; box: string; package: string; bStatus: string;
+      trxId: string; monthlyBill: number; received: number; moneyReceiptNo: string; createdBy: string;
+    }> = [];
+
+    customers.forEach(c => {
+      (c.paymentHistory || []).forEach((p, idx) => {
+        rows.push({
+          id: p.trxId || p.id || `${c.id}-${idx}`,
+          rDate: p.date || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          cCode: c.clientCode || c.id,
+          idIp: c.pppUser || c.id,
+          name: c.name,
+          zone: c.zone || "DHAKA DIVISION",
+          subZone: c.subzone || "KALKINI SOMITIR HAT",
+          box: c.box || "SOMITIR HAT BAZAR",
+          package: c.package || "35M",
+          bStatus: c.status === "active" ? "Active" : c.status === "suspended" ? "Suspended" : "Due",
+          trxId: p.trxId || p.id || `TRX-${Date.now().toString().slice(-8)}`,
+          monthlyBill: c.monthlyBill || c.price || 500,
+          received: Number(p.amount) || 0,
+          moneyReceiptNo: p.trxId || `${c.clientCode || c.id}-RV-${(p.date || "").replace(/[^0-9]/g, "")}`,
+          createdBy: p.by || "maabestnetwork",
+        });
+      });
+    });
+
+    // Sort newest first
+    rows.sort((a, b) => {
+      const da = new Date(a.rDate.split(" ").reverse().join("-")).getTime();
+      const db = new Date(b.rDate.split(" ").reverse().join("-")).getTime();
+      return db - da;
+    });
+
+    return rows;
+  }, [customers]);
 
   const filteredRows = useMemo(() => {
     return collectionRows.filter(r => {
