@@ -12,6 +12,13 @@ interface IndividualSmsPageProps {
 
 export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate }) => {
   const { customers } = useCustomerContext();
+  const [templates] = useState<SmsTemplate[]>(() => {
+    try {
+      const saved = localStorage.getItem("mbn_sms_templates");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_SMS_TEMPLATES;
+  });
   const [phoneNumbers, setPhoneNumbers] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [smsDescription, setSmsDescription] = useState("");
@@ -44,7 +51,7 @@ export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate
       setSmsDescription("");
       return;
     }
-    const tpl = INITIAL_SMS_TEMPLATES.find(t => t.id === templateId);
+    const tpl = templates.find(t => t.id === templateId);
     if (tpl) {
       setSmsDescription(tpl.template);
     }
@@ -60,7 +67,7 @@ export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate
 
     // Auto-render customer variables if a template is selected
     if (selectedTemplateId) {
-      const tpl = INITIAL_SMS_TEMPLATES.find(t => t.id === selectedTemplateId);
+      const tpl = templates.find(t => t.id === selectedTemplateId);
       if (tpl) {
         let text = tpl.template
           .replace(/{CustomerName}/g, c.name)
@@ -252,7 +259,7 @@ export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate
               className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-muted border border-border text-foreground outline-none focus:border-primary font-medium"
             >
               <option value="">Select</option>
-              {INITIAL_SMS_TEMPLATES.map(tpl => (
+              {templates.map(tpl => (
                 <option key={tpl.id} value={tpl.id}>
                   {tpl.sr}. {tpl.name}
                 </option>

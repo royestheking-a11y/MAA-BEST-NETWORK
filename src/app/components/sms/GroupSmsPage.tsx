@@ -3,7 +3,7 @@ import {
   MessageSquare, Send, ArrowRightLeft, Users, CheckCircle2,
   Search, X, Sparkles, Filter, CheckSquare, Square, Layers
 } from "lucide-react";
-import { INITIAL_SMS_TEMPLATES, INITIAL_SMS_GROUPS, COMPANY_SMS_METADATA, SmsGroup } from "./smsData";
+import { INITIAL_SMS_TEMPLATES, INITIAL_SMS_GROUPS, COMPANY_SMS_METADATA, SmsGroup, SmsTemplate } from "./smsData";
 import { useCustomerContext } from "../../context/CustomerContext";
 
 interface GroupSmsPageProps {
@@ -18,6 +18,13 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
       if (saved) return JSON.parse(saved);
     } catch {}
     return INITIAL_SMS_GROUPS;
+  });
+  const [templates] = useState<SmsTemplate[]>(() => {
+    try {
+      const saved = localStorage.getItem("mbn_sms_templates");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_SMS_TEMPLATES;
   });
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [messageContent, setMessageContent] = useState("");
@@ -51,7 +58,7 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
       setMessageContent("");
       return;
     }
-    const tpl = INITIAL_SMS_TEMPLATES.find(t => t.id === templateId);
+    const tpl = templates.find(t => t.id === templateId);
     if (tpl) {
       setMessageContent(tpl.template);
     }
@@ -143,12 +150,33 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
             const list = saved ? JSON.parse(saved) : [];
             const selectedRecipients = recipientUsers.filter(u => u.selected);
             selectedRecipients.forEach((u, i) => {
+              const c = customers.find(x => x.id === u.id);
+              const billAmt = c ? (c.monthlyBill || c.price || 500) : 500;
+              const dueAmt = c ? (c.dueAmount || c.due || 0) : 0;
+              const clientCode = c ? (c.clientCode || c.id) : u.id;
+              const personalizedMsg = messageContent
+                .replace(/{CustomerName}/g, u.name)
+                .replace(/{CustomerId}/g, clientCode)
+                .replace(/{ClientID}/g, clientCode)
+                .replace(/{ClientCode}/g, clientCode)
+                .replace(/{UserName}/g, c?.pppUser || clientCode)
+                .replace(/{LoginUserName}/g, c?.pppUser || clientCode)
+                .replace(/{MonthlyBillAmount}/g, `৳ ${billAmt}`)
+                .replace(/{TotalAmount}/g, `৳ ${billAmt}`)
+                .replace(/{Due}/g, `৳ ${dueAmt}`)
+                .replace(/{DueAmount}/g, `৳ ${dueAmt}`)
+                .replace(/{Package}/g, c?.package || "20Mbps Fiber")
+                .replace(/{MonthName}/g, new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }))
+                .replace(/{CompanyName}/g, COMPANY_SMS_METADATA.companyName)
+                .replace(/{CompanyMobile}/g, COMPANY_SMS_METADATA.companyMobile)
+                .replace(/{BaseSiteURL}/g, COMPANY_SMS_METADATA.baseSiteURL);
+
               list.unshift({
                 id: `SMS-${Date.now()}-${i}`,
                 recipient: u.name,
                 phone: u.mobile,
-                message: messageContent,
-                smsCount: Math.ceil(messageContent.length / 160) || 1,
+                message: personalizedMsg,
+                smsCount: Math.ceil(personalizedMsg.length / 160) || 1,
                 provider: "MaaBest-SMS-Gateway",
                 status: "delivered",
                 timestamp: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
@@ -216,7 +244,7 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
                 className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-muted border border-border text-foreground outline-none focus:border-primary font-medium"
               >
                 <option value="">Select</option>
-                {INITIAL_SMS_TEMPLATES.map(tpl => (
+                {templates.map(tpl => (
                   <option key={tpl.id} value={tpl.id}>
                     {tpl.sr}. {tpl.name}
                   </option>
