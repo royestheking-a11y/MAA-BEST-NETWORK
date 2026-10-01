@@ -3,7 +3,7 @@ import {
   MessageSquare, Send, ArrowRightLeft, Users, CheckCircle2,
   Search, X, Sparkles, Filter, CheckSquare, Square, Layers
 } from "lucide-react";
-import { INITIAL_SMS_TEMPLATES, INITIAL_SMS_GROUPS, COMPANY_SMS_METADATA } from "./smsData";
+import { INITIAL_SMS_TEMPLATES, INITIAL_SMS_GROUPS, COMPANY_SMS_METADATA, SmsGroup } from "./smsData";
 import { useCustomerContext } from "../../context/CustomerContext";
 
 interface GroupSmsPageProps {
@@ -12,6 +12,13 @@ interface GroupSmsPageProps {
 
 export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
   const { customers } = useCustomerContext();
+  const [groups] = useState<SmsGroup[]>(() => {
+    try {
+      const saved = localStorage.getItem("mbn_sms_groups");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_SMS_GROUPS;
+  });
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [messageContent, setMessageContent] = useState("");
 
@@ -59,13 +66,13 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
   // Transfer action: Transfer matching users from selected groups into the USERS table
   const handleTransfer = () => {
     if (selectedGroupIds.length === 0) {
-      alert("Please select at least one group from the list.");
+      showToast("Please select at least one group from the list.");
       return;
     }
 
     let matched: any[] = [];
     selectedGroupIds.forEach(grpId => {
-      const grp = INITIAL_SMS_GROUPS.find(g => g.id === grpId);
+      const grp = groups.find(g => g.id === grpId);
       if (!grp) return;
 
       if (grp.criteria === "all") {
@@ -115,11 +122,11 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
 
   const handleSendMessage = () => {
     if (selectedCount === 0) {
-      alert("Please select at least one recipient user.");
+      showToast("Please select at least one recipient user.");
       return;
     }
     if (!messageContent.trim()) {
-      alert("Please provide SMS message content.");
+      showToast("Please provide SMS message content.");
       return;
     }
 
@@ -131,6 +138,24 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
         if (p >= 100) {
           clearInterval(interval);
           setIsSending(false);
+          try {
+            const saved = localStorage.getItem("isp_outbound_sms_logs_v3");
+            const list = saved ? JSON.parse(saved) : [];
+            const selectedRecipients = recipientUsers.filter(u => u.selected);
+            selectedRecipients.forEach((u, i) => {
+              list.unshift({
+                id: `SMS-${Date.now()}-${i}`,
+                recipient: u.name,
+                phone: u.mobile,
+                message: messageContent,
+                smsCount: Math.ceil(messageContent.length / 160) || 1,
+                provider: "MaaBest-SMS-Gateway",
+                status: "delivered",
+                timestamp: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+              });
+            });
+            localStorage.setItem("isp_outbound_sms_logs_v3", JSON.stringify(list.slice(0, 200)));
+          } catch {}
           showToast(`Broadcast completed! Dispatched ${selectedCount} messages successfully.`);
           return 100;
         }
@@ -231,7 +256,7 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {INITIAL_SMS_GROUPS.map(grp => {
+                  {groups.map(grp => {
                     const isChecked = selectedGroupIds.includes(grp.id);
                     return (
                       <tr

@@ -104,11 +104,11 @@ export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate
   const handleSendSms = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumbers.trim()) {
-      alert("Please provide at least one recipient mobile number.");
+      showToast("Please provide at least one recipient mobile number.");
       return;
     }
     if (!smsDescription.trim()) {
-      alert("Please enter SMS description or select a template.");
+      showToast("Please enter SMS description or select a template.");
       return;
     }
 

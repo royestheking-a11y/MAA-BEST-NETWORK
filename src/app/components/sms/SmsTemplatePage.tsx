@@ -63,7 +63,7 @@ export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) 
   const handleSaveTemplate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || !formContent.trim()) {
-      alert("Please fill in template name and content");
+      showToast("Please fill in template name and content");
       return;
     }
 

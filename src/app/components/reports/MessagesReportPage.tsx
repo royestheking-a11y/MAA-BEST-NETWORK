@@ -171,7 +171,7 @@ export const MessagesReportPage: React.FC<MessagesReportPageProps> = ({ onNaviga
 
   const handleResendBulk = () => {
     if (selectedCount === 0) {
-      alert("Please select at least one message log to resend.");
+      showToast("Please select at least one message log to resend.");
       return;
     }
     showToast(`Re-dispatched ${selectedCount} SMS message(s) through Gateway!`);

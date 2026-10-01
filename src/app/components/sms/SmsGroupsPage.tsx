@@ -66,7 +66,7 @@ export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
   const handleSaveGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
-      alert("Please provide group name.");
+      showToast("Please provide group name.");
       return;
     }
 
