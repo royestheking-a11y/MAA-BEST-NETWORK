@@ -80,15 +80,15 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
   const filteredRows = useMemo(() => {
     return btrcRows.filter(r => {
       const matchSearch =
-        r.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.allocated_ip.includes(searchQuery) ||
-        r.contact_number.includes(searchQuery);
+        (r.client_name && r.client_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.fullName && r.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.allocated_ip && r.allocated_ip.includes(searchQuery)) ||
+        (r.contact_number && r.contact_number.includes(searchQuery));
 
       const matchServer = serverFilter === "all" || r.server === serverFilter;
       const matchService = serviceFilter === "all" || r.service === serviceFilter;
       const matchClientType = clientTypeFilter === "all" || r.client_type === clientTypeFilter;
-      const matchZone = zoneFilter === "all" || r.zone.toLowerCase().includes(zoneFilter.toLowerCase());
+      const matchZone = zoneFilter === "all" || (r.zone && r.zone.toLowerCase().includes(zoneFilter.toLowerCase()));
 
       return matchSearch && matchServer && matchService && matchClientType && matchZone;
     });

@@ -862,8 +862,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
     const matchSearch =
       !q ||
-      c.name.toLowerCase().includes(q) ||
-      c.id.toLowerCase().includes(q) ||
+      (c.name || "").toLowerCase().includes(q) ||
+      (c.id || "").toLowerCase().includes(q) ||
       (c.clientCode || "").toLowerCase().includes(q) ||
       (c.phone || "").includes(q) ||
       (c.pppUser || "").toLowerCase().includes(q) ||

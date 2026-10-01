@@ -320,14 +320,14 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
       if (search.trim()) {
         const q = search.toLowerCase();
         const match =
-          c.name.toLowerCase().includes(q) ||
-          c.clientCode.toLowerCase().includes(q) ||
-          c.id.toLowerCase().includes(q) ||
-          c.phone.includes(q) ||
-          c.pppoeUser.toLowerCase().includes(q) ||
-          c.ipAddress.includes(q) ||
-          c.zone.toLowerCase().includes(q) ||
-          c.subzone.toLowerCase().includes(q);
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          (c.clientCode && c.clientCode.toLowerCase().includes(q)) ||
+          (c.id && c.id.toLowerCase().includes(q)) ||
+          (c.phone && c.phone.includes(q)) ||
+          (c.pppoeUser && c.pppoeUser.toLowerCase().includes(q)) ||
+          (c.ipAddress && c.ipAddress.includes(q)) ||
+          (c.zone && c.zone.toLowerCase().includes(q)) ||
+          (c.subzone && c.subzone.toLowerCase().includes(q));
         if (!match) return false;
       }
       return true;

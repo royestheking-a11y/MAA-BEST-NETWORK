@@ -84,14 +84,16 @@ export const GroupSmsPage: React.FC<GroupSmsPageProps> = ({ onNavigate }) => {
 
       if (grp.criteria === "all") {
         matched = [...matched, ...customers];
-      } else if (grp.criteria === "due") {
+      } else if (grp.criteria === "due" || grp.criteria === "unpaid") {
         matched = [...matched, ...customers.filter(c => (c.dueAmount || c.due || 0) > 0)];
-      } else if (grp.criteria === "paid") {
+      } else if (grp.criteria === "paid" || grp.criteria === "collected") {
         matched = [...matched, ...customers.filter(c => (c.dueAmount || c.due || 0) === 0)];
       } else if (grp.criteria === "active") {
         matched = [...matched, ...customers.filter(c => c.status === "active")];
       } else if (grp.criteria === "inactive") {
         matched = [...matched, ...customers.filter(c => c.status !== "active")];
+      } else if (grp.criteria === "left") {
+        matched = [...matched, ...customers.filter(c => c.status === "suspended" || (c as any).status === "terminated")];
       } else {
         matched = [...matched, ...customers.slice(0, 10)];
       }

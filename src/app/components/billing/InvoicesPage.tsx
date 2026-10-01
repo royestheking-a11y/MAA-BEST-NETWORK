@@ -61,11 +61,11 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
     if (!custSearchQuery.trim()) return customers.slice(0, 8);
     const q = custSearchQuery.toLowerCase();
     return customers.filter(c =>
-      c.id.toLowerCase().includes(q) ||
+      (c.id && c.id.toLowerCase().includes(q)) ||
       (c.clientCode && c.clientCode.toLowerCase().includes(q)) ||
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      c.pppUser.toLowerCase().includes(q) ||
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.pppUser && c.pppUser.toLowerCase().includes(q)) ||
       (c.zone && c.zone.toLowerCase().includes(q))
     ).slice(0, 10);
   }, [customers, custSearchQuery]);
@@ -219,7 +219,12 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const dueClientCount = useMemo(() => customers.filter(c => (c.dueAmount || 0) > 0).length, [customers]);
   const totalDueAmount = useMemo(() => customers.reduce((sum, c) => sum + (c.dueAmount || 0), 0), [customers]);
   const totalPaidAmount = useMemo(() => {
-    return customers.flatMap(c => c.paymentHistory || []).filter(p => (p.date || "").includes("Sep 2026") || (p.date || "").includes("01 Sep")).reduce((sum, p) => sum + p.amount, 0) || 500;
+    const now = new Date();
+    const curMonthYear = now.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    const curMonth = now.toLocaleDateString("en-GB", { month: "short" });
+    return customers.flatMap(c => c.paymentHistory || [])
+      .filter(p => (p.date || "").includes(curMonthYear) || (p.date || "").includes(curMonth) || (p.date || "").includes("Sep 2026"))
+      .reduce((sum, p) => sum + p.amount, 0) || 500;
   }, [customers]);
 
   const summaryStats = {

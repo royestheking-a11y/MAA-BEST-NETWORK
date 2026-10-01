@@ -187,13 +187,13 @@ export const PaymentProcessingFeeReportPage: React.FC<PaymentProcessingFeeReport
     return allFeeRows.filter(r => {
       const matchCustomer =
         customerFilter === "all" ||
-        r.pUType.toLowerCase().includes(customerFilter.toLowerCase());
+        (r.pUType && r.pUType.toLowerCase().includes(customerFilter.toLowerCase()));
 
       const matchSearch =
-        r.trxNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.gateway.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.pUType.toLowerCase().includes(searchQuery.toLowerCase());
+        (r.trxNo && r.trxNo.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.provider && r.provider.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.gateway && r.gateway.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.pUType && r.pUType.toLowerCase().includes(searchQuery.toLowerCase()));
 
       return matchCustomer && matchSearch;
     });

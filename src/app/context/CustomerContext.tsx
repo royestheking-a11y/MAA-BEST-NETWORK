@@ -367,13 +367,18 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("isp_customers_store_v10");
       localStorage.removeItem("isp_customers_store_v9");
 
-      const delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+      let delSaved: any[] = [];
+      try {
+        delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+      } catch {
+        delSaved = [];
+      }
       const delSet = new Set<string>();
       if (Array.isArray(delSaved)) {
         delSaved.forEach((d: any) => {
-          if (d.id) delSet.add(d.id.toLowerCase());
-          if (d.clientCode) delSet.add(d.clientCode.toLowerCase());
-          if (d.pppUser) delSet.add(d.pppUser.toLowerCase());
+          if (d?.id) delSet.add(String(d.id).toLowerCase());
+          if (d?.clientCode) delSet.add(String(d.clientCode).toLowerCase());
+          if (d?.pppUser) delSet.add(String(d.pppUser).toLowerCase());
         });
       }
 
@@ -439,13 +444,18 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     // 3. Subscribe to realtime updates for active customers
     const unsubCustomers = subscribeToCustomers(cloudCustomers => {
       if (cloudCustomers && cloudCustomers.length > 0) {
-        const delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+        let delSaved: any[] = [];
+        try {
+          delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+        } catch {
+          delSaved = [];
+        }
         const delSet = new Set<string>();
         if (Array.isArray(delSaved)) {
           delSaved.forEach((d: any) => {
-            if (d.id) delSet.add(d.id.toLowerCase());
-            if (d.clientCode) delSet.add(d.clientCode.toLowerCase());
-            if (d.pppUser) delSet.add(d.pppUser.toLowerCase());
+            if (d?.id) delSet.add(String(d.id).toLowerCase());
+            if (d?.clientCode) delSet.add(String(d.clientCode).toLowerCase());
+            if (d?.pppUser) delSet.add(String(d.pppUser).toLowerCase());
           });
         }
 
@@ -599,13 +609,18 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           });
         }
 
-        const delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+        let delSaved: any[] = [];
+        try {
+          delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+        } catch {
+          delSaved = [];
+        }
         const delSet = new Set<string>();
         if (Array.isArray(delSaved)) {
           delSaved.forEach((d: any) => {
-            if (d.id) delSet.add(d.id.toLowerCase());
-            if (d.clientCode) delSet.add(d.clientCode.toLowerCase());
-            if (d.pppUser) delSet.add(d.pppUser.toLowerCase());
+            if (d?.id) delSet.add(String(d.id).toLowerCase());
+            if (d?.clientCode) delSet.add(String(d.clientCode).toLowerCase());
+            if (d?.pppUser) delSet.add(String(d.pppUser).toLowerCase());
           });
         }
 
@@ -985,11 +1000,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const cleanId = identifier.trim().toLowerCase();
     const customer = customers.find(
       c =>
-        c.id.toLowerCase() === cleanId ||
+        (c.id && c.id.toLowerCase() === cleanId) ||
         (c.clientCode && c.clientCode.toLowerCase() === cleanId) ||
-        c.phone.replace(/\D/g, "") === cleanId.replace(/\D/g, "") ||
-        c.pppUser.toLowerCase() === cleanId ||
-        c.email.toLowerCase() === cleanId
+        (c.phone && c.phone.replace(/\D/g, "") === cleanId.replace(/\D/g, "")) ||
+        (c.pppUser && c.pppUser.toLowerCase() === cleanId) ||
+        (c.email && c.email.toLowerCase() === cleanId)
     );
 
     if (!customer) {

@@ -254,16 +254,16 @@ export function DueCustomersPage({ onNavigate }: DueCustomersPageProps) {
       if (search.trim()) {
         const q = search.toLowerCase();
         const match =
-          c.clientCode.toLowerCase().includes(q) ||
-          c.name.toLowerCase().includes(q) ||
-          c.id.toLowerCase().includes(q) ||
-          c.phone.includes(q) ||
-          c.pppoe.toLowerCase().includes(q) ||
-          c.ipAddress.includes(q) ||
-          c.zone.toLowerCase().includes(q) ||
-          c.subzone.toLowerCase().includes(q) ||
-          c.box.toLowerCase().includes(q) ||
-          c.package.toLowerCase().includes(q);
+          (c.clientCode && c.clientCode.toLowerCase().includes(q)) ||
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          (c.id && c.id.toLowerCase().includes(q)) ||
+          (c.phone && c.phone.includes(q)) ||
+          (c.pppoe && c.pppoe.toLowerCase().includes(q)) ||
+          (c.ipAddress && c.ipAddress.includes(q)) ||
+          (c.zone && c.zone.toLowerCase().includes(q)) ||
+          (c.subzone && c.subzone.toLowerCase().includes(q)) ||
+          (c.box && c.box.toLowerCase().includes(q)) ||
+          (c.package && c.package.toLowerCase().includes(q));
         if (!match) return false;
       }
 

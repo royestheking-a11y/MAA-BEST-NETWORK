@@ -80,9 +80,9 @@ export const EnableDisableHistoryPage: React.FC<EnableDisableHistoryPageProps> =
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
       const matchSearch =
-        r.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.server.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.profile.toLowerCase().includes(searchQuery.toLowerCase());
+        (r.username && r.username.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.server && r.server.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (r.profile && r.profile.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchStatus =
         statusFilter === "all" ||

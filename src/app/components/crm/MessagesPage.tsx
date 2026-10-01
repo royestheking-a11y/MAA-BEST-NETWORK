@@ -45,10 +45,10 @@ export function MessagesPage({ onNavigate }: MessagesPageProps) {
     if (!search.trim()) return list.slice(0, 25);
     const q = search.toLowerCase();
     return list.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      c.custId.toLowerCase().includes(q) ||
-      c.clientCode.toLowerCase().includes(q)
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.custId && c.custId.toLowerCase().includes(q)) ||
+      (c.clientCode && c.clientCode.toLowerCase().includes(q))
     );
   }, [customers, messages, search]);
 

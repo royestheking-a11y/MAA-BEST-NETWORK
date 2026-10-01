@@ -45,6 +45,31 @@ export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const getGroupMembers = (criteria?: string) => {
+    switch (criteria) {
+      case "all":
+        return customers;
+      case "paid":
+        return customers.filter(c => (c.dueAmount || c.due || 0) === 0);
+      case "due":
+        return customers.filter(c => (c.dueAmount || c.due || 0) > 0);
+      case "collected":
+        return customers.filter(c => (c.paymentHistory || []).length > 0 || (c.dueAmount || c.due || 0) === 0);
+      case "unpaid":
+        return customers.filter(c => (c.dueAmount || c.due || 0) > 0 && (c.paymentHistory || []).length === 0);
+      case "active":
+        return customers.filter(c => c.status === "active");
+      case "inactive":
+        return customers.filter(c => c.status !== "active");
+      case "employee":
+        return [];
+      case "left":
+        return customers.filter(c => c.status === "suspended" || (c as any).status === "terminated");
+      default:
+        return customers;
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingGroup(null);
     setFormName("");
@@ -272,7 +297,7 @@ export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
                     {/* Member Count */}
                     <td className="py-3.5 px-4 text-center">
                       <span className="inline-flex items-center justify-center px-3 py-1 rounded-lg text-xs font-bold font-mono bg-muted text-foreground border border-border">
-                        {grp.memberCount} Clients
+                        {grp.criteria ? getGroupMembers(grp.criteria).length : (grp.memberCount || 0)} Clients
                       </span>
                     </td>
 
@@ -439,7 +464,7 @@ export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
             <div className="p-5 border-b border-border flex items-center justify-between bg-muted/30">
               <div>
                 <h3 className="font-bold text-foreground text-base">Members of {viewingMembersGroup.name}</h3>
-                <p className="text-xs text-muted-foreground">{viewingMembersGroup.memberCount} Subscribers attached</p>
+                <p className="text-xs text-muted-foreground">{getGroupMembers(viewingMembersGroup.criteria).length} Subscribers attached</p>
               </div>
               <button
                 onClick={() => setViewingMembersGroup(null)}
@@ -450,17 +475,37 @@ export const SmsGroupsPage: React.FC<SmsGroupsPageProps> = ({ onNavigate }) => {
             </div>
 
             <div className="p-5 max-h-80 overflow-y-auto divide-y divide-border">
-              {customers.slice(0, 15).map(c => (
-                <div key={c.id} className="py-2.5 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">{c.name}</p>
-                    <p className="text-[11px] font-mono text-muted-foreground">{c.clientCode || c.id} · {c.phone}</p>
-                  </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                    Active
-                  </span>
-                </div>
-              ))}
+              {getGroupMembers(viewingMembersGroup.criteria).length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6">No matching subscribers in this group.</p>
+              ) : (
+                getGroupMembers(viewingMembersGroup.criteria).map(c => {
+                  const isDue = (c.dueAmount || c.due || 0) > 0;
+                  return (
+                    <div key={c.id} className="py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-semibold text-foreground">{c.name}</p>
+                        <p className="text-[11px] font-mono text-muted-foreground">
+                          {c.clientCode || c.id} · {c.phone} · {c.package || "Package"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                          c.status === "active"
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                            : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                        }`}>
+                          {c.status === "active" ? "Active" : "Suspended"}
+                        </span>
+                        {isDue && (
+                          <p className="text-[10px] font-mono text-rose-500 font-bold mt-0.5">
+                            Due: ৳{c.dueAmount || c.due}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <div className="p-4 border-t border-border flex justify-end">

@@ -358,12 +358,13 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
 
   const custTickets = useMemo(() => {
     const cId = (customer.id || "").toLowerCase();
+    const cUser = (customer.pppoeUsername || "").toLowerCase();
     const cName = (customer.name || "").toLowerCase();
     return allTickets.filter(t =>
-      (t.custId && t.custId.toLowerCase() === cId) ||
+      (t.custId && (t.custId.toLowerCase() === cId || (cUser && t.custId.toLowerCase() === cUser))) ||
       (t.customerName && t.customerName.toLowerCase() === cName)
     );
-  }, [allTickets, customer.id, customer.name]);
+  }, [allTickets, customer.id, customer.pppoeUsername, customer.name]);
 
   const displayMessages = useMemo(() => {
     const pkgPrice = customer.packagePrice || 500;

@@ -1241,7 +1241,7 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
                       { name: "100 Mbps Gigabit Beast", speed: "100/50", price: 2200, features: ["Gigabit Fiber Direct Route", "Real IP Included", "VIP Dedicated Core Queue"] },
                     ]
                 ).map(pkg => {
-                  const isCurrent = customer.package.toLowerCase().includes(pkg.name.split(" ")[0].toLowerCase());
+                  const isCurrent = (customer.package || "").toLowerCase().includes(pkg.name.split(" ")[0].toLowerCase());
                   const isPending = upgradeRequests.some(
                     r => r.customerId === customer.id && r.status === "pending" && r.requestedPackage === pkg.name
                   );

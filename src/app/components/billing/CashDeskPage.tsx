@@ -15,6 +15,7 @@ interface CashDeskPageProps {
 
 interface QuickCustomer {
   id: string;
+  clientCode?: string;
   name: string;
   phone: string;
   zone: string;
@@ -32,6 +33,7 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
   const cashCustomers: QuickCustomer[] = useMemo(() => {
     return customers.map(c => ({
       id: c.id,
+      clientCode: c.clientCode || c.id,
       name: c.name,
       phone: c.phone,
       zone: c.subzone || c.zone,
@@ -445,9 +447,10 @@ export function CashDeskPage({ onNavigate }: CashDeskPageProps) {
   };
 
   const filtered = cashCustomers.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone.includes(searchQuery) ||
-    c.id.toLowerCase().includes(searchQuery.toLowerCase())
+    (c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (c.phone && c.phone.includes(searchQuery)) ||
+    (c.id && c.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (c.clientCode && c.clientCode.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (

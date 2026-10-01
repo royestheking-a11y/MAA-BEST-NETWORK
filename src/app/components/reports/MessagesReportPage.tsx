@@ -140,18 +140,18 @@ export const MessagesReportPage: React.FC<MessagesReportPageProps> = ({ onNaviga
     const targetCust = customerFilter !== "all" ? customers.find(c => c.id === customerFilter) : null;
     return logs.filter(l => {
       const matchSearch =
-        l.logNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.toWhom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.toNumber.includes(searchQuery) ||
-        l.smsText.toLowerCase().includes(searchQuery.toLowerCase());
+        (l.logNo && l.logNo.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (l.toWhom && l.toWhom.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (l.toNumber && l.toNumber.includes(searchQuery)) ||
+        (l.smsText && l.smsText.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchSmsType = smsType === "all" || l.smsType.toLowerCase().includes(smsType.toLowerCase());
+      const matchSmsType = smsType === "all" || (l.smsType && l.smsType.toLowerCase().includes(smsType.toLowerCase()));
       const matchStatus = smsStatus === "all" || l.status === smsStatus;
-      const matchUserType = userType === "all" || l.toWhom.toLowerCase().includes(userType.toLowerCase());
-      const matchEmployee = employeeFilter === "all" || l.toWhom.toLowerCase().includes(employeeFilter.toLowerCase());
+      const matchUserType = userType === "all" || (l.toWhom && l.toWhom.toLowerCase().includes(userType.toLowerCase()));
+      const matchEmployee = employeeFilter === "all" || (l.toWhom && l.toWhom.toLowerCase().includes(employeeFilter.toLowerCase()));
       const matchCustomer =
         customerFilter === "all" ||
-        (targetCust && (l.toWhom.toLowerCase().includes(targetCust.name.toLowerCase()) || l.toNumber.includes(targetCust.phone)));
+        (targetCust && ((l.toWhom && l.toWhom.toLowerCase().includes((targetCust.name || "").toLowerCase())) || (l.toNumber && l.toNumber.includes(targetCust.phone || ""))));
 
       return matchSearch && matchSmsType && matchStatus && matchUserType && matchEmployee && matchCustomer;
     });

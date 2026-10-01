@@ -171,11 +171,11 @@ export function SplitterLedgerPage({ onNavigate }: SplitterLedgerPageProps) {
     if (!custSearchQuery.trim()) return customers.slice(0, 8);
     const q = custSearchQuery.toLowerCase();
     return customers.filter(c =>
-      c.id.toLowerCase().includes(q) ||
+      (c.id && c.id.toLowerCase().includes(q)) ||
       (c.clientCode && c.clientCode.toLowerCase().includes(q)) ||
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      c.pppUser.toLowerCase().includes(q)
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.pppUser && c.pppUser.toLowerCase().includes(q))
     ).slice(0, 8);
   }, [customers, custSearchQuery]);
 
