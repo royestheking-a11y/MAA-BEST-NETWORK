@@ -9,7 +9,7 @@ import {
   CreditCard, Zap, Sparkles, Send, MapPin, Inbox,
   UserPlus, Calendar, CheckSquare
 } from "lucide-react";
-import { useCustomerContext } from "../context/CustomerContext";
+import { useCustomerContext, parseSafeDate } from "../context/CustomerContext";
 import { billingStore } from "./billing/billingData";
 import { useLanguage } from "../context/LanguageContext";
 import { useNetxLiveData } from "../services/netxApiService";
@@ -89,7 +89,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, [liveStats]);
   const dueCustomers = useMemo(() => customers.filter(c => c.userType !== "free" && ((c.dueAmount || 0) > 0 || c.status === "due")), [customers]);
   const totalDue = useMemo(() => customers.filter(c => c.userType !== "free").reduce((sum, c) => sum + (c.dueAmount || 0), 0), [customers]);
-  const monthlyRevenue = useMemo(() => activeSubscribers.reduce((sum, c) => sum + (c.monthlyBill || c.price || 500), 0), [activeSubscribers]);
+  const monthlyRevenue = useMemo(() => activeSubscribers.reduce((sum, c) => sum + (c.userType === "free" ? 0 : (c.monthlyBill || c.price || 500)), 0), [activeSubscribers]);
   const paidCustomersCount = useMemo(() => activeSubscribers.filter(c => (c.dueAmount || 0) === 0).length, [activeSubscribers]);
 
   // Top 20 Unpaid Clients List sorted by highest due amount (excludes Free tier)
@@ -100,30 +100,66 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       .slice(0, 20);
   }, [customers]);
 
-  // Merge customer internal payment history and direct cashier billing payments
+  // Merge and deduplicate payment transactions
   const allPayments = useMemo(() => {
-    const fromCust = customers.flatMap(c => (c.paymentHistory || []).map(p => ({
-      id: p.trxId || p.id,
-      customer: c.name,
-      amount: p.amount,
-      method: p.method,
-      time: p.date,
-      status: p.status
-    })));
+    const seenTxns = new Set<string>();
+    const list: Array<{ id: string; customer: string; amount: number; method: string; time: string; status: string; isCurrentMonth: boolean }> = [];
 
-    const fromBilling = billingPayments.map(p => ({
-      id: p.txn || p.id,
-      customer: p.customer,
-      amount: p.amount,
-      method: p.method,
-      time: `${p.date} ${p.time}`,
-      status: p.status
-    }));
+    const isCurrentMonthPayment = (dateStr?: string) => {
+      if (!dateStr) return false;
+      const d = parseSafeDate(dateStr);
+      if (!d || isNaN(d.getTime())) return false;
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    };
 
-    return [...fromBilling, ...fromCust];
-  }, [customers, billingPayments]);
+    // 1. Direct cashier & billing payments
+    billingPayments.forEach(p => {
+      const key = (p.txn || p.id || "").trim();
+      if (key) seenTxns.add(key);
+      list.push({
+        id: key || p.id,
+        customer: p.customer,
+        amount: Number(p.amount) || 0,
+        method: p.method,
+        time: `${p.date} ${p.time || ""}`.trim(),
+        status: p.status,
+        isCurrentMonth: isCurrentMonthPayment(p.date),
+      });
+    });
 
-  const todayCollected = useMemo(() => allPayments.reduce((sum, p) => sum + (p.amount || 0), 0), [allPayments]);
+    // 2. Customer individual payment histories
+    customers.forEach(c => {
+      (c.paymentHistory || []).forEach(p => {
+        const key = (p.trxId || p.id || "").trim();
+        if (key && seenTxns.has(key)) return;
+        if (key) seenTxns.add(key);
+        list.push({
+          id: key || p.id,
+          customer: c.name,
+          amount: Number(p.amount) || 0,
+          method: p.method,
+          time: p.date,
+          status: p.status,
+          isCurrentMonth: isCurrentMonthPayment(p.date),
+        });
+      });
+    });
+
+    return list;
+  }, [customers, billingPayments, now]);
+
+  // Month-to-date actual verified collections
+  const todayCollected = useMemo(() => {
+    return allPayments
+      .filter(p => p.isCurrentMonth && p.status !== "refunded")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+  }, [allPayments]);
+
+  const allTimeCollected = useMemo(() => {
+    return allPayments
+      .filter(p => p.status !== "refunded")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+  }, [allPayments]);
 
   // Real Dynamic Zone Breakdown
   const collectionByZone = useMemo(() => {
@@ -152,9 +188,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       { month: "May", revenue: Math.round(monthlyRevenue * 0.85), collection: Math.round(monthlyRevenue * 0.8) },
       { month: "Jun", revenue: Math.round(monthlyRevenue * 0.9), collection: Math.round(monthlyRevenue * 0.88) },
       { month: "Jul", revenue: Math.round(monthlyRevenue * 0.95), collection: Math.round(monthlyRevenue * 0.92) },
-      { month: currentMonthName, revenue: monthlyRevenue, collection: todayCollected > 0 ? todayCollected : monthlyRevenue }
+      { month: currentMonthName, revenue: monthlyRevenue, collection: todayCollected > 0 ? todayCollected : 0 }
     ];
-  }, [monthlyRevenue, todayCollected]);
+  }, [monthlyRevenue, todayCollected, now]);
 
   const networkDevices = useMemo(() => {
     const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
@@ -419,11 +455,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
           <div className="text-right">
             <div className="flex items-center justify-end gap-1 mb-1">
-              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Collected Bill</p>
+              <p className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">Collected (This Month)</p>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">→</span>
             </div>
             <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400">৳{todayCollected.toLocaleString()}</h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Real-time Verified Payments</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {todayCollected === 0 ? "No collections recorded yet this month" : "Verified Month Collections"}
+            </p>
           </div>
         </div>
 
