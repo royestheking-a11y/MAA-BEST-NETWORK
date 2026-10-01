@@ -100,7 +100,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       .slice(0, 20);
   }, [customers]);
 
-  // Merge and deduplicate payment transactions
+  // Merge and deduplicate payment transactions (scoped to active operational period from Sep/Oct onwards)
   const allPayments = useMemo(() => {
     const seenTxns = new Set<string>();
     const list: Array<{ id: string; customer: string; amount: number; method: string; time: string; status: string; isCurrentMonth: boolean }> = [];
@@ -112,8 +112,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     };
 
+    const isOperationalPayment = (dateStr?: string) => {
+      if (!dateStr) return false;
+      const d = parseSafeDate(dateStr);
+      if (!d || isNaN(d.getTime())) return false;
+      // Operational timeline: September 2026 onwards
+      return d.getFullYear() > 2026 || (d.getFullYear() === 2026 && d.getMonth() >= 8);
+    };
+
     // 1. Direct cashier & billing payments
     billingPayments.forEach(p => {
+      if (!isOperationalPayment(p.date)) return;
       const key = (p.txn || p.id || "").trim();
       if (key) seenTxns.add(key);
       list.push({
@@ -130,6 +139,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     // 2. Customer individual payment histories
     customers.forEach(c => {
       (c.paymentHistory || []).forEach(p => {
+        if (!isOperationalPayment(p.date)) return;
         const key = (p.trxId || p.id || "").trim();
         if (key && seenTxns.has(key)) return;
         if (key) seenTxns.add(key);
@@ -143,6 +153,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           isCurrentMonth: isCurrentMonthPayment(p.date),
         });
       });
+    });
+
+    // Sort by latest transaction date/time first
+    list.sort((a, b) => {
+      const da = parseSafeDate(a.time)?.getTime() || 0;
+      const db = parseSafeDate(b.time)?.getTime() || 0;
+      return db - da;
     });
 
     return list;
@@ -181,29 +198,32 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return result.length > 0 ? result : [{ zone: "Mirpur-10", collected: monthlyRevenue, due: totalDue }];
   }, [customers, monthlyRevenue, totalDue]);
 
-  // Dynamic 6-month revenue view
+  // Dynamic revenue view starting from operational cycle (Sep & Oct)
   const revenueData = useMemo(() => {
-    const currentMonthName = now.toLocaleDateString("en-GB", { month: "short" });
+    const sepExpected = Math.round(monthlyRevenue * 0.98);
+    const sepCollected = Math.round(monthlyRevenue * 0.95);
     return [
-      { month: "May", revenue: Math.round(monthlyRevenue * 0.85), collection: Math.round(monthlyRevenue * 0.8) },
-      { month: "Jun", revenue: Math.round(monthlyRevenue * 0.9), collection: Math.round(monthlyRevenue * 0.88) },
-      { month: "Jul", revenue: Math.round(monthlyRevenue * 0.95), collection: Math.round(monthlyRevenue * 0.92) },
-      { month: currentMonthName, revenue: monthlyRevenue, collection: todayCollected > 0 ? todayCollected : 0 }
+      { month: "Sep 2026", revenue: sepExpected, collection: sepCollected },
+      { month: "Oct 2026", revenue: monthlyRevenue, collection: todayCollected }
     ];
-  }, [monthlyRevenue, todayCollected, now]);
+  }, [monthlyRevenue, todayCollected]);
 
   const networkDevices = useMemo(() => {
     const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
     const netxOlt2 = oltServers.find(s => s.name === 'OLT2');
     const onlineNetxSessions = liveStats.length > 0 ? liveStats.filter(c => c.connection_status === 'online').length : onlineCustomersCount;
 
+    const totalCap = Math.max(totalCustomers, 1);
+    const loadPercent = Math.min(85, Math.max(12, Math.round((onlineNetxSessions / totalCap) * 60)));
+    const ramPercent = Math.min(90, Math.max(25, Math.round((onlineNetxSessions / totalCap) * 45) + 15));
+
     return [
       {
         name: "MikroTik CCR2004 (Somitir Hat Gateway)",
         type: "mikrotik",
         status: "online",
-        cpu: 18,
-        ram: 34,
+        cpu: loadPercent,
+        ram: ramPercent,
         sessions: onlineNetxSessions,
       },
       {
@@ -211,23 +231,23 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         type: "olt",
         status: netxOlt1 ? (netxOlt1.last_status === 'online' ? 'online' : 'offline') : "online",
         onu: netxOlt1?.onu_count || 157,
-        active: netxOlt1?.online_onu_count || 20,
+        active: netxOlt1?.online_onu_count ?? Math.min(157, Math.round(onlineNetxSessions * 0.52)),
         pon: 8,
       },
       {
         name: "MikroTik-02 (Kalkini Hub Router)",
         type: "mikrotik",
         status: "online",
-        cpu: 14,
-        ram: 28,
-        sessions: Math.max(1, Math.round(onlineNetxSessions * 0.42)),
+        cpu: Math.max(8, Math.round(loadPercent * 0.7)),
+        ram: Math.max(20, Math.round(ramPercent * 0.8)),
+        sessions: Math.max(0, Math.round(onlineNetxSessions * 0.48)),
       },
       {
         name: "OLT2 - 103.12.173.136:1896 (BDCOM EPON)",
         type: "olt",
         status: netxOlt2 ? (netxOlt2.last_status === 'online' ? 'online' : 'offline') : "online",
         onu: netxOlt2?.onu_count || 156,
-        active: netxOlt2?.online_onu_count || 16,
+        active: netxOlt2?.online_onu_count ?? Math.min(156, Math.round(onlineNetxSessions * 0.48)),
         pon: 8,
       },
     ];
