@@ -158,9 +158,13 @@ export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) 
       .replace(/{Discount}/g, "৳ 0")
       .replace(/{VAT}/g, "৳ 0")
       .replace(/{RecieptNo}/g, "REC-82910")
-      .replace(/{InvoiceNo}/g, "INV-2026-0801")
-      .replace(/{BillingLastDate}/g, "05/09/2026")
-      .replace(/{PaymentDate}/g, "28/08/2026")
+      .replace(/{InvoiceNo}/g, `INV-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}01`)
+      .replace(/{BillingLastDate}/g, (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+      })())
+      .replace(/{PaymentDate}/g, new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }))
       .replace(/{CompanyName}/g, COMPANY_SMS_METADATA.companyName)
       .replace(/{CompanyMobile}/g, COMPANY_SMS_METADATA.companyMobile)
       .replace(/{BaseSiteURL}/g, COMPANY_SMS_METADATA.baseSiteURL)
@@ -170,7 +174,7 @@ export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) 
       .replace(/{CustomerNumber}/g, sampleCust.phone)
       .replace(/{EmpName}/g, "Nasir Uddin (Tech)")
       .replace(/{EmployeeName}/g, "Tareq Hossain")
-      .replace(/{MonthName}/g, "August 2026")
+      .replace(/{MonthName}/g, new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }))
       .replace(/{TotalSalary}/g, "৳ 22,000")
       .replace(/{Username}/g, "Maa Best Admin");
   };

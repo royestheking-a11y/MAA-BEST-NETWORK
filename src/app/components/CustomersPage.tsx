@@ -2916,7 +2916,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                         </label>
                         <input
                           type="text"
-                          value={serviceForm.billingStartMonth || "08/2026"}
+                          value={serviceForm.billingStartMonth || `${String(new Date().getMonth() + 1).padStart(2, "0")}/${new Date().getFullYear()}`}
                           onChange={e => setServiceForm(prev => ({ ...prev, billingStartMonth: e.target.value }))}
                           className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none focus:border-primary font-mono"
                         />

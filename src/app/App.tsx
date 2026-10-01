@@ -435,7 +435,7 @@ function renderPage(page: Page, onNavigate: (p: Page) => void) {
     case "customer-reports":
       return <CustomerReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "network-reports":
-      return <RevenueReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
+      return <NetworkReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
     case "custom-reports":
       return <CustomReportsPage onNavigate={(target) => onNavigate(target as Page)} />;
 

@@ -97,8 +97,17 @@ export const PaymentProcessingFeeReportPage: React.FC<PaymentProcessingFeeReport
   const { customers } = useCustomerContext();
 
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("01/08/2026");
-  const [toDate, setToDate] = useState("31/08/2026");
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    return `01/${m}/${d.getFullYear()}`;
+  });
+  const [toDate, setToDate] = useState(() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    return `${String(lastDay).padStart(2, "0")}/${m}/${d.getFullYear()}`;
+  });
   const [pageSize, setPageSize] = useState(100);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,16 +118,86 @@ export const PaymentProcessingFeeReportPage: React.FC<PaymentProcessingFeeReport
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const allFeeRows = useMemo<ProcessingFeeRow[]>(() => {
+    const rows: ProcessingFeeRow[] = [];
+    customers.forEach(c => {
+      (c.paymentHistory || []).forEach((p, idx) => {
+        const method = p.method || "Cash";
+        let feePercent = 0;
+        let gateway = "Direct Cash / Counter";
+        let provider: ProcessingFeeRow["provider"] = "bKash";
+
+        if (method === "bKash") {
+          feePercent = 1.5;
+          gateway = "bKash Online PGW";
+          provider = "bKash";
+        } else if (method === "Nagad") {
+          feePercent = 1.2;
+          gateway = "Nagad Direct API";
+          provider = "Nagad";
+        } else if (method === "Rocket") {
+          feePercent = 1.5;
+          gateway = "DBBL Rocket API";
+          provider = "Rocket";
+        } else if (method === "Upay") {
+          feePercent = 1.0;
+          gateway = "Upay Online Gateway";
+          provider = "Upay";
+        } else if (method === "Card") {
+          feePercent = 2.0;
+          gateway = "SSLCommerz Merchant PGW";
+          provider = "SSLCommerz";
+        } else {
+          return;
+        }
+
+        const paidAmount = Number(p.amount) || 0;
+        const feeAmount = Number(((paidAmount * feePercent) / 100).toFixed(2));
+        const vatAmount = Number(((feeAmount * 0.15)).toFixed(2));
+        const ppFeeAmount = Number((feeAmount + vatAmount).toFixed(2));
+        const stlAmount = Number((paidAmount - ppFeeAmount).toFixed(2));
+
+        rows.push({
+          id: p.trxId || `${c.id}-${idx}`,
+          trxNo: p.trxId || `TRX-${(p.id || "").slice(-6)}`,
+          pUType: `Client (${c.clientCode || c.id})`,
+          provider,
+          gateway,
+          feeType: "Percentage",
+          paidAmount,
+          feePercent,
+          feeAmount,
+          vatCer: "VAT-01",
+          appVat: "15%",
+          vatAmount,
+          exFeeName: "MFS Surcharge",
+          appExFee: "Fixed",
+          exFeeAmount: 0.0,
+          ppFeeAmount,
+          stlAmount,
+          netAmount: stlAmount
+        });
+      });
+    });
+
+    return rows.length > 0 ? rows : DEFAULT_FEE_ROWS;
+  }, [customers]);
+
   const filteredRows = useMemo(() => {
-    return DEFAULT_FEE_ROWS.filter(r => {
+    return allFeeRows.filter(r => {
+      const matchCustomer =
+        customerFilter === "all" ||
+        r.pUType.toLowerCase().includes(customerFilter.toLowerCase());
+
       const matchSearch =
         r.trxNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.gateway.toLowerCase().includes(searchQuery.toLowerCase());
+        r.gateway.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.pUType.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchSearch;
+      return matchCustomer && matchSearch;
     });
-  }, [searchQuery]);
+  }, [allFeeRows, customerFilter, searchQuery]);
 
   // Totals calculations
   const totalPaid = filteredRows.reduce((s, r) => s + r.paidAmount, 0);
@@ -228,7 +307,7 @@ export const PaymentProcessingFeeReportPage: React.FC<PaymentProcessingFeeReport
               type="text"
               value={fromDate}
               onChange={e => setFromDate(e.target.value)}
-              placeholder="01/08/2026"
+              placeholder="DD/MM/YYYY"
               className="w-full px-3.5 py-2.5 text-xs font-mono rounded-xl bg-muted border border-border text-foreground outline-none focus:border-primary"
             />
           </div>
@@ -239,7 +318,7 @@ export const PaymentProcessingFeeReportPage: React.FC<PaymentProcessingFeeReport
               type="text"
               value={toDate}
               onChange={e => setToDate(e.target.value)}
-              placeholder="31/08/2026"
+              placeholder="DD/MM/YYYY"
               className="w-full px-3.5 py-2.5 text-xs font-mono rounded-xl bg-muted border border-border text-foreground outline-none focus:border-primary"
             />
           </div>

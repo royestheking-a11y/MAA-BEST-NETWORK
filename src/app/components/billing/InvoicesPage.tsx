@@ -809,7 +809,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   <input
                     value={newInv.period}
                     onChange={e => setNewInv(p => ({ ...p, period: e.target.value }))}
-                    placeholder="Aug 2026"
+                    placeholder={newInv.period || "e.g. Oct 2026"}
                     className="w-full px-3 py-2 rounded-xl outline-none font-bold"
                     style={inputStyle}
                   />
@@ -819,7 +819,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   <input
                     value={newInv.due}
                     onChange={e => setNewInv(p => ({ ...p, due: e.target.value }))}
-                    placeholder="10 Aug 2026"
+                    placeholder={newInv.due || "e.g. 10 Oct 2026"}
                     className="w-full px-3 py-2 rounded-xl outline-none font-bold"
                     style={inputStyle}
                   />

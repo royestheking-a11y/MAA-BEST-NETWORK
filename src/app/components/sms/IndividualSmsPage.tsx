@@ -82,8 +82,12 @@ export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate
           .replace(/{VAT}/g, "৳ 0")
           .replace(/{RecieptNo}/g, `REC-${Date.now().toString().slice(-5)}`)
           .replace(/{InvoiceNo}/g, `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`)
-          .replace(/{BillingLastDate}/g, "05/09/2026")
-          .replace(/{PaymentDate}/g, "28/08/2026")
+          .replace(/{BillingLastDate}/g, (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+          })())
+          .replace(/{PaymentDate}/g, new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }))
           .replace(/{CompanyName}/g, COMPANY_SMS_METADATA.companyName)
           .replace(/{CompanyMobile}/g, COMPANY_SMS_METADATA.companyMobile)
           .replace(/{BaseSiteURL}/g, COMPANY_SMS_METADATA.baseSiteURL)
@@ -111,6 +115,25 @@ export const IndividualSmsPage: React.FC<IndividualSmsPageProps> = ({ onNavigate
     setIsSending(true);
     setTimeout(() => {
       setIsSending(false);
+      try {
+        const saved = localStorage.getItem("isp_outbound_sms_logs_v3");
+        const list = saved ? JSON.parse(saved) : [];
+        const phones = phoneNumbers.split(/[\n,]+/).map(p => p.trim()).filter(Boolean);
+        phones.forEach((ph, i) => {
+          list.unshift({
+            id: `SMS-${Date.now()}-${i}`,
+            recipient: "Subscriber",
+            phone: ph,
+            message: smsDescription,
+            smsCount: Math.ceil(smsDescription.length / 160) || 1,
+            provider: "MaaBest-SMS-Gateway",
+            status: "delivered",
+            timestamp: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+          });
+        });
+        localStorage.setItem("isp_outbound_sms_logs_v3", JSON.stringify(list.slice(0, 200)));
+      } catch {}
+
       showToast(`SMS successfully dispatched to ${recipientCount} recipient(s)! Cost: ৳ ${totalCost}`);
       setPhoneNumbers("");
       setSmsDescription("");

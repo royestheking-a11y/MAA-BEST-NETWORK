@@ -73,10 +73,10 @@ export function CustomReportsPage({ onNavigate }: CustomReportsPageProps) {
               className="w-full px-3 py-2.5 rounded-xl outline-none"
               style={inputStyle}
             >
-              <option value="this_month">Current Billing Cycle (August 2026)</option>
-              <option value="last_month">Last Billing Cycle (July 2026)</option>
-              <option value="quarter">Last Quarter (Q2 2026)</option>
-              <option value="year">Fiscal Year 2025-2026</option>
+              <option value="this_month">Current Billing Cycle ({new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })})</option>
+              <option value="last_month">Last Billing Cycle ({(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString("en-US", { month: "long", year: "numeric" }); })()})</option>
+              <option value="quarter">Last Quarter</option>
+              <option value="year">Full Year ({new Date().getFullYear()})</option>
             </select>
           </div>
 

@@ -25,7 +25,7 @@ export function RevenueReportsPage({ onNavigate }: RevenueReportsPageProps) {
               Revenue & Collection Reports
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: "#DCFCE7", color: "#16A34A" }}>
-              August 2026 Collection Efficiency: 95.3%
+              Overall Collection Efficiency: 95.3%
             </span>
           </div>
           <p style={{ fontSize: 13, color: "var(--muted-foreground)" }}>

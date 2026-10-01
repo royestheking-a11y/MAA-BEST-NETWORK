@@ -48,13 +48,13 @@ export function SmsAutomationPage({ onNavigate }: SmsAutomationPageProps) {
 
   // Broadcast state
   const [targetAudience, setTargetAudience] = useState<"all" | "due" | "kalkini" | "sadar" | "custom">("due");
-  const [broadcastMsg, setBroadcastMsg] = useState("Dear {name}, your MAA BEST NETWORK bill of ৳{due_amount} for August 2026 is due. Pay easily via bKash: https://pay.maabestnetwork.com/{cust_id}");
+  const [broadcastMsg, setBroadcastMsg] = useState(() => `Dear {name}, your MAA BEST NETWORK bill of ৳{due_amount} for ${new Date().toLocaleString("en-US", { month: "long", year: "numeric" })} is due. Pay easily via bKash: https://pay.maabestnetwork.com/{cust_id}`);
   const [customPhoneList, setCustomPhoneList] = useState("");
   const [isSending, setIsSending] = useState(false);
 
   // Test SMS State
   const [testPhone, setTestPhone] = useState("01712345678");
-  const [testText, setTestText] = useState("Dear Customer, your internet bill of ৳1,000 for August 2026 is due. Pay via bKash: 01788-990011. - MAA BEST NETWORK");
+  const [testText, setTestText] = useState(() => `Dear Customer, your internet bill of ৳1,000 for ${new Date().toLocaleString("en-US", { month: "long", year: "numeric" })} is due. Pay via bKash: 01788-990011. - MAA BEST NETWORK`);
 
   useEffect(() => {
     return automationStore.subscribe(() => {

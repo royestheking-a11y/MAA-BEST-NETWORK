@@ -209,9 +209,13 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
               className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary"
             >
               <option value="all">Select</option>
-              <option value="08-2026">August 2026</option>
-              <option value="07-2026">July 2026</option>
-              <option value="06-2026">June 2026</option>
+              {Array.from({ length: 6 }, (_, i) => {
+                const d = new Date();
+                d.setMonth(d.getMonth() - (i + 1));
+                const val = `${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+                const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                return <option key={val} value={val}>{label}</option>;
+              })}
             </select>
           </div>
 

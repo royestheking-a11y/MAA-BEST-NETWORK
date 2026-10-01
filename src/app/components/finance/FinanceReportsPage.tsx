@@ -30,9 +30,12 @@ export function FinanceReportsPage({ onNavigate }: FinanceReportsPageProps) {
     const totalExp = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     return totalExp > 0 ? totalExp : Math.round(monthlySubscriberRev * 0.42);
   }, [monthlySubscriberRev]);
-
   const monthlyPlData = useMemo(() => {
-    const months = ["Apr 2026", "May 2026", "Jun 2026", "Jul 2026", "Aug 2026", "Sep 2026"];
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (5 - i));
+      return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    });
     const growthFactors = [0.88, 0.91, 0.94, 0.96, 0.98, 1.0];
     return months.map((month, idx) => {
       const factor = growthFactors[idx];

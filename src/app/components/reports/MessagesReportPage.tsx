@@ -81,7 +81,29 @@ const DEFAULT_SMS_LOGS: MessageLog[] = [
 
 export const MessagesReportPage: React.FC<MessagesReportPageProps> = ({ onNavigate }) => {
   const { customers } = useCustomerContext();
-  const [logs, setLogs] = useState<MessageLog[]>(DEFAULT_SMS_LOGS);
+  const [logs, setLogs] = useState<MessageLog[]>(() => {
+    try {
+      const saved = localStorage.getItem("isp_outbound_sms_logs_v3");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const liveLogs: MessageLog[] = parsed.map((item: any, idx: number) => ({
+            id: item.id || `msg-${idx}`,
+            logNo: item.id ? `LOG-${item.id.replace(/\D/g, "").slice(-4) || (9500 + idx)}` : `LOG-${9500 + idx}`,
+            toWhom: item.recipient ? `${item.recipient} (Client)` : "Client",
+            smsType: item.template || "Money Receipt",
+            toNumber: item.phone || "",
+            smsText: item.message || "",
+            dateTime: item.timestamp || new Date().toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+            status: item.status === "delivered" ? "Delivered" : item.status === "failed" ? "Failed" : "Delivered",
+            selected: false,
+          }));
+          return [...liveLogs, ...DEFAULT_SMS_LOGS];
+        }
+      }
+    } catch {}
+    return DEFAULT_SMS_LOGS;
+  });
 
   // 2-Row Filters (Screenshot 4 Layout)
   const [userType, setUserType] = useState("all");
@@ -91,8 +113,17 @@ export const MessagesReportPage: React.FC<MessagesReportPageProps> = ({ onNaviga
 
   const [employeeFilter, setEmployeeFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("01/08/2026");
-  const [toDate, setToDate] = useState("31/08/2026");
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    return `01/${m}/${d.getFullYear()}`;
+  });
+  const [toDate, setToDate] = useState(() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    return `${String(lastDay).padStart(2, "0")}/${m}/${d.getFullYear()}`;
+  });
 
   const [pageSize, setPageSize] = useState(100);
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,6 +137,7 @@ export const MessagesReportPage: React.FC<MessagesReportPageProps> = ({ onNaviga
   };
 
   const filteredLogs = useMemo(() => {
+    const targetCust = customerFilter !== "all" ? customers.find(c => c.id === customerFilter) : null;
     return logs.filter(l => {
       const matchSearch =
         l.logNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -113,12 +145,17 @@ export const MessagesReportPage: React.FC<MessagesReportPageProps> = ({ onNaviga
         l.toNumber.includes(searchQuery) ||
         l.smsText.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchSmsType = smsType === "all" || l.smsType.includes(smsType);
+      const matchSmsType = smsType === "all" || l.smsType.toLowerCase().includes(smsType.toLowerCase());
       const matchStatus = smsStatus === "all" || l.status === smsStatus;
+      const matchUserType = userType === "all" || l.toWhom.toLowerCase().includes(userType.toLowerCase());
+      const matchEmployee = employeeFilter === "all" || l.toWhom.toLowerCase().includes(employeeFilter.toLowerCase());
+      const matchCustomer =
+        customerFilter === "all" ||
+        (targetCust && (l.toWhom.toLowerCase().includes(targetCust.name.toLowerCase()) || l.toNumber.includes(targetCust.phone)));
 
-      return matchSearch && matchSmsType && matchStatus;
+      return matchSearch && matchSmsType && matchStatus && matchUserType && matchEmployee && matchCustomer;
     });
-  }, [logs, searchQuery, smsType, smsStatus]);
+  }, [logs, searchQuery, smsType, smsStatus, userType, employeeFilter, customerFilter, customers]);
 
   const toggleSelectAll = () => {
     const nextVal = !selectAll;

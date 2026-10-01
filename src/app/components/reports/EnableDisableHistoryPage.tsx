@@ -39,8 +39,17 @@ export const EnableDisableHistoryPage: React.FC<EnableDisableHistoryPageProps> =
   const { customers } = useCustomerContext();
 
   const [statusFilter, setStatusFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("01/08/2026");
-  const [toDate, setToDate] = useState("29/08/2026");
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    return `01/${m}/${d.getFullYear()}`;
+  });
+  const [toDate, setToDate] = useState(() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    return `${String(lastDay).padStart(2, "0")}/${m}/${d.getFullYear()}`;
+  });
   const [pageSize, setPageSize] = useState(100);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,8 +61,20 @@ export const EnableDisableHistoryPage: React.FC<EnableDisableHistoryPageProps> =
   };
 
   const records = useMemo(() => {
-    // Combine seeded records with any live subscriber status changes
-    return DEFAULT_HISTORY_RECORDS;
+    if (!customers || customers.length === 0) return DEFAULT_HISTORY_RECORDS;
+    return customers.map(c => {
+      const isEnabled = c.status === "active";
+      return {
+        id: `ed-${c.id}`,
+        username: c.pppUser || c.id,
+        server: c.zone || "RETAIL_1",
+        service: "PPPOE",
+        profile: c.package || "PIONEER_HOME_20Mbps",
+        mStatus: isEnabled ? ("Enabled" as const) : ("Disabled" as const),
+        daysEnabled: isEnabled ? 30 : 0,
+        daysFundCredited: (c.dueAmount || 0) <= 0 ? 30 : 15,
+      };
+    });
   }, [customers]);
 
   const filteredRecords = useMemo(() => {

@@ -499,11 +499,11 @@ export function ReportsPage({ initialTab = "revenue" }: { initialTab?: Tab }) {
         <div className="flex flex-col gap-5">
           <div className="rounded-xl p-4 flex items-center gap-3" style={{ background:"#FEF3C7", border:"1px solid #D97706aa" }}>
             <ClipboardList size={18} style={{ color:"#D97706", flexShrink:0 }}/>
-            <p style={{ fontSize:13, color:"#92400E" }}>BTRC regulatory report for August 2026. Verify all fields against current BTRC submission requirements before filing.</p>
+            <p style={{ fontSize:13, color:"#92400E" }}>BTRC regulatory report for {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}. Verify all fields against current BTRC submission requirements before filing.</p>
           </div>
           <div className="rounded-xl overflow-hidden" style={{ background:"var(--card)", border:"1px solid var(--border)" }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom:"1px solid var(--border)" }}>
-              <h3 style={{ fontFamily:"var(--font-display)", fontWeight:600, fontSize:15, color:"var(--foreground)" }}>Subscriber Statistics · August 2026</h3>
+              <h3 style={{ fontFamily:"var(--font-display)", fontWeight:600, fontSize:15, color:"var(--foreground)" }}>Subscriber Statistics · {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h3>
               <div className="flex items-center gap-2">
                 <button onClick={doExportBTRC} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white" style={{ background:"#8B2020", fontSize:12, fontWeight:500 }}>
                   <Download size={12}/> Export CSV
