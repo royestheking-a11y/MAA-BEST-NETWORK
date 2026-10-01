@@ -142,8 +142,10 @@ export async function saveCustomersBatchToFirestore(customersList: Customer[]): 
   }
 }
 
+export const DELETED_CUSTOMERS_COLLECTION = "deleted_customers";
+
 /**
- * Deletes a customer document from Cloud Firestore.
+ * Deletes a customer document from Cloud Firestore active collection.
  */
 export async function deleteCustomerFromFirestore(customerId: string): Promise<void> {
   try {
@@ -151,6 +153,61 @@ export async function deleteCustomerFromFirestore(customerId: string): Promise<v
     await deleteDoc(docRef);
   } catch (err) {
     console.error("Failed to delete customer from Firestore:", err);
+  }
+}
+
+/**
+ * Saves a deleted customer to the deleted_customers archive in Firestore.
+ */
+export async function saveDeletedCustomerToFirestore(customer: Customer): Promise<void> {
+  try {
+    const sanitized = sanitizeForFirestore(customer);
+    const docRef = doc(db, DELETED_CUSTOMERS_COLLECTION, customer.id);
+    await setDoc(docRef, sanitized, { merge: true });
+    // Ensure deleted customer is also removed from active collection
+    const activeRef = doc(db, CUSTOMERS_COLLECTION, customer.id);
+    await deleteDoc(activeRef);
+  } catch (err) {
+    console.error("Failed to save deleted customer archive to Firestore:", err);
+  }
+}
+
+/**
+ * Subscribes to realtime updates of deleted customers in Cloud Firestore.
+ */
+export function subscribeToDeletedCustomers(
+  onUpdate: (deletedCustomers: Customer[]) => void,
+  onError?: (err: Error) => void
+): Unsubscribe {
+  const colRef = collection(db, DELETED_CUSTOMERS_COLLECTION);
+  return onSnapshot(
+    colRef,
+    snapshot => {
+      const docs: Customer[] = [];
+      snapshot.forEach(docSnap => {
+        const raw = docSnap.data() as any;
+        if (raw && raw.id) {
+          docs.push(raw as Customer);
+        }
+      });
+      onUpdate(docs);
+    },
+    err => {
+      console.warn("Firestore Deleted Customers sync warning:", err.message);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Permanently removes a customer document from deleted_customers archive in Firestore.
+ */
+export async function purgeDeletedCustomerFromFirestore(customerId: string): Promise<void> {
+  try {
+    const docRef = doc(db, DELETED_CUSTOMERS_COLLECTION, customerId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error("Failed to purge deleted customer from Firestore:", err);
   }
 }
 

@@ -2,7 +2,10 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import {
   subscribeToCustomers,
   subscribeToUpgradeRequests,
+  subscribeToDeletedCustomers,
   saveCustomerToFirestore,
+  saveDeletedCustomerToFirestore,
+  purgeDeletedCustomerFromFirestore,
   saveCustomersBatchToFirestore,
   saveUpgradeRequestToFirestore,
   seedInitialFirestoreDataIfEmpty,
@@ -341,9 +344,22 @@ export function normalizeCustomerPackage(c: Customer): Customer {
 }
 
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
+  const [deletedCustomers, setDeletedCustomers] = useState<Customer[]>(() => {
+    try {
+      const saved = localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
   const [customers, setCustomers] = useState<Customer[]>(() => {
     try {
-      // Purge old cache keys containing stale 195th dummy customer or hardcoded signals or legacy package names
+      // Purge old cache keys
       localStorage.removeItem("isp_customers_store_v14_authentic_194_fixed");
       localStorage.removeItem("isp_customers_store_v13_live_laser_and_synced");
       localStorage.removeItem("isp_customers_store_v12_authentic_194_subscribers");
@@ -351,13 +367,23 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("isp_customers_store_v10");
       localStorage.removeItem("isp_customers_store_v9");
 
+      const delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+      const delSet = new Set<string>();
+      if (Array.isArray(delSaved)) {
+        delSaved.forEach((d: any) => {
+          if (d.id) delSet.add(d.id.toLowerCase());
+          if (d.clientCode) delSet.add(d.clientCode.toLowerCase());
+          if (d.pppUser) delSet.add(d.pppUser.toLowerCase());
+        });
+      }
+
       const saved = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // normalizeCustomerPackage handles stale-date migration and daysRemaining recalculation
           const clean = parsed
             .filter((c: any) => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
+            .filter((c: any) => !delSet.has((c.id || "").toLowerCase()) && !(c.clientCode && delSet.has(c.clientCode.toLowerCase())) && !(c.pppUser && delSet.has(c.pppUser.toLowerCase())))
             .map((c: any) => normalizeCustomerPackage(c));
 
           if (clean.length > 0) return clean;
@@ -379,19 +405,6 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     return INITIAL_UPGRADE_REQUESTS;
   });
 
-  const [deletedCustomers, setDeletedCustomers] = useState<Customer[]>(() => {
-    try {
-      const saved = localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
-  });
-
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(() => {
     try {
       return localStorage.getItem("isp_active_customer_id") || "MBN0001";
@@ -402,23 +415,47 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
   // ── Cloud Firestore Realtime Sync ──
   useEffect(() => {
-    // 1. Ensure initial customer roster is present in Cloud Firestore in background (single atomic batch)
+    // 1. Ensure initial customer roster is present in Cloud Firestore in background
     seedInitialFirestoreDataIfEmpty(INITIAL_CUSTOMERS, INITIAL_UPGRADE_REQUESTS);
 
-    // 2. Subscribe to realtime updates for customers
+    // 2. Subscribe to realtime updates for deleted customers archive
+    const unsubDeleted = subscribeToDeletedCustomers(cloudDeleted => {
+      if (Array.isArray(cloudDeleted) && cloudDeleted.length > 0) {
+        setDeletedCustomers(prev => {
+          const map = new Map<string, Customer>();
+          prev.forEach(d => map.set(d.id, d));
+          cloudDeleted.forEach(d => map.set(d.id, d));
+          const list = Array.from(map.values());
+          try {
+            localStorage.setItem(DELETED_CUSTOMERS_STORAGE_KEY, JSON.stringify(list));
+          } catch (e) {
+            console.error(e);
+          }
+          return list;
+        });
+      }
+    });
+
+    // 3. Subscribe to realtime updates for active customers
     const unsubCustomers = subscribeToCustomers(cloudCustomers => {
       if (cloudCustomers && cloudCustomers.length > 0) {
-        const clean = cloudCustomers.filter(c => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"));
+        const delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+        const delSet = new Set<string>();
+        if (Array.isArray(delSaved)) {
+          delSaved.forEach((d: any) => {
+            if (d.id) delSet.add(d.id.toLowerCase());
+            if (d.clientCode) delSet.add(d.clientCode.toLowerCase());
+            if (d.pppUser) delSet.add(d.pppUser.toLowerCase());
+          });
+        }
+
+        const clean = cloudCustomers
+          .filter(c => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
+          .filter(c => !delSet.has((c.id || "").toLowerCase()) && !(c.clientCode && delSet.has(c.clientCode.toLowerCase())) && !(c.pppUser && delSet.has(c.pppUser.toLowerCase())));
+
         if (clean.length > 0) {
-          // normalizeCustomerPackage already handles stale-date migration,
-          // daysRemaining recalculation, and package normalization.
           const refreshed = clean.map(c => normalizeCustomerPackage(c));
 
-          // ── SMART MERGE: cloud data + local state, local wins for critical fields ──
-          // Problem: Firestore listener fires with OLD data during the 1-2s write lag
-          // after payment/enable. A full replacement would revert local state to
-          // stale Firestore data, causing the "enable→offline" / "recharge→sudden off"
-          // visible within 1-2 seconds. Fix: merge and let local paid/enabled state win.
           setCustomers(prev => {
             const merged = refreshed.map(cloudCust => {
               const local = prev.find(p =>
@@ -426,9 +463,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 p.clientCode === cloudCust.clientCode ||
                 (p.pppUser && p.pppUser === cloudCust.pppUser)
               );
-              if (!local) return cloudCust; // New customer from cloud — accept as-is
+              if (!local) return cloudCust;
 
-              // Determine the better endDate (the later one wins)
               const localEndDate = parseSafeDate(local.endDate);
               const cloudEndDate = parseSafeDate(cloudCust.endDate);
               const localEndLater = localEndDate && cloudEndDate && !isNaN(localEndDate.getTime()) && !isNaN(cloudEndDate.getTime()) && localEndDate > cloudEndDate;
@@ -436,10 +472,6 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               const bestEndDateObj = parseSafeDate(bestEndDate);
               const bestDaysRemaining = bestEndDateObj ? Math.ceil((bestEndDateObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : cloudCust.daysRemaining;
 
-              // Intelligent Merge Strategy:
-              // Firestore (cloudCust) is the source of truth for cloud-persisted state.
-              // However, during the 1-3s Firestore write lag or if admin just updated locally,
-              // local admin edits MUST take precedence so edits don't revert to stale cloud snapshots.
               const localTime = Math.max(local.updatedAt || 0, local.createdAt || 0);
               const cloudTime = Math.max((cloudCust as any).updatedAt || 0, (cloudCust as any).createdAt || 0);
               const localIsNewer = (localTime >= cloudTime) ||
@@ -447,7 +479,6 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                                    Boolean(local.createdAt && (Date.now() - local.createdAt) < 120000);
 
               if (localIsNewer) {
-                // Local state was recently modified by admin — local edits take precedence over stale cloud data
                 return {
                   ...cloudCust,
                   ...local,
@@ -464,7 +495,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
               return {
                 ...local,
-                ...cloudCust, // Verified cloud state updates local state
+                ...cloudCust,
                 endDate: bestEndDate,
                 expireDate: bestEndDate,
                 daysRemaining: bestDaysRemaining,
@@ -476,9 +507,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               };
             });
 
-            // CRITICAL: Preserve local customers that haven't arrived in the cloud snapshot yet
-            // (e.g. newly created subscriber or pending Firestore sync) so they are not wiped out
             const localOnly = prev.filter(local =>
+              !delSet.has((local.id || "").toLowerCase()) &&
+              !(local.clientCode && delSet.has(local.clientCode.toLowerCase())) &&
+              !(local.pppUser && delSet.has(local.pppUser.toLowerCase())) &&
               !refreshed.some(c =>
                 c.id === local.id ||
                 c.clientCode === local.clientCode ||
@@ -486,13 +518,19 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               )
             );
 
-            return [...localOnly, ...merged];
+            const result = [...localOnly, ...merged];
+            try {
+              localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(result));
+            } catch (e) {
+              console.error(e);
+            }
+            return result;
           });
         }
       }
     });
 
-    // 3. Subscribe to realtime updates for upgrade requests
+    // 4. Subscribe to realtime updates for upgrade requests
     const unsubUpgrades = subscribeToUpgradeRequests(cloudRequests => {
       if (cloudRequests && cloudRequests.length > 0) {
         setUpgradeRequests(cloudRequests);
@@ -501,6 +539,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubCustomers();
+      unsubDeleted();
       unsubUpgrades();
     };
   }, []);
@@ -560,12 +599,24 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           });
         }
 
+        const delSaved = JSON.parse(localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY) || "[]");
+        const delSet = new Set<string>();
+        if (Array.isArray(delSaved)) {
+          delSaved.forEach((d: any) => {
+            if (d.id) delSet.add(d.id.toLowerCase());
+            if (d.clientCode) delSet.add(d.clientCode.toLowerCase());
+            if (d.pppUser) delSet.add(d.pppUser.toLowerCase());
+          });
+        }
+
         setCustomers(prev => {
           let hasChange = false;
           const matchedNetxIds = new Set<string>();
 
           // 1. Update existing customers with live billing, status, and telemetry
-          const updated = prev.map(c => {
+          const updated = prev
+            .filter(c => !delSet.has((c.id || "").toLowerCase()) && !(c.clientCode && delSet.has(c.clientCode.toLowerCase())) && !(c.pppUser && delSet.has(c.pppUser.toLowerCase())))
+            .map(c => {
             const pppKey = (c.pppUser || "").toLowerCase();
             const nameKey = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
             const macKey = (c.mac || "").toLowerCase().trim();
@@ -766,6 +817,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               const ncId = (nc.id || '').toLowerCase();
               const ncPpp = (nc.pppoe_username || '').toLowerCase();
               const ncCode = (nc.customer_code || '').toLowerCase();
+
+              // Do not ingest if subscriber is in deleted archive
+              if (delSet.has(ncId) || delSet.has(ncPpp) || delSet.has(ncCode)) {
+                return;
+              }
+
               if (matchedNetxIds.has(ncId) || matchedNetxIds.has(ncPpp) || matchedNetxIds.has(ncCode)) {
                 return; // Already in roster
               }
@@ -1445,6 +1502,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         }
         return updated;
       });
+
+      // Save archive directly to Cloud Firestore
+      saveDeletedCustomerToFirestore(archived);
     }
 
     setCustomers(prev => {
@@ -1561,6 +1621,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
+    // Remove from deleted archive in Cloud Firestore and save to active
+    purgeDeletedCustomerFromFirestore(target.id);
+    if (target.clientCode && target.clientCode !== target.id) {
+      purgeDeletedCustomerFromFirestore(target.clientCode);
+    }
     saveCustomerToFirestore(restored);
 
     // Re-provision on MikroTik
@@ -1577,6 +1642,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const permanentlyPurgeCustomer = (id: string) => {
+    const target = deletedCustomers.find(c => c.id === id || c.clientCode === id);
+    const targetId = target?.id || id;
+    const targetCode = target?.clientCode;
+
     setDeletedCustomers(prev => {
       const updated = prev.filter(c => c.id !== id && c.clientCode !== id);
       try {
@@ -1586,6 +1655,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    purgeDeletedCustomerFromFirestore(targetId);
+    if (targetCode && targetCode !== targetId) {
+      purgeDeletedCustomerFromFirestore(targetCode);
+    }
 
     activityLogger.log({
       type: "customer",
