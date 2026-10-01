@@ -111,9 +111,9 @@ export const SmsTemplatePage: React.FC<SmsTemplatePageProps> = ({ onNavigate }) 
   // Filtered Templates
   const filteredTemplates = templates.filter(t => {
     const matchesSearch =
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.template.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.id.toLowerCase().includes(searchQuery.toLowerCase());
+      (t.name && t.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.template && t.template.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.id && t.id.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = activeCategory === "all" || t.category === activeCategory;
     return matchesSearch && matchesCategory;
   });

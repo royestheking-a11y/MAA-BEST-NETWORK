@@ -395,7 +395,7 @@ export function DueCustomersPage({ onNavigate }: DueCustomersPageProps) {
     }
     const amountNum = Number(paymentAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert("Please enter a valid payment amount.");
+      showToast("Please enter a valid payment amount.");
       return;
     }
 

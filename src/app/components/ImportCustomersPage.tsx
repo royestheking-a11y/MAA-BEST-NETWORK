@@ -86,6 +86,12 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
   const [syncMikrotik, setSyncMikrotik] = useState(true);
   const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(true);
 
+  const [toastMsg, setToastMsg] = useState("");
+  const showToast = (m: string) => {
+    setToastMsg(m);
+    setTimeout(() => setToastMsg(""), 3500);
+  };
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ── CSV Parsing & Live Validation Engine ──
@@ -96,7 +102,7 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
 
     const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
     if (lines.length === 0) {
-      alert("The uploaded file is empty. Please upload a valid CSV file.");
+      showToast("The uploaded file is empty. Please upload a valid CSV file.");
       return;
     }
 
@@ -317,7 +323,7 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
   // Execute Bulk Import to Firestore & Context
   const handleImport = () => {
     if (isReadOnly || !canEdit) {
-      alert("Access Restricted: Your account role only has Read (View Only) permission.");
+      showToast("Access Restricted: Your account role only has Read (View Only) permission.");
       return;
     }
     setStep("importing");
@@ -325,7 +331,7 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
 
     const validRows = parsedRows.filter(r => r.status === "valid");
     if (validRows.length === 0) {
-      alert("No valid rows available for import.");
+      showToast("No valid rows available for import.");
       setStep("validate");
       return;
     }
@@ -431,18 +437,23 @@ export function ImportCustomersPage({ onNavigate }: ImportCustomersPageProps) {
   const filteredPreviews = validParsedRows.filter(row => {
     const q = previewSearch.toLowerCase();
     return !q ||
-      row.name.toLowerCase().includes(q) ||
-      row.id.toLowerCase().includes(q) ||
-      row.phone.includes(q) ||
-      row.zone.toLowerCase().includes(q) ||
-      row.subzone.toLowerCase().includes(q) ||
-      row.pppoeUser.toLowerCase().includes(q);
+      (row.name && row.name.toLowerCase().includes(q)) ||
+      (row.id && row.id.toLowerCase().includes(q)) ||
+      (row.phone && row.phone.includes(q)) ||
+      (row.zone && row.zone.toLowerCase().includes(q)) ||
+      (row.subzone && row.subzone.toLowerCase().includes(q)) ||
+      (row.pppoeUser && row.pppoeUser.toLowerCase().includes(q));
   });
 
   const totalBatchRevenue = validParsedRows.reduce((sum, r) => sum + r.monthlyBill, 0);
 
   return (
     <div className="min-h-[calc(100vh-80px)] w-full py-4 sm:py-8 px-3 sm:px-6 flex flex-col items-center justify-start">
+      {toastMsg && (
+        <div className="fixed top-5 right-5 z-50 bg-primary text-primary-foreground px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-primary/20 text-xs font-semibold animate-in fade-in slide-in-from-top-3">
+          <span>{toastMsg}</span>
+        </div>
+      )}
       {/* Hidden File Input */}
       <input
         type="file"

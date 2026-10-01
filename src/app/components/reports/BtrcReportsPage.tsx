@@ -76,6 +76,31 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
     });
   }, [customers]);
 
+  // Available filter options dynamically computed from btrcRows
+  const availableServers = useMemo(() => {
+    const set = new Set<string>();
+    btrcRows.forEach(r => { if (r.server) set.add(r.server); });
+    return ["all", ...Array.from(set).sort()];
+  }, [btrcRows]);
+
+  const availableZones = useMemo(() => {
+    const set = new Set<string>();
+    btrcRows.forEach(r => { if (r.zone) set.add(r.zone); });
+    return ["all", ...Array.from(set).sort()];
+  }, [btrcRows]);
+
+  const availableSubZones = useMemo(() => {
+    const set = new Set<string>();
+    btrcRows.forEach(r => { if (r.subzone) set.add(r.subzone); });
+    return ["all", ...Array.from(set).sort()];
+  }, [btrcRows]);
+
+  const availableBoxes = useMemo(() => {
+    const set = new Set<string>();
+    btrcRows.forEach(r => { if (r.box) set.add(r.box); });
+    return ["all", ...Array.from(set).sort()];
+  }, [btrcRows]);
+
   // Filtered rows
   const filteredRows = useMemo(() => {
     return btrcRows.filter(r => {
@@ -88,11 +113,15 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
       const matchServer = serverFilter === "all" || r.server === serverFilter;
       const matchService = serviceFilter === "all" || r.service === serviceFilter;
       const matchClientType = clientTypeFilter === "all" || r.client_type === clientTypeFilter;
+      const matchConnectionType = connectionTypeFilter === "all" || (r.connection_type && r.connection_type.toLowerCase() === connectionTypeFilter.toLowerCase());
+      const matchBStatus = !bStatusFilter.trim() || (r.status && r.status.toLowerCase().includes(bStatusFilter.toLowerCase().trim()));
       const matchZone = zoneFilter === "all" || (r.zone && r.zone.toLowerCase().includes(zoneFilter.toLowerCase()));
+      const matchSubZone = subZoneFilter === "all" || (r.subzone && r.subzone.toLowerCase().includes(subZoneFilter.toLowerCase()));
+      const matchBox = boxFilter === "all" || (r.box && r.box.toLowerCase().includes(boxFilter.toLowerCase()));
 
-      return matchSearch && matchServer && matchService && matchClientType && matchZone;
+      return matchSearch && matchServer && matchService && matchClientType && matchConnectionType && matchBStatus && matchZone && matchSubZone && matchBox;
     });
-  }, [btrcRows, searchQuery, serverFilter, serviceFilter, clientTypeFilter, zoneFilter]);
+  }, [btrcRows, searchQuery, serverFilter, serviceFilter, clientTypeFilter, connectionTypeFilter, bStatusFilter, zoneFilter, subZoneFilter, boxFilter]);
 
   const exportPDF = () => {
     showToast("Generating BTRC Statutory Return PDF...");
@@ -226,9 +255,10 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
               onChange={e => setServerFilter(e.target.value)}
               className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary"
             >
-              <option value="all">Select</option>
-              <option value="RETAIL_1">RETAIL_1</option>
-              <option value="MikroTik-01">MikroTik-01</option>
+              <option value="all">All Servers</option>
+              {availableServers.filter(s => s !== "all").map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
 
@@ -294,9 +324,10 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
               onChange={e => setZoneFilter(e.target.value)}
               className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary"
             >
-              <option value="all">Select</option>
-              <option value="DHAKA DIVISION">DHAKA DIVISION</option>
-              <option value="MADARIPUR">MADARIPUR</option>
+              <option value="all">All Zones</option>
+              {availableZones.filter(z => z !== "all").map(z => (
+                <option key={z} value={z}>{z}</option>
+              ))}
             </select>
           </div>
 
@@ -307,8 +338,10 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
               onChange={e => setSubZoneFilter(e.target.value)}
               className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary"
             >
-              <option value="all">Select</option>
-              <option value="KALKINI SOMITIR HAT">KALKINI SOMITIR HAT</option>
+              <option value="all">All Sub Zones</option>
+              {availableSubZones.filter(sz => sz !== "all").map(sz => (
+                <option key={sz} value={sz}>{sz}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -322,8 +355,10 @@ export const BtrcReportsPage: React.FC<BtrcReportsPageProps> = ({ onNavigate }) 
               onChange={e => setBoxFilter(e.target.value)}
               className="w-full px-3 py-2 rounded-lg text-xs bg-muted border border-border text-foreground outline-none focus:border-primary"
             >
-              <option value="all">Select</option>
-              <option value="SOMITIR HAT BAZAR">SOMITIR HAT BAZAR</option>
+              <option value="all">All Boxes</option>
+              {availableBoxes.filter(b => b !== "all").map(b => (
+                <option key={b} value={b}>{b}</option>
+              ))}
             </select>
           </div>
 

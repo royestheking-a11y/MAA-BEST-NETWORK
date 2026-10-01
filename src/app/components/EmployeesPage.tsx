@@ -436,7 +436,7 @@ export function EmployeesPage() {
     // Check duplicate email
     const exists = employees.some(em => em.email.toLowerCase() === email);
     if (exists) {
-      alert(`An employee with email "${email}" already exists. Please enter a unique email address.`);
+      showToast(`An employee with email "${email}" already exists.`);
       return;
     }
 
@@ -449,7 +449,7 @@ export function EmployeesPage() {
     const isReserved = ["admin", "maabest", "root"].includes(username);
     const usernameTaken = employees.some(em => em.username?.toLowerCase() === username);
     if (isReserved || usernameTaken) {
-      alert(`Username "@${username}" is already taken or reserved by administrator. Please choose a unique username.`);
+      showToast(`Username "@${username}" is already taken or reserved.`);
       return;
     }
 
@@ -501,7 +501,7 @@ export function EmployeesPage() {
       const isReserved = ["admin", "maabest", "root"].includes(username);
       const usernameTaken = employees.some(em => em.id !== editEmployee.id && em.username?.toLowerCase() === username);
       if (isReserved || usernameTaken) {
-        alert(`Username "@${username}" is already taken by another account. Please choose a different username.`);
+        showToast(`Username "@${username}" is already taken by another account.`);
         return;
       }
     }

@@ -80,7 +80,7 @@ export function subscribeToCustomers(
         if (data.passcode && data.passcode.startsWith("isp@")) {
           data.passcode = data.passcode.replace(/^isp@/i, "mbn@");
         } else if (!data.passcode) {
-          data.passcode = `mbn@${(data.clientCode || data.id).replace(/\D/g, "")}`;
+          data.passcode = `mbn@${(data.clientCode || data.id || "0001").replace(/\D/g, "") || "0001"}`;
         }
         docs.push(data);
       });
@@ -108,7 +108,7 @@ export async function saveCustomerToFirestore(customer: Customer): Promise<void>
   try {
     const fixedCust = {
       ...customer,
-      passcode: (customer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(customer.clientCode || customer.id).replace(/\D/g, "")}`
+      passcode: (customer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(customer.clientCode || customer.id || "0001").replace(/\D/g, "") || "0001"}`
     };
     const sanitized = sanitizeForFirestore(fixedCust);
     const docRef = doc(db, CUSTOMERS_COLLECTION, fixedCust.id);
@@ -131,7 +131,7 @@ export async function saveCustomersBatchToFirestore(customersList: Customer[]): 
       for (const cust of chunk) {
         const fixedCust = {
           ...cust,
-          passcode: (cust.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(cust.clientCode || cust.id).replace(/\D/g, "")}`
+          passcode: (cust.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(cust.clientCode || cust.id || "0001").replace(/\D/g, "") || "0001"}`
         };
         const sanitized = sanitizeForFirestore(fixedCust);
         const docRef = doc(db, CUSTOMERS_COLLECTION, fixedCust.id);
