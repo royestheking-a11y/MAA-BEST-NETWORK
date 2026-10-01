@@ -119,7 +119,7 @@ const INITIAL_PACKAGES: IspPackage[] = [
 ];
 
 const INITIAL_DISCOUNT_RULES: DiscountRule[] = [
-  { id: "DISC-101", code: "SUMMER2026", name: "Summer Speed Boost", type: "percentage", value: 15, scope: "specific_pkg", minPackageSpeed: 20, durationMonths: 3, usageCount: 248, maxUsage: 500, validUntil: "31 Aug 2026", status: "active" },
+  { id: "DISC-101", code: "FIBER2026", name: "Fiber Subscriber Offer", type: "percentage", value: 10, scope: "specific_pkg", minPackageSpeed: 35, durationMonths: 3, usageCount: 0, maxUsage: 500, validUntil: "31 Dec 2026", status: "active" },
   { id: "DISC-102", code: "NEWFIBER100", name: "New Fiber Subscriber Offer", type: "fixed", value: 100, scope: "new_customers", durationMonths: 2, usageCount: 412, maxUsage: 1000, validUntil: "31 Dec 2026", status: "active" },
   { id: "DISC-103", code: "ANNUALPAY20", name: "Annual Advance Payment Discount", type: "percentage", value: 20, scope: "annual_plan", durationMonths: 12, usageCount: 89, maxUsage: 200, validUntil: "31 Dec 2026", status: "active" },
   { id: "DISC-104", code: "CORPVIP10", name: "Corporate Volume Tier", type: "percentage", value: 10, scope: "resellers", durationMonths: 6, usageCount: 34, maxUsage: 100, validUntil: "15 Oct 2026", status: "active" },
@@ -202,9 +202,13 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
   const [invStatusFilter, setInvStatusFilter] = useState<"all" | "paid" | "pending" | "overdue" | "cancelled">("all");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showNewInvoice, setShowNewInvoice] = useState(false);
-  const [newInv, setNewInv] = useState({
-    customer: "", custId: "", phone: "", zone: "DHAKA DIVISION", pkgName: "35M",
-    amount: "500", period: "Aug 2026", due: "10 Aug 2026", discount: "0", applyVat: true
+  const [newInv, setNewInv] = useState(() => {
+    const now = new Date();
+    const periodLabel = now.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    const dueDay = new Date(now.getFullYear(), now.getMonth(), 10);
+    const dueDateStr = dueDay.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    return { customer: "", custId: "", phone: "", zone: "DHAKA DIVISION", pkgName: "35M",
+      amount: "500", period: periodLabel, due: dueDateStr, discount: "0", applyVat: true };
   });
 
   // Payments Tab state
@@ -346,7 +350,10 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
     setInvoices(prev => [inv, ...prev]);
     setShowNewInvoice(false);
     showToast(`Invoice ${nextId} created for ${inv.customer} (৳${net.toLocaleString()})`);
-    setNewInv({ customer: "", custId: "", phone: "", zone: "Dhanmondi-01", pkgName: "20 Mbps Plus", amount: "1200", period: "Aug 2026", due: "10 Aug 2026", discount: "0", applyVat: true });
+    const _now = new Date();
+    const _period = _now.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    const _due = new Date(_now.getFullYear(), _now.getMonth(), 10).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    setNewInv({ customer: "", custId: "", phone: "", zone: "DHAKA DIVISION", pkgName: "35M", amount: "500", period: _period, due: _due, discount: "0", applyVat: true });
   };
 
   const handleRecordPayment = () => {

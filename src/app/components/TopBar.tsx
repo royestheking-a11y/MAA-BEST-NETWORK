@@ -84,11 +84,11 @@ interface NotifItem {
 }
 
 const INITIAL_NOTIFICATIONS: NotifItem[] = [
-  { id: 1, type: "critical", icon: WifiOff, title: "Optical Loss: OLT-Uttara-01 (PON 0/2)", desc: "ONU-1004 Rx dropped to -27.8 dBm (Nasrin Begum)", time: "3m ago", actionLabel: "Optical Laser Boost", solutionMsg: "Sent optical laser boost & dispatched ticket to field technician (Nasir)", targetPage: "olt" },
-  { id: 2, type: "warning", icon: AlertTriangle, title: "MikroTik-01 High CPU (78%)", desc: "1,284 PPPoE queues active on Mirpur Core", time: "11m ago", actionLabel: "Re-sync Queues", solutionMsg: "MikroTik-01 queues cleaned and stale ARP cache flushed via RouterOS API", targetPage: "mikrotik" },
-  { id: 3, type: "warning", icon: Zap, title: "14 Overdue Invoices (Aug 2026)", desc: "৳16,800 due balance pending collection", time: "25m ago", actionLabel: "Send bKash SMS", solutionMsg: "Dispatched automated WhatsApp & SMS bill reminders with bKash dynamic payment link", targetPage: "invoices" },
-  { id: 4, type: "success", icon: CheckCircle2, title: "bKash Auto-Payment Verified", desc: "৳1,200 from Rahim Uddin (CUST-10293)", time: "31m ago", actionLabel: "View Receipt", targetPage: "payments" },
-  { id: 5, type: "info", icon: Info, title: "Encrypted Cloud Backup Completed", desc: "MAA BEST NETWORK DB & MikroTik config backed up safely", time: "5h ago", targetPage: "backups" },
+  { id: 1, type: "critical", icon: WifiOff, title: "Optical Loss: OLT-Kalkini-01 (PON 0/2)", desc: "ONU-1004 Rx dropped to -27.8 dBm — check optical splitter", time: "3m ago", actionLabel: "Optical Laser Boost", solutionMsg: "Sent optical laser boost & dispatched ticket to field technician (Nasir)", targetPage: "olt" },
+  { id: 2, type: "warning", icon: AlertTriangle, title: "MikroTik-Core High CPU (78%)", desc: "Active PPPoE queues spiking on Somitir Hat Core router", time: "11m ago", actionLabel: "Re-sync Queues", solutionMsg: "MikroTik queues cleaned and stale ARP cache flushed via RouterOS API", targetPage: "mikrotik" },
+  { id: 3, type: "warning", icon: Zap, title: `Overdue Invoices — ${new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" })}`, desc: "Pending bill collection — send SMS reminders to due subscribers", time: "Just now", actionLabel: "Send bKash SMS", solutionMsg: "Dispatched automated SMS bill reminders with bKash dynamic payment link", targetPage: "invoices" },
+  { id: 4, type: "success", icon: CheckCircle2, title: "bKash Auto-Payment Verified", desc: "Monthly subscription payment collected successfully", time: "31m ago", actionLabel: "View Receipt", targetPage: "payments" },
+  { id: 5, type: "info", icon: Info, title: "Encrypted Cloud Backup Completed", desc: "MAA BEST NETWORK DB & MikroTik config backed up safely to Firebase", time: "5h ago", targetPage: "backups" },
 ];
 
 interface TopBarProps {

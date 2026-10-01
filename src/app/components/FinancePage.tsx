@@ -195,8 +195,8 @@ export function FinancePage({ initialTab = "accounts" }: { initialTab?: FinTab }
       <div className="grid gap-4" style={{ gridTemplateColumns:"repeat(4,1fr)" }}>
         {[
           { label:"Total Balance",    value:`৳${(totalBalance/100000).toFixed(1)}L`, sub:`${accounts.length} accounts`,  icon:Wallet,       iconBg:"#F3F4F6", iconColor:"#6B7280" },
-          { label:"Monthly Income",   value:"৳48.2L",  sub:"Aug 2026",         icon:TrendingUp,   iconBg:"#DCFCE7", iconColor:"#16A34A" },
-          { label:"Monthly Expenses", value:"৳29.6L",  sub:"Aug 2026",         icon:TrendingDown, iconBg:"#FEE2E2", iconColor:"#DC2626" },
+          { label:"Monthly Income",   value:"৳48.2L",  sub: new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" }), icon:TrendingUp,   iconBg:"#DCFCE7", iconColor:"#16A34A" },
+          { label:"Monthly Expenses", value:"৳29.6L",  sub: new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" }), icon:TrendingDown, iconBg:"#FEE2E2", iconColor:"#DC2626" },
           { label:"Net Profit",       value:"৳18.6L",  sub:"38.6% margin",     icon:ArrowUpRight, iconBg:"#DBEAFE", iconColor:"#2563EB" },
         ].map(s=>{ const Icon=s.icon; return (
           <div key={s.label} className="rounded-xl p-4" style={{ background:"var(--card)", border:"1px solid var(--border)" }}>

@@ -205,7 +205,9 @@ export function CustomerPortalPage({ onNavigate, onLogout }: CustomerPortalPageP
 
   const handleRequestGrace = () => {
     setGraceActive(true);
-    showToast("72-Hour Emergency Grace Period activated! Full internet speed extended until 29 Aug 2026.");
+    const graceUntil = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    const graceStr = graceUntil.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    showToast(`72-Hour Emergency Grace Period activated! Full internet speed extended until ${graceStr}.`);
   };
 
   // Subscriber Link Speed Test
