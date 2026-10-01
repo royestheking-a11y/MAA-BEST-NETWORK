@@ -603,12 +603,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             // GRACE PERIOD: Newly created or recently edited customers (within 120s) are immune to API overwrites.
             const isRecentlyEdited = Boolean((c.updatedAt && (Date.now() - c.updatedAt) < 120000) || (c.createdAt && (Date.now() - c.createdAt) < 120000));
             const apiSaysDisabled = netxMatch?.status === "disabled";
-            const isPaidOrFree = c.userType === "free" || c.userType === "unlimited" || ((c.dueAmount === 0 || c.due === 0) && c.status === "active");
+            const isWithinGrace = Boolean(c.graceExpiryDate && (parseSafeDate(c.graceExpiryDate)?.getTime() ?? 0) >= Date.now());
+            const isPaidOrFree = c.userType === "free" || c.userType === "unlimited" || isWithinGrace || ((c.dueAmount === 0 || c.due === 0) && c.status === "active");
 
-            // CRITICAL FIX: If customer has paid their bill (dueAmount === 0) or is free/active,
+            // CRITICAL FIX: If customer has paid their bill (dueAmount === 0), is free/active, or is within active bonus grace,
             // never let upstream NetX's stale "disabled" (caused by expiry cutoff) override their line to disabled/suspended!
             const isLineDisabled = isPaidOrFree
-              ? (c.disabledInMikrotik === true && c.status === "suspended")
+              ? (c.disabledInMikrotik === true && c.status === "suspended" && !isWithinGrace)
               : isRecentlyEdited
                 ? (c.disabledInMikrotik === true)
                 : (c.disabledInMikrotik === true || (apiSaysDisabled && c.disabledInMikrotik !== false));
@@ -706,6 +707,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               if (localExpiry && !isNaN(localExpiry.getTime())) {
                 newDaysRemaining = Math.ceil((localExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               }
+            }
+
+            // If active bonus grace is present, compute remaining days based on graceExpiryDate
+            const graceExpiryObj = parseSafeDate(c.graceExpiryDate);
+            if (graceExpiryObj && graceExpiryObj.getTime() > Date.now()) {
+              const graceRemaining = Math.ceil((graceExpiryObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              newDaysRemaining = Math.max(newDaysRemaining || 0, graceRemaining);
             }
 
             if (
