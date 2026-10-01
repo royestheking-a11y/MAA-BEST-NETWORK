@@ -43,7 +43,7 @@ const INITIAL_PROBES: PeeringProbe[] = [
 
 export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
   const { customers } = useCustomerContext();
-  const { telemetry, isLiveConnected, lastSyncTime } = useRealtimeHardwareTelemetry(2000);
+  const { telemetry, isLiveConnected, lastSyncTime } = useRealtimeHardwareTelemetry(8000);
   const { liveStats, isConnected: isNetxConnected, refresh: refreshNetx, isLoading: isNetxLoading } = useNetxLiveData(15000);
 
   const [probes, setProbes] = useState<PeeringProbe[]>(INITIAL_PROBES);

@@ -86,7 +86,7 @@ const isFakeRouter = (s?: MikrotikServer | null) =>
 export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
   const { customers, addCustomer, toggleNetStatus, setActiveCustomer } = useCustomerContext();
   const { canEdit, canDelete, isReadOnly } = usePermission("mikrotik");
-  const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(2000);
+  const { telemetry, lastSyncTime } = useRealtimeHardwareTelemetry(8000);
   const { liveStats, isConnected: isNetxConnected, refresh: refreshNetx, isLoading: isNetxLoading } = useNetxLiveData(15000);
 
   const [servers, setServers] = useState<MikrotikServer[]>(() => {

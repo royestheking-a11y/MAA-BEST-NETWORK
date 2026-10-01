@@ -94,6 +94,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [mikrotikList, setMikrotikList] = useState<MikrotikServer[]>(() => networkStore.getMikrotik());
 
   useEffect(() => {
+    billingStore.syncLivePackages();
     const unsubBilling = billingStore.subscribe(pkgs => {
       if (pkgs && pkgs.length > 0) setPackagesList(pkgs);
     });
@@ -139,7 +140,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [deviceVendor, setDeviceVendor] = useState("BDCOM");
   const [purchaseDate, setPurchaseDate] = useState(() => {
     const d = new Date();
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [splitterBox, setSplitterBox] = useState("SOMITIR HAT BAZAR - Splitter 1 (1:8)");
   const [splitterPort, setSplitterPort] = useState("Port 1");
@@ -152,7 +153,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [billingStartMonth, setBillingStartMonth] = useState(() => {
     const d = new Date();
-    return `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [monthlyBill, setMonthlyBill] = useState(() => {
     const pkgs = billingStore.getPackages();
@@ -164,11 +165,11 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   const [expireDate, setExpireDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [joiningDate, setJoiningDate] = useState(() => {
     const d = new Date();
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [sendGreetingsSms, setSendGreetingsSms] = useState(true);
 
@@ -231,24 +232,34 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
   // Packages list from live billing store
   const PACKAGES = useMemo(() => {
     const source = packagesList.length > 0 ? packagesList : billingStore.getPackages();
-    if (source.length === 0) {
-      return [
-        { name: "35M — ৳500", cleanName: "35M", speed: "35/35 Mbps", price: 500, badge: "Most Popular", down: 35, up: 35 },
-        { name: "50M — ৳600", cleanName: "50M", speed: "50/50 Mbps", price: 600, badge: "Ultra Fiber", down: 50, up: 50 },
-        { name: "80M — ৳800", cleanName: "80M", speed: "80/80 Mbps", price: 800, badge: "Pro Speed", down: 80, up: 80 },
-        { name: "100M — ৳1,000", cleanName: "100M", speed: "100/100 Mbps", price: 1000, badge: "Gigabit Ready", down: 100, up: 100 },
-      ];
-    }
-    return source.map((pkg, idx) => ({
-      name: `${pkg.name} — ৳${pkg.price.toLocaleString()}`,
-      cleanName: pkg.name,
-      speed: `${pkg.down}/${pkg.up} Mbps`,
-      price: pkg.price,
-      down: pkg.down,
-      up: pkg.up,
-      badge: pkg.name === "35M" ? "Primary Live Tier" : idx === 1 ? "Ultra Fiber" : pkg.type === "Corporate Lease" ? "Enterprise" : "Standard Fiber"
-    }));
+    return source.map((pkg) => {
+      const isCorp = pkg.type === "Corporate Lease" || pkg.name.includes("Mbps");
+      const badge = isCorp ? "Corporate 1:1" : `${pkg.down} Mbps`;
+      return {
+        name: `${pkg.name} — ৳${pkg.price.toLocaleString()}`,
+        cleanName: pkg.name,
+        mikrotikProfile: pkg.mikrotikProfile || pkg.name,
+        speed: `${pkg.down}/${pkg.up} Mbps`,
+        price: pkg.price,
+        down: pkg.down,
+        up: pkg.up,
+        badge: badge,
+        type: pkg.type || "PPPoE"
+      };
+    });
   }, [packagesList]);
+
+  // Sync selectedPackage when PACKAGES loads/changes
+  useEffect(() => {
+    if (PACKAGES.length > 0) {
+      const exists = PACKAGES.find(p => p.name === selectedPackage);
+      if (!exists) {
+        setSelectedPackage(PACKAGES[0].name);
+        setProfileName(PACKAGES[0].mikrotikProfile || PACKAGES[0].cleanName);
+        setMonthlyBill(String(PACKAGES[0].price));
+      }
+    }
+  }, [PACKAGES, selectedPackage]);
 
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -282,6 +293,17 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
     const finalClientCode = effectiveClientCode;
     const nextNum = parseInt(finalClientCode.replace(/\D/g, ""), 10) || (customers.length + 1);
 
+    const toDdMmYyyy = (dateStr: string) => {
+      if (!dateStr || !dateStr.includes("-")) return dateStr;
+      const [yyyy, mm, dd] = dateStr.split("-");
+      return `${dd}/${mm}/${yyyy}`;
+    };
+    const toMmYyyy = (dateStr: string) => {
+      if (!dateStr || !dateStr.includes("-")) return dateStr;
+      const [yyyy, mm] = dateStr.split("-");
+      return `${mm}/${yyyy}`;
+    };
+
     const newCust: Partial<Customer> = {
       id: finalClientCode,
       clientCode: finalClientCode,
@@ -306,9 +328,16 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       box: selectedBox,
       connectionType: connectionType,
       serverName: serverName || "DC-CA",
-      profile: (selectedPackage.split("—")[0].trim()) || profileName || "35M",
+      profile: (() => {
+        if (profileName && profileName.trim() !== "") return profileName.trim();
+        const p = PACKAGES.find(x => x.name === selectedPackage || x.cleanName === selectedPackage.split("—")[0].trim());
+        return p?.mikrotikProfile || p?.cleanName || "35M";
+      })(),
       service: protocolType as "pppoe",
-      package: selectedPackage.split("—")[0].trim() || "35M",
+      package: (() => {
+        const p = PACKAGES.find(x => x.name === selectedPackage || x.cleanName === selectedPackage.split("—")[0].trim());
+        return p?.mikrotikProfile || p?.cleanName || selectedPackage.split("—")[0].trim() || "35M";
+      })(),
       speed: (() => {
         const p = PACKAGES.find(x => x.name === selectedPackage || x.cleanName === selectedPackage.split("—")[0].trim());
         return p ? p.speed.replace(" Mbps", "") : "35/35";
@@ -327,8 +356,8 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       netStatus: userType === "free" ? "online" : (wantDisableClient ? "offline" : "online"),
       userType: userType,
       billingDate: 1,
-      startDate: joiningDate,
-      endDate: userType === "free" || userType === "unlimited" ? "Permanent / Lifetime" : expireDate,
+      startDate: toDdMmYyyy(joiningDate),
+      endDate: userType === "free" || userType === "unlimited" ? "Permanent / Lifetime" : toDdMmYyyy(expireDate),
       daysRemaining: userType === "free" || userType === "unlimited" ? 999 : 30,
       dueAmount: 0,
       ipAddress: "",
@@ -342,11 +371,11 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       onuSignal: "—",
       sessionUptime: "0m",
       monthlyUsageGB: 0,
-      joinDate: joiningDate,
+      joinDate: toDdMmYyyy(joiningDate),
       clientType: clientType,
       billingStatus: userType === "free" ? "Prepaid" : billingStatus,
-      billingStartMonth: billingStartMonth,
-      expireDate: expireDate,
+      billingStartMonth: toMmYyyy(billingStartMonth),
+      expireDate: toDdMmYyyy(expireDate),
       cableMetre: Number(cableMetre) || 100,
       fiberCode: fiberCode,
       coreNumber: Number(numberOfCore) || 2,
@@ -354,7 +383,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       deviceType: device,
       deviceSerial: deviceSerial || `BDCOM-${finalClientCode}`,
       deviceVendor: deviceVendor,
-      purchaseDate: purchaseDate,
+      purchaseDate: toDdMmYyyy(purchaseDate),
       splitterBox: splitterBox,
       splitterPort: splitterPort,
       invoices: [],
@@ -1243,7 +1272,7 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                         type="button"
                         onClick={() => {
                           setSelectedPackage(pkg.name);
-                          setProfileName(pkg.name);
+                          setProfileName(pkg.mikrotikProfile || pkg.cleanName || "35M");
                           setMonthlyBill(String(pkg.price));
                         }}
                         className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
@@ -1317,6 +1346,24 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 </div>
               </div>
 
+              {/* MikroTik Profile Name Override */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                  <span>MikroTik Profile Name *</span>
+                  <span className="text-[10px] text-muted-foreground">Must exactly match RouterOS profile</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    placeholder="e.g. 35M or Profile_1"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-card border border-primary/40 text-foreground outline-none focus:border-primary font-mono font-bold"
+                  />
+                </div>
+              </div>
+
               {/* Monthly Bill & Override */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
@@ -1348,10 +1395,9 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-foreground">Billing Start Month *</label>
                   <input
-                    type="text"
+                    type="month"
                     value={billingStartMonth}
                     onChange={e => setBillingStartMonth(e.target.value)}
-                    placeholder="09/2026"
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-muted/40 border border-border text-foreground outline-none focus:border-primary font-mono"
                   />
                 </div>
@@ -1407,10 +1453,9 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-foreground">Subscription Expire Date</label>
                   <input
-                    type="text"
+                    type="date"
                     value={expireDate}
                     onChange={e => setExpireDate(e.target.value)}
-                    placeholder="10/10/2026"
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-muted/40 border border-border text-foreground outline-none focus:border-primary"
                   />
                 </div>

@@ -145,81 +145,25 @@ export const INITIAL_INVOICES: Invoice[] = REAL_ISP_CUSTOMERS.flatMap(c => {
 export const INITIAL_PAYMENTS: Payment[] = REAL_BILLING_PAYMENTS;
 
 export const INITIAL_PACKAGES: IspPackage[] = [
-  {
-    id: "PKG-35M",
-    name: "35M",
-    down: 35,
-    up: 35,
-    price: 500,
-    type: "PPPoE",
-    customers: 194,
-    margin: 56,
-    mikrotikProfile: "35M",
-    burstLimit: "No Burst",
-    fupLimit: "Unlimited",
-    status: "active",
-    desc: "35 Mbps Synchronous Fiber Broadband — Active Primary Tier"
-  },
-  {
-    id: "PKG-50M",
-    name: "50M",
-    down: 50,
-    up: 50,
-    price: 600,
-    type: "PPPoE",
-    customers: 0,
-    margin: 60,
-    mikrotikProfile: "50M",
-    burstLimit: "No Burst",
-    fupLimit: "Unlimited",
-    status: "active",
-    desc: "50 Mbps Synchronous Ultra-Fiber — Streaming & Gaming"
-  },
-  {
-    id: "PKG-80M",
-    name: "80M",
-    down: 80,
-    up: 80,
-    price: 800,
-    type: "PPPoE",
-    customers: 0,
-    margin: 65,
-    mikrotikProfile: "80M",
-    burstLimit: "No Burst",
-    fupLimit: "Unlimited",
-    status: "active",
-    desc: "80 Mbps Synchronous Pro Fiber — Multi-Device Power Users"
-  },
-  {
-    id: "PKG-100M",
-    name: "100M",
-    down: 100,
-    up: 100,
-    price: 1000,
-    type: "PPPoE",
-    customers: 0,
-    margin: 70,
-    mikrotikProfile: "100M",
-    burstLimit: "No Burst",
-    fupLimit: "Unlimited",
-    status: "active",
-    desc: "100 Mbps Gigabit-Ready Enterprise Fiber Tier"
-  },
-  {
-    id: "PKG-10M",
-    name: "10 Mbps",
-    down: 10,
-    up: 10,
-    price: 1000,
-    type: "Corporate Lease",
-    customers: 0,
-    margin: 75,
-    mikrotikProfile: "10 Mbps",
-    burstLimit: "No Burst",
-    fupLimit: "Dedicated 1:1",
-    status: "active",
-    desc: "10 Mbps Dedicated 1:1 Corporate Bandwidth Pipe"
-  }
+  { id: "PKG-02M-CYB", name: "Cyber-02M", down: 2, up: 2, price: 400, type: "PPPoE", customers: 0, margin: 45, mikrotikProfile: "Cyber-02M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "2 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-15M", name: "15M", down: 15, up: 15, price: 500, type: "PPPoE", customers: 0, margin: 56, mikrotikProfile: "15M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "15 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-20M", name: "20M", down: 20, up: 20, price: 500, type: "PPPoE", customers: 0, margin: 56, mikrotikProfile: "20M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "20 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-35M", name: "35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 194, margin: 56, mikrotikProfile: "35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber Broadband — Active Primary Tier" },
+  { id: "PKG-35M-MER", name: "Meradia-35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 0, margin: 56, mikrotikProfile: "Meradia-35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-35M-ZAP", name: "Zappy-35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 0, margin: 56, mikrotikProfile: "Zappy-35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-35M-CYB", name: "Cyber-35M", down: 35, up: 35, price: 500, type: "PPPoE", customers: 0, margin: 56, mikrotikProfile: "Cyber-35M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "35 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-50M", name: "50M", down: 50, up: 50, price: 600, type: "PPPoE", customers: 0, margin: 60, mikrotikProfile: "50M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "50 Mbps Synchronous Ultra-Fiber — Streaming & Gaming" },
+  { id: "PKG-50M-CYB", name: "Cyber-50M", down: 50, up: 50, price: 650, type: "PPPoE", customers: 0, margin: 66, mikrotikProfile: "Cyber-50M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "50 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-55M-MER", name: "Meradia-55M", down: 55, up: 55, price: 700, type: "PPPoE", customers: 0, margin: 69, mikrotikProfile: "Meradia-55M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "55 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-65M-MER", name: "Meradia-65M", down: 65, up: 65, price: 800, type: "PPPoE", customers: 0, margin: 73, mikrotikProfile: "Meradia-65M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "65 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-75M-MER", name: "Meradia-75M", down: 75, up: 75, price: 900, type: "PPPoE", customers: 0, margin: 76, mikrotikProfile: "Meradia-75M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "75 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-80M", name: "80M", down: 80, up: 80, price: 800, type: "PPPoE", customers: 0, margin: 65, mikrotikProfile: "80M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "80 Mbps Synchronous Pro Fiber — Multi-Device Power Users" },
+  { id: "PKG-80M-CYB", name: "Cyber-80M", down: 80, up: 80, price: 850, type: "PPPoE", customers: 0, margin: 74, mikrotikProfile: "Cyber-80M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "80 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-80M-MER", name: "Meradia-80M", down: 80, up: 80, price: 1000, type: "PPPoE", customers: 0, margin: 78, mikrotikProfile: "Meradia-80M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "80 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-100M", name: "100M", down: 100, up: 100, price: 1000, type: "PPPoE", customers: 0, margin: 70, mikrotikProfile: "100M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "100 Mbps Gigabit-Ready Enterprise Fiber Tier" },
+  { id: "PKG-100M-CYB", name: "Cyber-100M", down: 100, up: 100, price: 1000, type: "PPPoE", customers: 0, margin: 78, mikrotikProfile: "Cyber-100M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "100 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-100M-MER", name: "Meradia-100M", down: 100, up: 100, price: 1200, type: "PPPoE", customers: 0, margin: 82, mikrotikProfile: "Meradia-100M", burstLimit: "No Burst", fupLimit: "Unlimited", status: "active", desc: "100 Mbps Synchronous Fiber — Live MikroTik DC-CA Profile" },
+  { id: "PKG-10M-CORP", name: "10 Mbps", down: 10, up: 10, price: 1000, type: "Corporate Lease", customers: 0, margin: 75, mikrotikProfile: "10 Mbps", burstLimit: "No Burst", fupLimit: "Dedicated 1:1", status: "active", desc: "10 Mbps Dedicated 1:1 Corporate Bandwidth Pipe" }
 ];
 
 export const INITIAL_DISCOUNT_RULES: DiscountRule[] = [
@@ -264,7 +208,7 @@ export const INITIAL_BILLING_SETTINGS: BillingSettingsConfig = {
 const STORAGE_KEYS = {
   INVOICES: "isp_billing_invoices_v3",
   PAYMENTS: "isp_billing_payments_v3",
-  PACKAGES: "isp_billing_packages_v5",
+  PACKAGES: "isp_billing_packages_v6",
   DISCOUNTS: "isp_billing_discounts_v3",
   ADJUSTMENTS: "isp_billing_adjustments_v3",
   SETTINGS: "isp_billing_settings_v3",
@@ -313,6 +257,10 @@ import {
 let sharedInvoices = loadStorage(STORAGE_KEYS.INVOICES, [...INITIAL_INVOICES]);
 let sharedPayments = loadStorage(STORAGE_KEYS.PAYMENTS, [...INITIAL_PAYMENTS]);
 let sharedPackages = loadStorage(STORAGE_KEYS.PACKAGES, [...INITIAL_PACKAGES]);
+if (sharedPackages.length < INITIAL_PACKAGES.length) {
+  sharedPackages = [...INITIAL_PACKAGES];
+  saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
+}
 let sharedDiscounts = loadStorage(STORAGE_KEYS.DISCOUNTS, [...INITIAL_DISCOUNT_RULES]);
 let sharedAdjustments = loadStorage(STORAGE_KEYS.ADJUSTMENTS, [...INITIAL_ADJUSTMENTS]);
 let sharedSettings = loadStorage(STORAGE_KEYS.SETTINGS, { ...INITIAL_BILLING_SETTINGS });
@@ -360,23 +308,20 @@ export function initBillingFirestoreSync() {
   });
 
   subscribeToPackages(cloudPackages => {
-    if (cloudPackages && cloudPackages.length > 0) {
+    if (cloudPackages && cloudPackages.length >= INITIAL_PACKAGES.length) {
       // Accept cloud packages — they are the canonical truth
       sharedPackages = cloudPackages as IspPackage[];
       saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
       notify();
     } else if (!hasPackagesSynced) {
-      // First sync and cloud is empty — seed from local/defaults
-      const wasInit = localStorage.getItem("isp_packages_initialized");
-      if (!wasInit && INITIAL_PACKAGES.length > 0) {
-        localStorage.setItem("isp_packages_initialized", "true");
+      // Seed from local/defaults with complete package catalogue
+      if (sharedPackages.length < INITIAL_PACKAGES.length) {
         sharedPackages = [...INITIAL_PACKAGES];
         saveStorage(STORAGE_KEYS.PACKAGES, sharedPackages);
-        sharedPackages.forEach(p => savePackageToFirestore(p));
-        notify();
-      } else if (sharedPackages.length > 0) {
       }
+      INITIAL_PACKAGES.forEach(p => savePackageToFirestore(p));
       hasPackagesSynced = true;
+      notify();
     }
   });
 }

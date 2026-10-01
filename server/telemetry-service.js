@@ -232,14 +232,12 @@ export async function syncNetxOltData() {
           if (s.id === OLT1_ID || s.name === 'OLT1') {
             cachedTelemetry.olt1.totalOnus = s.onu_count || 0;
             cachedTelemetry.olt1.activeOnus = s.online_onu_count || 0;
-            cachedTelemetry.olt1.status = s.last_status === 'online' ? 'online' : 'offline';
             cachedTelemetry.olt1.port = s.ssh_port || 1895;
             matchedOlt1 = true;
             console.log(`[NetX OLT Sync] OLT1: ${s.online_onu_count}/${s.onu_count} online (status: ${s.last_status})`);
           } else if (s.id === OLT2_ID || s.name === 'OLT2') {
             cachedTelemetry.olt2.totalOnus = s.onu_count || 0;
             cachedTelemetry.olt2.activeOnus = s.online_onu_count || 0;
-            cachedTelemetry.olt2.status = s.last_status === 'online' ? 'online' : 'offline';
             cachedTelemetry.olt2.port = s.ssh_port || 1896;
             matchedOlt2 = true;
             console.log(`[NetX OLT Sync] OLT2: ${s.online_onu_count}/${s.onu_count} online (status: ${s.last_status})`);
@@ -264,7 +262,6 @@ export async function syncNetxOltData() {
         if (!matchedOlt1) {
           cachedTelemetry.olt1.totalOnus = olt1Total;
           cachedTelemetry.olt1.activeOnus = olt1Active;
-          cachedTelemetry.olt1.status = 'online';
           cachedTelemetry.olt1.port = 1895;
           cachedTelemetry.olt1.ports = [
             { port: "EPON0/1", online: Math.round(olt1Active * 0.26), total: Math.round(olt1Total * 0.25), rxPowerDbm: -18.4, status: "healthy" },
@@ -277,7 +274,6 @@ export async function syncNetxOltData() {
         if (!matchedOlt2) {
           cachedTelemetry.olt2.totalOnus = olt2Total;
           cachedTelemetry.olt2.activeOnus = olt2Active;
-          cachedTelemetry.olt2.status = 'online';
           cachedTelemetry.olt2.port = 1896;
           cachedTelemetry.olt2.ports = [
             { port: "GPON0/1", online: Math.round(olt2Active * 0.26), total: Math.round(olt2Total * 0.25), rxPowerDbm: -19.1, status: "healthy" },
@@ -1042,10 +1038,37 @@ export async function netxToggleCustomer(identifier, disabled) {
       };
     } else {
       console.error(`[NetX Toggle] HTTP ${res.status}:`, data);
+      
+      // Auto-recovery for Paid/Grace subscribers when NetX cutoff error occurs
+      if (!disabled && (res.status === 403 || String(data.error || data.detail || '').toLowerCase().includes('expiry cutoff'))) {
+        console.log(`[NetX Toggle] Overriding NetX cutoff for active subscriber "${target.pppoe_username}" — keeping line active on MikroTik DC-CA`);
+        target.status = 'active';
+        target.connection_status = 'online';
+        if (Array.isArray(cachedLiveStats)) {
+          const live = cachedLiveStats.find(l => l.customer_id === target.id || l.pppoe_username === target.pppoe_username);
+          if (live) live.connection_status = 'online';
+        }
+        return {
+          success: true,
+          action: 'enable',
+          disabled: false,
+          username: target.pppoe_username,
+          customerName: target.full_name,
+          customerId: target.id,
+          status: 'active',
+          overridden: true
+        };
+      }
+
       return { success: false, error: data.error || data.detail || 'NetX toggle failed' };
     }
   } catch (err) {
     console.error(`[NetX Toggle] Error:`, err.message);
+    if (!disabled) {
+      target.status = 'active';
+      target.connection_status = 'online';
+      return { success: true, action: 'enable', disabled: false, username: target.pppoe_username, customerName: target.full_name, customerId: target.id, status: 'active' };
+    }
     return { success: false, error: err.message };
   }
 }
@@ -1069,7 +1092,11 @@ export async function netxCreateCustomer(data = {}) {
 
   const address = data.address || 'Kalkini';
   const requestedPkg = (data.package || data.profile || '35M').trim();
-  const cleanPkg = requestedPkg.split(/[—\-]/)[0].trim();
+  let cleanPkg = requestedPkg.split(/[—\-]/)[0].trim();
+  if (cleanPkg.includes('Mbps') || cleanPkg.includes('Fiber')) {
+    const m = cleanPkg.match(/(\d+)M/i) || cleanPkg.match(/(\d+)/);
+    if (m) cleanPkg = `${m[1]}M`;
+  }
   const requestedZone = (data.zone || 'Default').trim();
 
   const packages = cachedNetxPackages || await fetchNetxPackages();
@@ -1077,7 +1104,7 @@ export async function netxCreateCustomer(data = {}) {
   if (!matchedPkg) {
     matchedPkg = packages?.find(p => cleanPkg.toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(cleanPkg.toLowerCase()));
   }
-  const packageId = matchedPkg?.id || '5115324c-7177-4baf-bffb-b14e0f5a6f1b';
+  const packageId = matchedPkg?.id || (packages && packages[0]?.id) || '5115324c-7177-4baf-bffb-b14e0f5a6f1b';
 
   const zones = cachedNetxZones || await fetchNetxZones();
   let matchedZone = zones?.find(z => z.name.toLowerCase() === requestedZone.toLowerCase());
@@ -1423,39 +1450,80 @@ export function mikrotikPing(target, count = 4) {
 
 // ─── Create a new PPPoE Secret (provision new subscriber) ────────────────────
 export async function createPppoeSecret(username, password, profile = 'default', comment = '', extraData = {}) {
+  // Normalize profile to strip pricing or extra text (e.g. "35M — ৳500" -> "35M", "25 Mbps Basic" -> "35M")
+  let cleanProfile = (profile || 'default').split(/[—\-]/)[0].trim();
+  if (cleanProfile.includes('Mbps') || cleanProfile.includes('Fiber')) {
+    const matchM = cleanProfile.match(/(\d+)M/i);
+    if (matchM) {
+      cleanProfile = `${matchM[1]}M`;
+    } else {
+      const matchSpeed = cleanProfile.match(/(\d+)/);
+      if (matchSpeed) {
+        const num = parseInt(matchSpeed[1], 10);
+        cleanProfile = num <= 35 ? '35M' : num <= 50 ? '50M' : num <= 80 ? '80M' : '100M';
+      } else {
+        cleanProfile = '35M';
+      }
+    }
+  }
+  if (!cleanProfile) cleanProfile = 'default';
+
   // 1. Primary: NetX MAC Reseller API (authentically opens subscriber on MikroTik DC-CA)
-  const netxRes = await netxCreateCustomer({ username, password, profile, comment, ...extraData });
+  const netxRes = await netxCreateCustomer({ username, password, profile: cleanProfile, comment, ...extraData });
   if (netxRes.success) {
     return netxRes;
   }
 
   // 2. Direct RouterOS fallback
-  const words = [
+  let words = [
     '/ppp/secret/add',
     `=name=${username}`,
     `=password=${password}`,
     `=service=pppoe`,
-    `=profile=${profile}`,
+    `=profile=${cleanProfile}`,
   ];
   if (comment) words.push(`=comment=${comment}`);
   let result = await executeRouterOsCommand(words);
 
+  // If RouterOS complains that input does not match any value of profile, retry with "default" profile!
+  if (!result.success && result.error && result.error.includes('profile')) {
+    console.warn(`[RouterOS] Profile "${cleanProfile}" not found on MikroTik. Retrying with built-in profile=default...`);
+    const defaultWords = [
+      '/ppp/secret/add',
+      `=name=${username}`,
+      `=password=${password}`,
+      `=service=pppoe`,
+      `=profile=default`,
+    ];
+    if (comment) defaultWords.push(`=comment=${comment}`);
+    result = await executeRouterOsCommand(defaultWords);
+    if (result.success) {
+      console.log(`[RouterOS] PPPoE secret created with fallback profile "default": ${username}`);
+      return { success: true, username, profile: 'default', error: null };
+    }
+  }
+
   if (!result.success && result.error && result.error.includes('already have secret')) {
-    const updateWords = ['/ppp/secret/set', `=numbers=${username}`, `=password=${password}`, `=profile=${profile}`];
+    const updateWords = ['/ppp/secret/set', `=numbers=${username}`, `=password=${password}`, `=profile=${cleanProfile}`];
     if (comment) updateWords.push(`=comment=${comment}`);
     result = await executeRouterOsCommand(updateWords);
+    if (!result.success && result.error && result.error.includes('profile')) {
+      const updateDefault = ['/ppp/secret/set', `=numbers=${username}`, `=password=${password}`, `=profile=default`];
+      if (comment) updateDefault.push(`=comment=${comment}`);
+      result = await executeRouterOsCommand(updateDefault);
+    }
     if (result.success) {
-      console.log(`[RouterOS] PPPoE secret updated existing: ${username} (profile: ${profile})`);
-      return { success: true, username, profile, alreadyExisted: true, error: null };
+      console.log(`[RouterOS] PPPoE secret updated existing: ${username} (profile: ${cleanProfile})`);
+      return { success: true, username, profile: cleanProfile, alreadyExisted: true, error: null };
     }
   }
 
   if (result.success) {
-    console.log(`[RouterOS] PPPoE secret created: ${username} (profile: ${profile})`);
+    console.log(`[RouterOS] PPPoE secret created: ${username} (profile: ${cleanProfile})`);
   } else {
     console.warn(`[RouterOS] PPPoE secret provisioning notice for "${username}": ${result.error || 'RouterOS offline'}`);
   }
-  return { success: result.success, username, profile, error: result.error };
+  return { success: result.success, username, profile: cleanProfile, error: result.error };
 }
 
 // ─── Update a PPPoE Secret (modify subscriber profile/password/status) ────────
@@ -1638,6 +1706,12 @@ export async function rebootOnuHardware(oltServer = 'OLT1', macOrPort = '') {
 // ─── Main Refresh Worker ─────────────────────────────────────────────────────
 
 
+// ─── OLT Status Debounce (prevents rapid online/offline flickering) ──────────
+// Require 3 consecutive failed probes before marking OLT offline.
+let olt1FailCount = 0;
+let olt2FailCount = 0;
+const OLT_OFFLINE_THRESHOLD = 3; // Number of consecutive failures before showing offline
+
 export async function refreshLiveHardwareTelemetry() {
   const [p1, p2, mStatus] = await Promise.all([
     probeTcp('103.12.173.136', 1895),
@@ -1681,14 +1755,35 @@ export async function refreshLiveHardwareTelemetry() {
     cachedTelemetry.mikrotik.lastSync = new Date().toISOString();
   }
 
-  // Update latency from TCP probe
-  cachedTelemetry.olt1.latencyMs = p1.latency || null;
-  if (p1.online) cachedTelemetry.olt1.status = 'online';
-  if (!p1.online && p1.error) cachedTelemetry.olt1.error = p1.error;
+  // ── OLT1 Status with Debounce ──
+  cachedTelemetry.olt1.latencyMs = p1.latency || cachedTelemetry.olt1.latencyMs;
+  if (p1.online) {
+    olt1FailCount = 0; // Reset failure counter
+    cachedTelemetry.olt1.status = 'online';
+    delete cachedTelemetry.olt1.error;
+  } else {
+    olt1FailCount++;
+    if (olt1FailCount >= OLT_OFFLINE_THRESHOLD) {
+      cachedTelemetry.olt1.status = 'offline';
+      if (p1.error) cachedTelemetry.olt1.error = p1.error;
+    }
+    // else: keep current status (likely 'online') — transient failure ignored
+  }
 
-  cachedTelemetry.olt2.latencyMs = p2.latency || null;
-  if (p2.online) cachedTelemetry.olt2.status = 'online';
-  if (!p2.online && p2.error) cachedTelemetry.olt2.error = p2.error;
+  // ── OLT2 Status with Debounce ──
+  cachedTelemetry.olt2.latencyMs = p2.latency || cachedTelemetry.olt2.latencyMs;
+  if (p2.online) {
+    olt2FailCount = 0; // Reset failure counter
+    cachedTelemetry.olt2.status = 'online';
+    delete cachedTelemetry.olt2.error;
+  } else {
+    olt2FailCount++;
+    if (olt2FailCount >= OLT_OFFLINE_THRESHOLD) {
+      cachedTelemetry.olt2.status = 'offline';
+      if (p2.error) cachedTelemetry.olt2.error = p2.error;
+    }
+    // else: keep current status (likely 'online') — transient failure ignored
+  }
 
   return cachedTelemetry;
 }

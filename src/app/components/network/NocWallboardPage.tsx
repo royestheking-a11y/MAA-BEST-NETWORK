@@ -19,7 +19,7 @@ interface NocWallboardPageProps {
 
 export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
   const { customers } = useCustomerContext();
-  const { telemetry, lastSyncTime, isLiveConnected } = useRealtimeHardwareTelemetry(2500);
+  const { telemetry, lastSyncTime, isLiveConnected } = useRealtimeHardwareTelemetry(8000);
   const { liveStats, isLoading: isNetxLoading, refresh: refreshNetx } = useNetxLiveData(30000);
 
   // ── Real Customer & Session Statistics ──

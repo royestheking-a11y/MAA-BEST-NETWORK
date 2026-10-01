@@ -131,8 +131,9 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
 
 /**
  * Custom React Hook to poll live hardware telemetry
+ * Uses debounce logic to prevent OLT status flickering between online/offline
  */
-export function useRealtimeHardwareTelemetry(pollIntervalMs = 2500) {
+export function useRealtimeHardwareTelemetry(pollIntervalMs = 8000) {
   const [telemetry, setTelemetry] = useState<HardwareTelemetryPayload>(DEFAULT_TELEMETRY);
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(true);
   const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString());
@@ -148,6 +149,39 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 2500) {
     let eventSource: EventSource | null = null;
     let fallbackInterval: any = null;
 
+    // ── OLT Status Debounce (client-side) ──────────────────────────────────
+    // Prevent rapid online/offline flickering by requiring 3 consecutive
+    // offline reports before changing status to offline on the UI.
+    let olt1OfflineCount = 0;
+    let olt2OfflineCount = 0;
+    const OFFLINE_THRESHOLD = 3;
+
+    function stabilizeOltStatus(data: HardwareTelemetryPayload): HardwareTelemetryPayload {
+      const result = { ...data };
+
+      // OLT1 debounce
+      if (data.olt1.status === 'offline') {
+        olt1OfflineCount++;
+        if (olt1OfflineCount < OFFLINE_THRESHOLD) {
+          result.olt1 = { ...data.olt1, status: 'online' }; // Keep showing online during transient failures
+        }
+      } else {
+        olt1OfflineCount = 0;
+      }
+
+      // OLT2 debounce
+      if (data.olt2.status === 'offline') {
+        olt2OfflineCount++;
+        if (olt2OfflineCount < OFFLINE_THRESHOLD) {
+          result.olt2 = { ...data.olt2, status: 'online' }; // Keep showing online during transient failures
+        }
+      } else {
+        olt2OfflineCount = 0;
+      }
+
+      return result;
+    }
+
     // 1. Try Zero-Delay Server-Sent Events (SSE) Stream
     try {
       if (typeof window !== "undefined" && window.EventSource) {
@@ -158,7 +192,7 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 2500) {
           try {
             const data = JSON.parse(event.data);
             if (data && data.mikrotik) {
-              setTelemetry(data);
+              setTelemetry(stabilizeOltStatus(data));
               setIsLiveConnected(true);
               setLastSyncTime(new Date().toLocaleTimeString());
             }
@@ -175,17 +209,17 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 2500) {
       }
     } catch (_) {}
 
-    // 2. Fast Polling Mechanism (every 2.5s)
+    // 2. Polling Mechanism
     async function fetchTelemetry() {
       try {
         const res = await fetch(statusEndpoint, {
-          signal: AbortSignal.timeout(3000),
+          signal: AbortSignal.timeout(5000),
         }).catch(() => null);
 
         if (res && res.ok) {
           const data = await res.json();
           if (isMounted && data && data.mikrotik) {
-            setTelemetry(data);
+            setTelemetry(stabilizeOltStatus(data));
             setIsLiveConnected(true);
             setLastSyncTime(new Date().toLocaleTimeString());
             return;

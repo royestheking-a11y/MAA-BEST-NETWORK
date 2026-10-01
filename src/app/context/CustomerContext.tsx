@@ -98,6 +98,8 @@ export interface Customer {
   billingStatus?: "Prepaid" | "Postpaid" | "Daily" | "Monthly";
   billingStartMonth?: string;
   expireDate?: string;
+  graceDays?: number; // Number of bonus / grace days granted without changing the base billing cycle
+  graceExpiryDate?: string; // Date until which internet access is granted under grace (e.g. "04 Nov 2026")
   cableMetre?: number | string;
   fiberCode?: string;
   coreNumber?: number | string;
@@ -115,12 +117,76 @@ export interface Customer {
   disabledInMikrotik?: boolean;
   disabledInSystem?: boolean;
   profileMismatch?: boolean;
+  createdAt?: number; // Epoch ms timestamp when account was provisioned (grace period protection)
+  updatedAt?: number; // Epoch ms timestamp when account was modified by admin
+  deletedAt?: string;
+  deletedDate?: string;
+  deletedBy?: string;
+  deletionReason?: string;
   lat?: number;
   lng?: number;
   latitude?: number;
   longitude?: number;
   invoices: Invoice[];
   paymentHistory: PaymentTransaction[];
+}
+
+const MONTH_NAMES_MAP: Record<string, number> = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11,
+};
+
+/**
+ * Safely parse date strings supporting DD/MM/YYYY, DD-MM-YYYY, DD MMM YYYY, and standard formats.
+ * Prevents V8 from misinterpreting DD/MM/YYYY as MM/DD/YYYY (e.g. 01/11/2026 being parsed as Jan 11 instead of Nov 1).
+ * Sets end-of-day (23:59:59) so subscribers retain access throughout the entire final expiry date.
+ */
+export function parseSafeDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr || dateStr === "Permanent / Lifetime" || dateStr === "—") return null;
+  const str = String(dateStr).trim();
+
+  // Pattern: "30 Oct 2026", "01-October-2026", "30-Oct-2026"
+  const namedMatch = str.match(/^(\d{1,2})[\s\-]+([a-zA-Z]+)[\s\-]+(\d{4})(.*)$/);
+  if (namedMatch) {
+    const day = parseInt(namedMatch[1], 10);
+    const monthKey = namedMatch[2].toLowerCase();
+    const month = MONTH_NAMES_MAP[monthKey];
+    const year = parseInt(namedMatch[3], 10);
+    if (month !== undefined && !isNaN(day) && !isNaN(year)) {
+      return new Date(year, month, day, 23, 59, 59, 999);
+    }
+  }
+
+  // Pattern: "DD/MM/YYYY" or "DD-MM-YYYY"
+  const ddmmyyyy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (ddmmyyyy) {
+    const day = parseInt(ddmmyyyy[1], 10);
+    const month = parseInt(ddmmyyyy[2], 10) - 1;
+    const year = parseInt(ddmmyyyy[3], 10);
+    return new Date(year, month, day, 23, 59, 59, 999);
+  }
+
+  // Pattern: "YYYY-MM-DD" or "YYYY/MM/DD"
+  const yyyymmdd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (yyyymmdd) {
+    const year = parseInt(yyyymmdd[1], 10);
+    const month = parseInt(yyyymmdd[2], 10) - 1;
+    const day = parseInt(yyyymmdd[3], 10);
+    return new Date(year, month, day, 23, 59, 59, 999);
+  }
+
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 import { REAL_ISP_CUSTOMERS } from "../data/realIspData";
@@ -164,6 +230,7 @@ interface CustomerContextType {
   bulkSetUserType: (customerIds: string[], userType: "normal" | "free" | "unlimited") => void;
 
   customers: Customer[];
+  deletedCustomers: Customer[];
   activeCustomer: Customer | null;
   upgradeRequests: PlanUpgradeRequest[];
   setActiveCustomer: (customer: Customer | null) => void;
@@ -173,7 +240,9 @@ interface CustomerContextType {
   addCustomerAsync: (newCustomer: Partial<Customer>) => Promise<{ success: boolean; customer: Customer; error?: string; alreadyExists?: boolean }>;
   addCustomersBulk: (newCustomers: Partial<Customer>[]) => Customer[];
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
-  deleteCustomer: (id: string) => void;
+  deleteCustomer: (id: string, reason?: string) => void;
+  restoreCustomer: (id: string) => void;
+  permanentlyPurgeCustomer: (id: string) => void;
   toggleNetStatus: (id: string, enable: boolean) => void;
   processPayment: (
     customerId: string,
@@ -199,14 +268,30 @@ interface CustomerContextType {
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
 const CUSTOMERS_STORAGE_KEY = "isp_customers_store_v16_authentic_mikrotik_packages";
+const DELETED_CUSTOMERS_STORAGE_KEY = "isp_deleted_customers_archive_v1";
 
 export function normalizeCustomerPackage(c: Customer): Customer {
+  // ── PACKAGE NORMALIZATION ─────────────────────────────────────────────────
+  // CRITICAL: Only migrate truly legacy/empty packages. NEVER overwrite 
+  // packages that were set by the admin or synced from MikroTik/NetX.
+  // This preserves user edits and prevents reverting to defaults.
   const isOldPkg = !c.package || c.package === "20Mbps" || c.package === "10 Mbps Basic" || c.package.includes("PIONEER");
   const pkg = isOldPkg ? "35M" : c.package;
-  const prof = isOldPkg ? "35M" : (c.profile || "35M");
-  const speed = pkg === "35M" ? "35/35" : (pkg === "50M" ? "50/50" : (pkg === "80M" ? "80/80" : (pkg === "100M" ? "100/100" : (c.speed || "35/35"))));
-  const down = pkg === "35M" ? 35 : (pkg === "50M" ? 50 : (pkg === "80M" ? 80 : (pkg === "100M" ? 100 : (c.downloadSpeedMbps || 35))));
-  const up = pkg === "35M" ? 35 : (pkg === "50M" ? 50 : (pkg === "80M" ? 80 : (pkg === "100M" ? 100 : (c.uploadSpeedMbps || 35))));
+  const prof = isOldPkg ? "35M" : (c.profile || c.package || "35M");
+
+  // Only derive speed/download/upload if they are missing or if we migrated from an old package
+  const knownPkgSpeeds: Record<string, { down: number; up: number }> = {
+    "35M": { down: 35, up: 35 },
+    "50M": { down: 50, up: 50 },
+    "80M": { down: 80, up: 80 },
+    "100M": { down: 100, up: 100 },
+    "10 Mbps": { down: 10, up: 10 },
+  };
+  const knownSpeed = knownPkgSpeeds[pkg];
+  const speed = c.speed && !isOldPkg ? c.speed : (knownSpeed ? `${knownSpeed.down}/${knownSpeed.up}` : (c.speed || "35/35"));
+  const down = c.downloadSpeedMbps && !isOldPkg ? c.downloadSpeedMbps : (knownSpeed?.down || c.downloadSpeedMbps || 35);
+  const up = c.uploadSpeedMbps && !isOldPkg ? c.uploadSpeedMbps : (knownSpeed?.up || c.uploadSpeedMbps || 35);
+
   const signal = c.onuSignal === "-18.5 dBm" ? "—" : (c.onuSignal || "—");
 
   // ── STALE-DATE MIGRATION (runs for every customer from every source) ──────
@@ -220,8 +305,8 @@ export function normalizeCustomerPackage(c: Customer): Customer {
     c.userType !== "free" && c.userType !== "unlimited" &&
     endDate && endDate !== "Permanent / Lifetime"
   ) {
-    const end = new Date(endDate);
-    if (!isNaN(end.getTime())) {
+    const end = parseSafeDate(endDate);
+    if (end && !isNaN(end.getTime())) {
       const rawDue = (c.dueAmount ?? c.due ?? 0);
       const diffDays = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       if (diffDays <= 0 && rawDue === 0 && c.status !== "suspended" && c.disabledInSystem !== true) {
@@ -244,9 +329,10 @@ export function normalizeCustomerPackage(c: Customer): Customer {
     speed,
     downloadSpeedMbps: down,
     uploadSpeedMbps: up,
-    price: c.price || 500,
-    monthlyBill: c.monthlyBill || 500,
-    serverName: "DC-CA",
+    // CRITICAL: Preserve existing price/monthlyBill/serverName — only fill if missing (never overwrite 0 for free tier)
+    price: typeof c.price === "number" ? c.price : (c.userType === "free" ? 0 : 500),
+    monthlyBill: typeof c.monthlyBill === "number" ? c.monthlyBill : (typeof c.price === "number" ? c.price : (c.userType === "free" ? 0 : 500)),
+    serverName: c.serverName || "DC-CA",
     onuSignal: signal,
     endDate,
     expireDate,
@@ -293,6 +379,19 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     return INITIAL_UPGRADE_REQUESTS;
   });
 
+  const [deletedCustomers, setDeletedCustomers] = useState<Customer[]>(() => {
+    try {
+      const saved = localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(() => {
     try {
       return localStorage.getItem("isp_active_customer_id") || "MBN0001";
@@ -321,7 +420,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           // stale Firestore data, causing the "enable→offline" / "recharge→sudden off"
           // visible within 1-2 seconds. Fix: merge and let local paid/enabled state win.
           setCustomers(prev => {
-            return refreshed.map(cloudCust => {
+            const merged = refreshed.map(cloudCust => {
               const local = prev.find(p =>
                 p.id === cloudCust.id ||
                 p.clientCode === cloudCust.clientCode ||
@@ -330,34 +429,64 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               if (!local) return cloudCust; // New customer from cloud — accept as-is
 
               // Determine the better endDate (the later one wins)
-              const localEndDate = local.endDate ? new Date(local.endDate) : null;
-              const cloudEndDate = cloudCust.endDate ? new Date(cloudCust.endDate) : null;
+              const localEndDate = parseSafeDate(local.endDate);
+              const cloudEndDate = parseSafeDate(cloudCust.endDate);
               const localEndLater = localEndDate && cloudEndDate && !isNaN(localEndDate.getTime()) && !isNaN(cloudEndDate.getTime()) && localEndDate > cloudEndDate;
               const bestEndDate = localEndLater ? local.endDate : cloudCust.endDate;
-              const bestDaysRemaining = bestEndDate ? Math.ceil((new Date(bestEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : cloudCust.daysRemaining;
+              const bestEndDateObj = parseSafeDate(bestEndDate);
+              const bestDaysRemaining = bestEndDateObj ? Math.ceil((bestEndDateObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : cloudCust.daysRemaining;
 
               // Intelligent Merge Strategy:
-              // Firestore (cloudCust) is the absolute source of truth for all manual administrative edits 
-              // (name, phone, billing status, toggle states, due amounts, etc.).
-              // However, syncNetx updates *live telemetry* directly in local state without writing to Firestore.
-              // We must preserve these live telemetry fields from `local` while letting `cloudCust` overwrite the rest.
+              // Firestore (cloudCust) is the source of truth for cloud-persisted state.
+              // However, during the 1-3s Firestore write lag or if admin just updated locally,
+              // local admin edits MUST take precedence so edits don't revert to stale cloud snapshots.
+              const localTime = Math.max(local.updatedAt || 0, local.createdAt || 0);
+              const cloudTime = Math.max((cloudCust as any).updatedAt || 0, (cloudCust as any).createdAt || 0);
+              const localIsNewer = (localTime >= cloudTime) ||
+                                   Boolean(local.updatedAt && (Date.now() - local.updatedAt) < 120000) ||
+                                   Boolean(local.createdAt && (Date.now() - local.createdAt) < 120000);
+
+              if (localIsNewer) {
+                // Local state was recently modified by admin — local edits take precedence over stale cloud data
+                return {
+                  ...cloudCust,
+                  ...local,
+                  endDate: bestEndDate,
+                  expireDate: bestEndDate,
+                  daysRemaining: bestDaysRemaining,
+                  onuSignal: local.onuSignal || cloudCust.onuSignal,
+                  sessionUptime: local.sessionUptime || cloudCust.sessionUptime,
+                  ipAddress: local.ipAddress || cloudCust.ipAddress,
+                  mac: local.mac || cloudCust.mac,
+                  netStatus: local.netStatus || cloudCust.netStatus,
+                };
+              }
+
               return {
                 ...local,
-                ...cloudCust, // Admin edits from any device overwrite local state
-
-                // Preserve live telemetry gathered by the local syncNetx loop
+                ...cloudCust, // Verified cloud state updates local state
+                endDate: bestEndDate,
+                expireDate: bestEndDate,
+                daysRemaining: bestDaysRemaining,
                 onuSignal: local.onuSignal || cloudCust.onuSignal,
                 sessionUptime: local.sessionUptime || cloudCust.sessionUptime,
                 ipAddress: local.ipAddress || cloudCust.ipAddress,
                 mac: local.mac || cloudCust.mac,
                 netStatus: local.netStatus || cloudCust.netStatus,
-
-                // Priority dates (always take the later expiry to prevent regression)
-                endDate: bestEndDate,
-                expireDate: bestEndDate,
-                daysRemaining: bestDaysRemaining,
               };
             });
+
+            // CRITICAL: Preserve local customers that haven't arrived in the cloud snapshot yet
+            // (e.g. newly created subscriber or pending Firestore sync) so they are not wiped out
+            const localOnly = prev.filter(local =>
+              !refreshed.some(c =>
+                c.id === local.id ||
+                c.clientCode === local.clientCode ||
+                (c.pppUser && local.pppUser && c.pppUser.toLowerCase() === local.pppUser.toLowerCase())
+              )
+            );
+
+            return [...localOnly, ...merged];
           });
         }
       }
@@ -453,6 +582,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (!liveMatch && !netxMatch) {
+              // ── CREATION GRACE PERIOD ──────────────────────────────────────
+              // Skip newly created customers (within 120s) — the NetX/MikroTik API
+              // hasn't synced yet and would return no data, causing the sync loop 
+              // to think the customer doesn't exist and potentially override their active state.
+              if (c.createdAt && (Date.now() - c.createdAt) < 120000) {
+                return c; // Preserve brand new customer as-is
+              }
               if (c.onuSignal === "-18.5 dBm") {
                 hasChange = true;
                 return { ...c, onuSignal: "—" };
@@ -461,23 +597,31 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Connection & Line State
-            // CRITICAL: If admin manually enabled the customer (disabledInMikrotik: false),
-            // the NetX API still shows "disabled" for up to 20–60s while MikroTik syncs.
-            // We must NOT let the stale API response re-disable the customer.
-            // Rule: local admin override (disabledInMikrotik: false) wins over stale API data.
+            // CRITICAL: If admin manually enabled/edited the customer,
+            // the NetX API still shows stale data for up to 20–60s while MikroTik syncs.
+            // We must NOT let the stale API response re-disable or overwrite the customer.
+            // GRACE PERIOD: Newly created or recently edited customers (within 120s) are immune to API overwrites.
+            const isRecentlyEdited = Boolean((c.updatedAt && (Date.now() - c.updatedAt) < 120000) || (c.createdAt && (Date.now() - c.createdAt) < 120000));
             const apiSaysDisabled = netxMatch?.status === "disabled";
-            const isLineDisabled = c.disabledInMikrotik === true ||
-              (apiSaysDisabled && c.disabledInMikrotik !== false);
-            // IMPORTANT: Only flip to offline if API *explicitly* confirms offline.
-            // If there's no live signal, preserve current status to prevent flicker
-            // (e.g. after payment or manual enable, API takes time to reflect new state).
+            const isPaidOrFree = c.userType === "free" || c.userType === "unlimited" || ((c.dueAmount === 0 || c.due === 0) && c.status === "active");
+
+            // CRITICAL FIX: If customer has paid their bill (dueAmount === 0) or is free/active,
+            // never let upstream NetX's stale "disabled" (caused by expiry cutoff) override their line to disabled/suspended!
+            const isLineDisabled = isPaidOrFree
+              ? (c.disabledInMikrotik === true && c.status === "suspended")
+              : isRecentlyEdited
+                ? (c.disabledInMikrotik === true)
+                : (c.disabledInMikrotik === true || (apiSaysDisabled && c.disabledInMikrotik !== false));
+
             const newNetStatus: "online" | "offline" = isLineDisabled
               ? "offline"
-              : (liveMatch?.connection_status === "online" || netxMatch?.connection_status === "online")
-                ? "online"
-                : liveMatch?.connection_status === "offline"
-                  ? "offline"
-                  : c.netStatus; // Preserve existing status — no explicit API signal
+              : isPaidOrFree
+                ? (liveMatch?.connection_status === "offline" ? (c.netStatus || "online") : "online")
+                : (liveMatch?.connection_status === "online" || netxMatch?.connection_status === "online")
+                  ? "online"
+                  : liveMatch?.connection_status === "offline"
+                    ? "offline"
+                    : c.netStatus;
 
             const newSignal = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
               ? `${liveMatch.onu_rx_power} dBm`
@@ -486,21 +630,24 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             const newMac = liveMatch?.live_mac || netxMatch?.onu_mac || c.mac;
             const newUptime = liveMatch?.live_uptime || c.sessionUptime;
 
-            // Live MikroTik package & pricing
-            const livePkg = netxMatch?.package_name || liveMatch?.package_name || c.package || "35M";
-            const livePrice = netxMatch?.package_price ? Number(netxMatch.package_price) : (netxMatch?.monthly_bill ? Number(netxMatch.monthly_bill) : (liveMatch?.package_price ? Number(liveMatch.package_price) : c.price));
-            const liveSpeed = livePkg === "35M" ? "35/35" : (livePkg === "50M" ? "50/50" : (livePkg === "80M" ? "80/80" : (livePkg === "100M" ? "100/100" : (livePkg === "10 Mbps" ? "10/10" : c.speed))));
-            const liveDown = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.downloadSpeedMbps))));
-            const liveUp = livePkg === "35M" ? 35 : (livePkg === "50M" ? 50 : (livePkg === "80M" ? 80 : (livePkg === "100M" ? 100 : (livePkg === "10 Mbps" ? 10 : c.uploadSpeedMbps))));
+            // Live MikroTik package & pricing — if customer was recently edited by admin or is free/unlimited, preserve admin's package & price!
+            const effectivePkg = isRecentlyEdited || c.userType === "free" || c.userType === "unlimited"
+              ? (c.package || "35M")
+              : (netxMatch?.package_name || liveMatch?.package_name || c.package || "35M");
+            const livePrice = isRecentlyEdited || c.userType === "free" || c.userType === "unlimited"
+              ? (c.price ?? (c.userType === "free" ? 0 : 500))
+              : (netxMatch?.package_price ? Number(netxMatch.package_price) : (netxMatch?.monthly_bill ? Number(netxMatch.monthly_bill) : (liveMatch?.package_price ? Number(liveMatch.package_price) : c.price)));
+            const liveSpeed = isRecentlyEdited
+              ? (c.speed || "35/35")
+              : (effectivePkg === "35M" ? "35/35" : (effectivePkg === "50M" ? "50/50" : (effectivePkg === "80M" ? "80/80" : (effectivePkg === "100M" ? "100/100" : (effectivePkg === "10 Mbps" ? "10/10" : c.speed)))));
+            const liveDown = isRecentlyEdited
+              ? (c.downloadSpeedMbps || 35)
+              : (effectivePkg === "35M" ? 35 : (effectivePkg === "50M" ? 50 : (effectivePkg === "80M" ? 80 : (effectivePkg === "100M" ? 100 : (effectivePkg === "10 Mbps" ? 10 : c.downloadSpeedMbps)))));
+            const liveUp = isRecentlyEdited
+              ? (c.uploadSpeedMbps || 35)
+              : (effectivePkg === "35M" ? 35 : (effectivePkg === "50M" ? 50 : (effectivePkg === "80M" ? 80 : (effectivePkg === "100M" ? 100 : (effectivePkg === "10 Mbps" ? 10 : c.uploadSpeedMbps)))));
 
             // ── HYBRID DUE AMOUNT ─────────────────────────────────────────────────
-            // PRIORITY: local paid state always beats stale API due balance.
-            // Case A: free/unlimited            → always 0
-            // Case B: API due > 0              → only use if local ALSO confirms unpaid
-            //   Guard 1: locally paid (amt=0+active) → preserve 0
-            //   Guard 2: admin just enabled (disabledInMikrotik:false) → preserve 0
-            // Case C: API explicitly says 0    → 0
-            // Case D: API has no due field     → keep local c.dueAmount (preserve, don't reset)
             const rawNetxDue = netxMatch?.due_amount !== undefined ? Number(netxMatch.due_amount) : undefined;
             let liveDueAmount: number;
             if (c.userType === "free" || c.userType === "unlimited") {
@@ -509,58 +656,54 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               const locallyPaid = (c.dueAmount === 0 || c.due === 0) && c.status === "active";
               liveDueAmount = locallyPaid ? 0 : rawNetxDue;
             } else if (rawNetxDue === 0) {
-              liveDueAmount = 0; // API explicitly cleared
+              liveDueAmount = 0;
             } else {
-              liveDueAmount = c.dueAmount ?? c.due ?? 0; // No API data — preserve local
+              liveDueAmount = c.dueAmount ?? c.due ?? 0;
             }
 
-            const liveMonthlyBill = netxMatch?.monthly_bill !== undefined ? Number(netxMatch.monthly_bill) : (livePrice || c.monthlyBill);
+            const liveMonthlyBill = isRecentlyEdited || c.userType === "free" || c.userType === "unlimited"
+              ? (c.monthlyBill ?? (c.userType === "free" ? 0 : 500))
+              : (netxMatch?.monthly_bill !== undefined ? Number(netxMatch.monthly_bill) : (livePrice || c.monthlyBill));
 
             // ── HYBRID LIFECYCLE STATUS ───────────────────────────────────────────
-            // Status is DERIVED from actual state, NOT blindly from API status string.
-            // Priority: disabled > due+balance > balance=0 resolve > API confirms active > keep
             let computedStatus: CustomerStatus = c.status;
-            if (isLineDisabled) {
-              computedStatus = "suspended"; // Line is definitely disabled
+            if (isPaidOrFree) {
+              computedStatus = "active";
+            } else if (isRecentlyEdited) {
+              computedStatus = c.status; // Preserve admin-chosen status during edit grace period
+            } else if (isLineDisabled) {
+              computedStatus = "suspended";
             } else if (liveDueAmount > 0 && netxMatch?.is_due) {
-              computedStatus = "due"; // API confirms unpaid and we have real balance
+              computedStatus = "due";
             } else if (liveDueAmount === 0) {
               if (c.status === "due") {
-                computedStatus = "active"; // Balance cleared → upgrade
+                computedStatus = "active";
               } else if (c.status === "suspended" && (c.disabledInSystem === false || c.disabledInMikrotik === false)) {
-                computedStatus = "active"; // Admin manually re-enabled → clear suspended
+                computedStatus = "active";
               } else if ((netxMatch?.status === "active" || newNetStatus === "online") && c.status !== "active" && c.status !== "disconnected") {
-                computedStatus = "active"; // API/live confirms line is up → sync
+                computedStatus = "active";
               }
-              // else: keep current (already active, or intentionally disconnected)
             } else if (netxMatch?.status === "active" && liveDueAmount === 0) {
               computedStatus = "active";
             }
 
             // ── HYBRID EXPIRY DATE & DAYS REMAINING ──────────────────────────────
-            // PRIORITY: always trust the LATER date (never undo a recent payment/renewal).
-            // KEY: Always recalculate daysRemaining from the final endDate so the billing
-            // engine has FRESH values — never relies on stale cached daysRemaining field.
             let newEndDate = c.endDate;
             let newDaysRemaining = c.daysRemaining;
             if (netxMatch?.expiry_date) {
-              const apiExpiry = new Date(netxMatch.expiry_date);
-              if (!isNaN(apiExpiry.getTime())) {
-                const localExpiry = c.endDate ? new Date(c.endDate) : null;
+              const apiExpiry = parseSafeDate(netxMatch.expiry_date);
+              if (apiExpiry && !isNaN(apiExpiry.getTime())) {
+                const localExpiry = parseSafeDate(c.endDate);
                 if (!localExpiry || isNaN(localExpiry.getTime()) || apiExpiry > localExpiry) {
-                  // API date is further in future — accept it
                   newEndDate       = apiExpiry.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
                   newDaysRemaining = Math.ceil((apiExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 } else {
-                  // Local date is later (post-payment) — keep local, but recalc days from it
                   newDaysRemaining = Math.ceil((localExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                 }
               }
             } else if (c.endDate && c.endDate !== "Permanent / Lifetime") {
-              // No API expiry data — always recalculate daysRemaining from local endDate.
-              // This keeps billing engine fresh instead of waiting for hourly batch recalc.
-              const localExpiry = new Date(c.endDate);
-              if (!isNaN(localExpiry.getTime())) {
+              const localExpiry = parseSafeDate(c.endDate);
+              if (localExpiry && !isNaN(localExpiry.getTime())) {
                 newDaysRemaining = Math.ceil((localExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
               }
             }
@@ -570,7 +713,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               c.onuSignal !== newSignal ||
               c.ipAddress !== newIp ||
               c.mac !== newMac ||
-              c.package !== livePkg ||
+              c.package !== effectivePkg ||
               c.price !== livePrice ||
               c.monthlyBill !== liveMonthlyBill ||
               c.dueAmount !== liveDueAmount ||
@@ -595,8 +738,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 ipAddress: newIp,
                 mac: newMac,
                 sessionUptime: newUptime,
-                package: livePkg,
-                profile: livePkg,
+                package: effectivePkg,
+                profile: effectivePkg,
                 speed: liveSpeed,
                 downloadSpeedMbps: liveDown,
                 uploadSpeedMbps: liveUp,
@@ -708,9 +851,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         const updated = prev.map(c => {
           if (c.userType === "free" || c.userType === "unlimited") return c;
           if (!c.endDate || c.endDate === "Permanent / Lifetime") return c;
-          const end = new Date(c.endDate);
-          if (!isNaN(end.getTime())) {
-            const diffMs = end.getTime() - now.getTime();
+          const baseEnd = parseSafeDate(c.endDate);
+          const graceEnd = parseSafeDate(c.graceExpiryDate);
+          const activeEnd = (graceEnd && graceEnd > now) ? graceEnd : baseEnd;
+          if (activeEnd && !isNaN(activeEnd.getTime())) {
+            const diffMs = activeEnd.getTime() - now.getTime();
             const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
             if (diffDays !== c.daysRemaining) {
               changed = true;
@@ -811,13 +956,16 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const newId = data.clientCode || `MBN${String(nextNum).padStart(4, "0")}`;
     const defaultPass = data.passcode || `mbn@${String(nextNum).padStart(4, "0")}`;
 
-    const speedVal = data.speed || "20/10";
-    const speeds = speedVal.split("/").map(s => parseInt(s.trim()) || 20);
+    const speedVal = data.speed || "35/35";
+    const speeds = speedVal.split("/").map(s => parseInt(s.trim()) || 35);
     const cleanName = (data.name || `client${nextNum}`).toLowerCase().replace(/[^a-z0-9]/g, "");
 
     const userType = data.userType || "normal";
     const isFree = userType === "free";
     const isUnlimited = userType === "unlimited";
+    const wantDisabled = data.status === "suspended" || data.netStatus === "offline";
+    const cleanProfile = isFree ? "default" : ((data.profile || data.package || "35M").split(/[—\-]/)[0].trim() || "35M");
+    const cleanPkg = isFree ? "Complimentary Free Tier (No Cutoff)" : ((data.package || cleanProfile).split(/[—\-]/)[0].trim() || "35M");
 
     const newCustomer: Customer = {
       name: data.name || `Mbn@${cleanName}`,
@@ -827,14 +975,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       zone: data.zone || "DHAKA DIVISION",
       subzone: data.subzone || "KALKINI SOMITIR HAT",
       box: data.box || "SOMITIR HAT BAZAR",
-      package: data.package || (isFree ? "Complimentary Free Tier (No Cutoff)" : "PIONEER_HOME_20Mbps"),
-      profile: data.profile || (isFree ? "default" : (data.package || "PIONEER_HOME_20Mbps")),
-      serverName: data.serverName || "RETAIL_1",
+      serverName: data.serverName || "DC-CA",
       service: data.service || "pppoe",
       connectionType: data.connectionType || "Optical Fiber",
       speed: speedVal,
-      downloadSpeedMbps: speeds[0] || 20,
-      uploadSpeedMbps: speeds[1] || 10,
+      downloadSpeedMbps: speeds[0] || 35,
+      uploadSpeedMbps: speeds[1] || 35,
       price: isFree ? 0 : (data.price || data.monthlyBill || 500),
       monthlyBill: isFree ? 0 : (data.monthlyBill || data.price || 500),
       status: isFree ? "active" : (data.status || "active"),
@@ -861,10 +1007,15 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       invoices: data.invoices || [],
       paymentHistory: data.paymentHistory || [],
       ...data,
+      profile: cleanProfile, // Ensure clean profile after spread
+      package: cleanPkg,
       id: newId,
       clientCode: newId,
       passcode: data.passcode || defaultPass,
       userType: userType,
+      createdAt: Date.now(), // Grace period: syncNetx won't override for 120s
+      disabledInMikrotik: wantDisabled ? true : false,
+      disabledInSystem: wantDisabled ? true : false,
       ...(isFree ? { dueAmount: 0, due: 0, price: 0, monthlyBill: 0, status: "active", netStatus: "online" } : {}),
     };
 
@@ -908,8 +1059,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       const gatewayBase = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
         ? "" : "https://maa-best-network.onrender.com";
       const pppUser = newCustomer.pppUser || `mbn@${(newCustomer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
-      const pppPass = newCustomer.pppPass || "123456";
-      const profile = newCustomer.package || newCustomer.profile || "35M";
+      const pppPass = newCustomer.pppPass || newCustomer.passcode || "123456";
+      const profile = (newCustomer.profile || newCustomer.package || "35M").split(/[—\-]/)[0].trim();
       const comment = `${newCustomer.name} (${newId}) — Created via ISP Portal`;
       fetch(`${gatewayBase}/api/mikrotik/user/create`, {
         method: "POST",
@@ -922,8 +1073,11 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           name: newCustomer.name,
           phone: newCustomer.phone,
           address: newCustomer.address,
-          package: newCustomer.package,
-          zone: newCustomer.zone
+          package: profile,
+          zone: newCustomer.zone,
+          olt: newCustomer.olt,
+          ponPort: newCustomer.ponPort,
+          mac: newCustomer.mac
         }),
       })
       .then(r => r.json())
@@ -994,7 +1148,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           phone: newCustomer.phone,
           address: newCustomer.address,
           package: profile,
-          zone: newCustomer.zone
+          zone: newCustomer.zone,
+          olt: newCustomer.olt,
+          ponPort: newCustomer.ponPort,
+          mac: newCustomer.mac
         }),
         signal: AbortSignal.timeout(35000), // 35s to allow for Render cold wake up if asleep
       });
@@ -1114,11 +1271,29 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     }
 
     setCustomers(prev => {
-      const updated = prev.map(c => {
+      const updated: Customer[] = prev.map((c): Customer => {
         if (c.id === id || c.clientCode === id || c.pppUser === id) {
           const finalUserType = updates.userType !== undefined ? updates.userType : c.userType || "normal";
           const isFree = finalUserType === "free";
           const isUnlimited = finalUserType === "unlimited";
+
+          const nextStatus: CustomerStatus = updates.status 
+            ? (updates.status as CustomerStatus)
+            : (updates.disabledInMikrotik !== undefined 
+                ? (updates.disabledInMikrotik ? "suspended" : "active") 
+                : c.status);
+
+          const nextNetStatus: "online" | "offline" = updates.netStatus
+            ? updates.netStatus
+            : (updates.disabledInMikrotik !== undefined
+                ? (updates.disabledInMikrotik ? "offline" : "online")
+                : (nextStatus === "suspended" ? "offline" : c.netStatus));
+
+          const finalStatus: CustomerStatus = isFree 
+            ? "active" 
+            : (isUnlimited && nextStatus === "suspended" ? "active" : nextStatus);
+
+          const finalNetStatus: "online" | "offline" = isFree ? "online" : nextNetStatus;
 
           return {
             ...c,
@@ -1126,20 +1301,16 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             id: newId,
             clientCode: newId,
             userType: finalUserType,
+            updatedAt: Date.now(), // Mark that admin updated this customer now
+            status: finalStatus,
+            netStatus: finalNetStatus,
+            disabledInMikrotik: isFree || isUnlimited ? false : (updates.disabledInMikrotik !== undefined ? updates.disabledInMikrotik : (finalStatus === "suspended")),
+            disabledInSystem: isFree || isUnlimited ? false : (updates.disabledInMikrotik !== undefined ? updates.disabledInMikrotik : (finalStatus === "suspended")),
             ...(isFree ? {
               dueAmount: 0,
               due: 0,
               price: 0,
               monthlyBill: 0,
-              status: "active" as CustomerStatus,
-              netStatus: "online" as const,
-              disabledInMikrotik: false,
-              disabledInSystem: false,
-            } : {}),
-            ...(isUnlimited ? {
-              disabledInMikrotik: false,
-              disabledInSystem: false,
-              status: (updates.status === "suspended" ? "active" as CustomerStatus : (updates.status || c.status)),
             } : {})
           };
         }
@@ -1235,12 +1406,38 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const deleteCustomer = (id: string) => {
+  const deleteCustomer = (id: string, reason?: string) => {
     const target = customers.find(c => c.id === id || c.clientCode === id);
     const targetName = target ? target.name : id;
     const targetPppUser = target?.pppUser || (target?.name ? `mbn@${target.name.toLowerCase().replace(/[^a-z0-9]/g, "")}` : undefined);
     const targetDocId = target?.id || id;
     const targetClientCode = target?.clientCode;
+
+    // Archive the deleted customer into deletedCustomers state and storage
+    if (target) {
+      const archived: Customer = {
+        ...target,
+        status: "disconnected" as CustomerStatus,
+        netStatus: "offline" as const,
+        disabledInMikrotik: true,
+        disabledInSystem: true,
+        deletedAt: new Date().toISOString(),
+        deletedDate: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        deletedBy: "Admin",
+        deletionReason: reason || "Account Terminated by Admin",
+      };
+
+      setDeletedCustomers(prev => {
+        const filtered = prev.filter(c => c.id !== target.id && c.clientCode !== target.clientCode);
+        const updated = [archived, ...filtered];
+        try {
+          localStorage.setItem(DELETED_CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+        return updated;
+      });
+    }
 
     setCustomers(prev => {
       const updated = prev.filter(c => c.id !== id && c.clientCode !== id && c.id !== targetDocId);
@@ -1252,7 +1449,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
-    // Delete document from Firestore
+    // Delete document from active Firestore collection
     deleteCustomerFromFirestore(targetDocId);
     if (targetClientCode && targetClientCode !== targetDocId) {
       deleteCustomerFromFirestore(targetClientCode);
@@ -1313,9 +1510,81 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     activityLogger.log({
       type: "customer",
       severity: "warning",
-      action: "Subscriber Account Terminated",
-      detail: `Deleted subscriber record for ${targetName} (${id}) from CRM & billing database.`,
-      targetId: id
+      action: "Subscriber Account Deleted & Archived",
+      detail: `Deleted subscriber record for ${targetName} (${id}) from active service. Account archived in Deleted Accounts section.`,
+      targetId: id,
+    });
+  };
+
+  const restoreCustomer = (id: string) => {
+    const target = deletedCustomers.find(c => c.id === id || c.clientCode === id);
+    if (!target) return;
+
+    const restored: Customer = {
+      ...target,
+      status: "active" as CustomerStatus,
+      netStatus: "online" as const,
+      disabledInMikrotik: false,
+      disabledInSystem: false,
+      deletedAt: undefined,
+      deletedDate: undefined,
+      deletedBy: undefined,
+      deletionReason: undefined,
+      updatedAt: Date.now(),
+    };
+
+    setDeletedCustomers(prev => {
+      const updated = prev.filter(c => c.id !== id && c.clientCode !== id);
+      try {
+        localStorage.setItem(DELETED_CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+
+    setCustomers(prev => {
+      const updated = [normalizeCustomerPackage(restored), ...prev.filter(c => c.id !== id && c.clientCode !== id)];
+      try {
+        localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+
+    saveCustomerToFirestore(restored);
+
+    // Re-provision on MikroTik
+    const targetPppUser = restored.pppUser || `mbn@${restored.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+    syncMikrotikUserState(targetPppUser, false, restored);
+
+    activityLogger.log({
+      type: "customer",
+      severity: "success",
+      action: "Subscriber Account Restored",
+      detail: `Subscriber ${restored.name} (${id}) restored from Deleted Accounts archive to active service.`,
+      targetId: id,
+    });
+  };
+
+  const permanentlyPurgeCustomer = (id: string) => {
+    setDeletedCustomers(prev => {
+      const updated = prev.filter(c => c.id !== id && c.clientCode !== id);
+      try {
+        localStorage.setItem(DELETED_CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+
+    activityLogger.log({
+      type: "customer",
+      severity: "warning",
+      action: "Subscriber Permanently Purged",
+      detail: `Archived customer ${id} was permanently purged from the database archive.`,
+      targetId: id,
     });
   };
 
@@ -1330,7 +1599,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         // Without this, the billing engine re-suspends in the next 60s cycle if endDate is past.
         let endDateExtension: Partial<Customer> = {};
         if (isEnabling) {
-          const currentEnd = c.endDate ? new Date(c.endDate) : null;
+          const currentEnd = parseSafeDate(c.endDate);
           const isExpired = !currentEnd || isNaN(currentEnd.getTime()) || currentEnd < new Date();
           if (isExpired) {
             const newEnd = new Date();
@@ -1373,18 +1642,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     setCustomers(prev => {
       const updated = prev.map(c => {
         if (c.id === customerId || c.clientCode === customerId) {
-          // Calculate new end date
-          let currentEnd = c.endDate ? new Date(c.endDate) : new Date();
-          if (isNaN(currentEnd.getTime())) {
-            currentEnd = new Date();
-          }
-          if (currentEnd < new Date()) {
-            currentEnd = new Date();
-          }
-          currentEnd.setDate(currentEnd.getDate() + extraDays);
+          // Calculate bonus grace end date without changing base billing cycle expiry date
+          const baseEnd = parseSafeDate(c.endDate || c.expireDate) || new Date();
+          const graceBase = new Date(Math.max(Date.now(), baseEnd.getTime()));
+          graceBase.setDate(graceBase.getDate() + extraDays);
 
-          const newEndDateStr = currentEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-          const newDays = Math.max(1, (c.daysRemaining && c.daysRemaining > 0 ? c.daysRemaining : 0) + extraDays);
+          const graceEndDateStr = graceBase.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+          const newDays = Math.max(extraDays, Math.ceil((graceBase.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
           const wasSuspended = c.status === "suspended" || c.disabledInMikrotik;
           if (wasSuspended) {
             shouldReactivate = true;
@@ -1392,17 +1656,16 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
           return {
             ...c,
-            endDate: newEndDateStr,
-            expireDate: newEndDateStr,
+            // Permanent base cycle expired date is preserved untouched as a bonus gift!
+            graceDays: (c.graceDays || 0) + extraDays,
+            graceExpiryDate: graceEndDateStr,
             daysRemaining: newDays,
-            ...(wasSuspended ? {
-              status: "active" as CustomerStatus,
-              netStatus: "online" as const,
-              disabledInMikrotik: false,
-              disabledInSystem: false,
-              disconnectedAt: undefined,
-              logoutTime: null,
-            } : {})
+            status: "active" as CustomerStatus,
+            netStatus: "online" as const,
+            disabledInMikrotik: false,
+            disabledInSystem: false,
+            disconnectedAt: undefined,
+            logoutTime: null,
           };
         }
         return c;
@@ -1422,8 +1685,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       activityLogger.log({
         type: "network",
         severity: "success",
-        action: "Subscriber Line Auto-Reactivated on MikroTik",
-        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser || targetCust.id}) following grace period extension.`,
+        action: "Subscriber Line Auto-Reactivated on MikroTik (Bonus Grace Gift)",
+        detail: `PPPoE secret restored & unblocked for ${targetCust.name} (${targetCust.pppUser || targetCust.id}) with +${extraDays} days bonus gift. Base cycle expiry remains ${targetCust.expireDate || targetCust.endDate}.`,
         targetId: customerId,
       });
     }
@@ -1431,10 +1694,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     activityLogger.log({
       type: "billing",
       severity: "info",
-      action: "Grace Period Extended",
-      detail: `Granted +${extraDays} days extension for subscriber ${targetCust?.name || customerId} (${customerId}).`,
+      action: "Bonus Gift / Grace Days Granted",
+      detail: `Granted +${extraDays} days bonus access gift for subscriber ${targetCust?.name || customerId} (${customerId}) without changing base billing cycle expiry (${targetCust?.expireDate || targetCust?.endDate}).`,
       targetId: customerId,
-      metadata: { extraDays, subscriber: targetCust?.name }
+      metadata: { extraDays, subscriber: targetCust?.name, baseExpiry: targetCust?.expireDate || targetCust?.endDate }
     });
   };
 
@@ -1480,7 +1743,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         // doesn't immediately re-suspend this customer in the next 60-second cycle.
         let endDateExtension: Partial<typeof c> = {};
         if (enable) {
-          const currentEnd = c.endDate ? new Date(c.endDate) : null;
+          const currentEnd = parseSafeDate(c.endDate);
           const isCurrentlyExpired = !currentEnd || isNaN(currentEnd.getTime()) || currentEnd < new Date();
           if (isCurrentlyExpired) {
             const newEnd = new Date();
@@ -1537,17 +1800,21 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       let hasChanges = false;
       const updated = prev.map(c => {
         if (c.userType === "free" || c.userType === "unlimited") return c;
+        if (c.createdAt && (Date.now() - c.createdAt) < 120000) return c; // Grace period: new customers immune to auto-cutoff
+        if (c.updatedAt && (Date.now() - c.updatedAt) < 120000) return c; // Grace period: recently edited/enabled customers immune
 
         const rawDue = c.dueAmount !== undefined ? c.dueAmount : (c.due !== undefined ? c.due : 0);
-        // CRITICAL FIX: Only consider a customer "due" if they have an actual positive balance.
-        // Checking c.status === "due" was causing ALL customers with status "due" (even
-        // dueAmount=0 after payment) to be auto-suspended every 60 seconds.
+        if (rawDue <= 0) return c; // Bill is paid / 0 due — never cutoff!
+
         const hasDue = rawDue > 0;
-        // CRITICAL FIX 2: Use ONLY the endDate date-comparison — NOT daysRemaining.
-        // daysRemaining is recalculated only every hour so it can be stale.
-        // A customer who just paid (endDate = today+30) could still have daysRemaining = -5
-        // from the old data, causing instant re-suspension right after payment.
-        const isExpired = c.endDate ? (new Date(c.endDate) < now) : false;
+        const endDateObj = parseSafeDate(c.endDate || c.expireDate);
+        const graceEndDateObj = parseSafeDate(c.graceExpiryDate);
+
+        // If customer was granted bonus gift / grace days and is within that grace window, do NOT cutoff!
+        const isWithinGrace = graceEndDateObj ? (graceEndDateObj >= now) : false;
+        if (isWithinGrace) return c;
+
+        const isExpired = endDateObj ? (endDateObj < now) : false;
 
         if (isExpired && hasDue && c.status !== "suspended") {
           hasChanges = true;
@@ -1695,6 +1962,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           startDate: startDate,
           endDate: endDate,
           expireDate: endDate,
+          graceDays: undefined,
+          graceExpiryDate: undefined,
           daysRemaining: Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
           invoices: updatedInvoices,
           paymentHistory: [newPayment, ...c.paymentHistory],
@@ -2020,6 +2289,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     <CustomerContext.Provider
       value={{
         customers,
+        deletedCustomers,
         activeCustomer,
         upgradeRequests,
         setActiveCustomer: cust => setActiveCustomerId(cust ? cust.id : null),
@@ -2030,6 +2300,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         addCustomersBulk,
         updateCustomer,
         deleteCustomer,
+        restoreCustomer,
+        permanentlyPurgeCustomer,
         toggleNetStatus,
         processPayment,
         generateDefaultPasscode,

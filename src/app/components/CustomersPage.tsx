@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Users, Search, Filter, Plus, ChevronLeft, ChevronRight,
   Wifi, WifiOff, AlertTriangle, Ban, Circle, Phone, MapPin,
@@ -6,9 +6,10 @@ import {
   X, Check, Clock, CheckCircle2, XCircle, Send, RefreshCw, Zap, FileText,
   Copy, Lock, Unlock, ExternalLink, Key, Smartphone, Sliders, Sparkles,
   Network, Server, Shield, Radio, CheckCheck, Save, ShieldAlert, ArrowRight,
-  Edit2, Edit3, Tag, UserCheck, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, Trash2, Calendar
+  Edit2, Edit3, Tag, UserCheck, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, Trash2, Calendar,
+  RotateCcw, Archive, History
 } from "lucide-react";
-import { useCustomerContext, Customer, CustomerStatus } from "../context/CustomerContext";
+import { useCustomerContext, Customer, CustomerStatus, parseSafeDate } from "../context/CustomerContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useNetxLiveData, type NetxLiveCustomer } from "../services/netxApiService";
 import { usePermission } from "../context/AuthContext";
@@ -105,6 +106,7 @@ interface CustomersPageProps {
 export function CustomersPage({ onNavigate }: CustomersPageProps) {
   const {
     customers,
+    deletedCustomers,
     setActiveCustomer,
     addCustomer,
     toggleNetStatus,
@@ -122,6 +124,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     setUserType,
     bulkSetUserType,
     deleteCustomer,
+    restoreCustomer,
+    permanentlyPurgeCustomer,
   } = useCustomerContext();
   const { t, bnNum, isBangla } = useLanguage();
   const { liveStats } = useNetxLiveData(30000);
@@ -140,7 +144,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
   // ── Search & Premium Filter State ──
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<CustomerStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<CustomerStatus | "all" | "deleted">("all");
   const [netStatusFilter, setNetStatusFilter] = useState<"all" | "online" | "offline">("all");
   const [macBindFilter, setMacBindFilter] = useState<"all" | "bound" | "unbound">("all");
   const [userTypeFilter, setUserTypeFilter] = useState<"all" | "normal" | "free" | "unlimited">("all");
@@ -161,6 +165,42 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     }
     setPage(1);
   };
+
+  // ── Top Horizontal Scroll Bar: Zero-Rerender Hardware-Accelerated Controller ──
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const sliderRef = useRef<HTMLInputElement>(null);
+
+  const updateScrollBounds = useCallback(() => {
+    if (tableScrollRef.current && sliderRef.current) {
+      const { scrollWidth, clientWidth, scrollLeft } = tableScrollRef.current;
+      const max = Math.max(1, scrollWidth - clientWidth);
+      sliderRef.current.max = String(max);
+      sliderRef.current.value = String(scrollLeft);
+    }
+  }, []);
+
+  const handleTableScroll = () => {
+    if (tableScrollRef.current && sliderRef.current) {
+      sliderRef.current.value = String(tableScrollRef.current.scrollLeft);
+    }
+  };
+
+  const handleSliderInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const val = Number((e.target as HTMLInputElement).value);
+    if (tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = val;
+    }
+  };
+
+  useEffect(() => {
+    updateScrollBounds();
+    const timer = setTimeout(updateScrollBounds, 150);
+    window.addEventListener("resize", updateScrollBounds);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updateScrollBounds);
+    };
+  }, [customers, statusFilter, itemsPerPage, page, updateScrollBounds]);
 
   // Dynamic filter lists
   const allZones = useMemo(() => {
@@ -198,6 +238,9 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
   const [payMethod, setPayMethod] = useState<"bKash" | "Nagad" | "Rocket" | "Upay" | "Card" | "Cash">("bKash");
   const [payTxId, setPayTxId] = useState("");
 
+  const [rechargeModalOpen, setRechargeModalOpen] = useState(false);
+  const [rechargeDate, setRechargeDate] = useState("");
+
   // ── Quick Edit Subscriber Modal State ──
   const [editModalCustomer, setEditModalCustomer] = useState<Customer | null>(null);
   const [editSubForm, setEditSubForm] = useState({
@@ -207,9 +250,9 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     email: "",
     address: "",
     userType: "normal" as "normal" | "free" | "unlimited",
-    package: "20 Mbps Fiber Standard — ৳1,200",
-    price: 1200,
-    speed: "20/10",
+    package: "35M — ৳500",
+    price: 500,
+    speed: "35/35",
     pppUser: "",
     pppPass: "",
     passcode: "",
@@ -221,13 +264,32 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
   });
 
   const [deleteConfirmCust, setDeleteConfirmCust] = useState<Customer | null>(null);
+  const [deleteReason, setDeleteReason] = useState<string>("Customer relocation / service discontinued");
+  const [restoreConfirmCust, setRestoreConfirmCust] = useState<Customer | null>(null);
+  const [purgeConfirmCust, setPurgeConfirmCust] = useState<Customer | null>(null);
 
   const handleDeleteCustomer = (c: Customer) => {
-    deleteCustomer(c.id);
+    deleteCustomer(c.id, deleteReason || "Customer relocation / service discontinued");
     if (selectedCustomer?.id === c.id || selectedCustomer?.clientCode === c.clientCode) setSelectedCustomer(null);
     if (editModalCustomer?.id === c.id || editModalCustomer?.clientCode === c.clientCode) setEditModalCustomer(null);
     setDeleteConfirmCust(null);
-    setToast(`✓ Subscriber "${c.name}" (${c.clientCode || c.id}) deleted. Removed from billing and MikroTik.`);
+    setToast(`✓ Subscriber "${c.name}" (${c.clientCode || c.id}) moved to Deleted Accounts Archive. Secret de-provisioned from MikroTik.`);
+    setTimeout(() => setToast(""), 4000);
+  };
+
+  const handleRestoreCustomer = (c: Customer) => {
+    restoreCustomer(c.id);
+    if (selectedCustomer?.id === c.id || selectedCustomer?.clientCode === c.clientCode) setSelectedCustomer(null);
+    setRestoreConfirmCust(null);
+    setToast(`✓ Subscriber "${c.name}" (${c.clientCode || c.id}) restored to Active Subscribers and re-provisioned on MikroTik.`);
+    setTimeout(() => setToast(""), 4000);
+  };
+
+  const handlePurgeCustomer = (c: Customer) => {
+    permanentlyPurgeCustomer(c.id);
+    if (selectedCustomer?.id === c.id || selectedCustomer?.clientCode === c.clientCode) setSelectedCustomer(null);
+    setPurgeConfirmCust(null);
+    setToast(`✓ Subscriber record "${c.name}" (${c.clientCode || c.id}) permanently removed from system.`);
     setTimeout(() => setToast(""), 4000);
   };
 
@@ -246,9 +308,9 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       email: c.email || "",
       address: c.address || "",
       userType: c.userType || "normal",
-      package: c.package || "20 Mbps Fiber Standard — ৳1,200",
-      price: c.price || c.monthlyBill || 1200,
-      speed: c.speed || "20/10",
+      package: c.package || "35M — ৳500",
+      price: c.price || c.monthlyBill || 500,
+      speed: c.speed || "35/35",
       pppUser: c.pppUser || "",
       pppPass: c.pppPass || "",
       passcode: c.passcode || `mbn@${(c.clientCode || c.id).replace(/\D/g, "")}`,
@@ -286,22 +348,21 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       address: editSubForm.address.trim(),
       userType: editSubForm.userType,
       package: editSubForm.package,
-      price: isFree ? 0 : (Number(editSubForm.price) || 1200),
-      monthlyBill: isFree ? 0 : (Number(editSubForm.price) || 1200),
-      speed: editSubForm.speed,
+      profile: editSubForm.package.split(/[—\-]/)[0].trim() || "35M",
+      price: isFree ? 0 : (Number(editSubForm.price) || editModalCustomer.price || 500),
+      monthlyBill: isFree ? 0 : (Number(editSubForm.price) || editModalCustomer.monthlyBill || 500),
+      speed: editSubForm.speed || "35/35",
       pppUser: editSubForm.pppUser.trim(),
       pppPass: editSubForm.pppPass.trim(),
       passcode: editSubForm.passcode.trim(),
       mac: cleanMac,
-      boundMac: editSubForm.macBound ? cleanMac : undefined,
-      callingStationId: editSubForm.macBound ? cleanMac : undefined,
+      boundMac: editSubForm.macBound ? cleanMac : "",
+      callingStationId: editSubForm.macBound ? cleanMac : "",
       macBound: editSubForm.macBound,
       zone: editSubForm.zone,
       subzone: editSubForm.subzone,
       status: isFree ? "active" : editSubForm.status,
-      netStatus: isFree ? "online" : undefined,
-      dueAmount: isFree ? 0 : undefined,
-      due: isFree ? 0 : undefined,
+      ...(isFree ? { dueAmount: 0, due: 0, netStatus: "online" as const } : {}),
     };
 
     updateCustomer(targetId, updates);
@@ -320,6 +381,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [personalForm, setPersonalForm] = useState<Partial<Customer>>({});
   const [extraDays, setExtraDays] = useState("3");
+  const [credForm, setCredForm] = useState({ pppUser: "", pppPass: "", passcode: "" });
+  const [isEditingCredentials, setIsEditingCredentials] = useState(false);
 
   useEffect(() => {
     if (selectedCustomer) {
@@ -330,29 +393,29 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
         phone: selectedCustomer.phone || "",
         email: selectedCustomer.email || "",
         address: selectedCustomer.address || "",
-        zone: selectedCustomer.zone || "Madaripur Sadar",
-        subzone: selectedCustomer.subzone || "Somitir Hat",
+        zone: selectedCustomer.zone || "",
+        subzone: selectedCustomer.subzone || "",
         passcode: selectedCustomer.passcode || "",
       });
       setNetForm({
-        package: selectedCustomer.package || "20 Mbps Fiber Standard",
-        serverName: selectedCustomer.serverName || "Active",
+        package: selectedCustomer.package || "",
+        serverName: selectedCustomer.serverName || "",
         protocolType: selectedCustomer.protocolType || selectedCustomer.service || "pppoe",
-        profile: selectedCustomer.profile || "PIONEER_HOME_20Mbps",
-        zone: selectedCustomer.zone || "DHAKA DIVISION",
-        subzone: selectedCustomer.subzone || "KALKINI SOMITIR HAT",
-        box: selectedCustomer.box || "SOMITIR HAT BAZAR",
-        connectionType: selectedCustomer.connectionType || "Optical Fiber",
-        splitterBox: selectedCustomer.splitterBox || "SOMITIR HAT BAZAR - Splitter 1 (1:8)",
-        splitterPort: selectedCustomer.splitterPort || "Port 1",
-        cableMetre: selectedCustomer.cableMetre || 100,
-        fiberCode: selectedCustomer.fiberCode || "f3kugd",
-        coreNumber: selectedCustomer.coreNumber || "2",
-        coreColor: selectedCustomer.coreColor || "Red",
-        deviceType: selectedCustomer.deviceType || "ONU Dual Band XPON (Gigabit)",
-        deviceSerial: selectedCustomer.deviceSerial || "VSOL-99882201",
-        deviceVendor: selectedCustomer.deviceVendor || "VSOL",
-        purchaseDate: selectedCustomer.purchaseDate || "28/08/2026",
+        profile: selectedCustomer.profile || selectedCustomer.package || "",
+        zone: selectedCustomer.zone || "",
+        subzone: selectedCustomer.subzone || "",
+        box: selectedCustomer.box || "",
+        connectionType: (selectedCustomer.connectionType || "") as any,
+        splitterBox: selectedCustomer.splitterBox || "",
+        splitterPort: selectedCustomer.splitterPort || "",
+        cableMetre: selectedCustomer.cableMetre || 0,
+        fiberCode: selectedCustomer.fiberCode || "",
+        coreNumber: selectedCustomer.coreNumber || "",
+        coreColor: selectedCustomer.coreColor || "",
+        deviceType: selectedCustomer.deviceType || "",
+        deviceSerial: selectedCustomer.deviceSerial || selectedCustomer.mac || "",
+        deviceVendor: selectedCustomer.deviceVendor || "",
+        purchaseDate: selectedCustomer.purchaseDate || selectedCustomer.joinDate || "",
       });
 
       setServiceForm({
@@ -361,12 +424,19 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
         pppUser: selectedCustomer.pppUser || "",
         pppPass: selectedCustomer.pppPass || "",
         billingStartMonth: selectedCustomer.billingStartMonth || (() => { const d = new Date(); return `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
-        monthlyBill: selectedCustomer.monthlyBill || selectedCustomer.price || 1200,
+        monthlyBill: selectedCustomer.monthlyBill !== undefined ? selectedCustomer.monthlyBill : (selectedCustomer.price ?? 500),
         clientType: selectedCustomer.clientType || "Home",
         billingStatus: selectedCustomer.billingStatus || "Monthly",
         expireDate: selectedCustomer.expireDate || selectedCustomer.endDate || (() => { const d = new Date(); d.setMonth(d.getMonth()+1); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
         joinDate: selectedCustomer.joinDate || (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })(),
       });
+
+      setCredForm({
+        pppUser: selectedCustomer.pppUser || "",
+        pppPass: selectedCustomer.pppPass || "",
+        passcode: (selectedCustomer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(selectedCustomer.clientCode || selectedCustomer.id).replace(/\D/g, "")}`,
+      });
+      setIsEditingCredentials(false);
     }
   }, [selectedCustomer]);
 
@@ -401,20 +471,29 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       setTimeout(() => setToast(""), 3000);
       return;
     }
-    if (!selectedCustomer) return;
     const days = parseInt(extraDays) || 3;
     grantExtraDays(selectedCustomer.id, days);
     
-    // update local modal state
-    let currentEnd = selectedCustomer.endDate ? new Date(selectedCustomer.endDate) : new Date();
-    if (isNaN(currentEnd.getTime())) currentEnd = new Date();
-    currentEnd.setDate(currentEnd.getDate() + days);
-    const newEndDateStr = currentEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    // update local modal state without modifying the base billing cycle expired date
+    const baseEnd = selectedCustomer.endDate ? parseSafeDate(selectedCustomer.endDate) : new Date();
+    const graceBase = new Date(Math.max(Date.now(), (baseEnd || new Date()).getTime()));
+    graceBase.setDate(graceBase.getDate() + days);
+    const graceEndDateStr = graceBase.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const newDays = Math.max(days, Math.ceil((graceBase.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
     
-    setSelectedCustomer(prev => prev ? { ...prev, endDate: newEndDateStr, expireDate: newEndDateStr, daysRemaining: (prev.daysRemaining || 0) + days } : null);
-    setServiceForm(prev => ({ ...prev, expireDate: newEndDateStr }));
+    setSelectedCustomer(prev => prev ? {
+      ...prev,
+      // Base billing cycle expireDate / endDate remains untouched!
+      graceDays: (prev.graceDays || 0) + days,
+      graceExpiryDate: graceEndDateStr,
+      daysRemaining: newDays,
+      status: "active",
+      netStatus: "online",
+      disabledInMikrotik: false,
+      disabledInSystem: false,
+    } : null);
     
-    setToast(`Granted ${days} extra days to ${selectedCustomer.name}!`);
+    setToast(`✓ Granted +${days} bonus gift days to ${selectedCustomer.name} (Base billing expiry: ${selectedCustomer.expireDate || selectedCustomer.endDate})!`);
     setTimeout(() => setToast(""), 3500);
   };
 
@@ -426,8 +505,18 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     }
     if (!selectedCustomer) return;
     setIsSavingDrawer(true);
-    updateCustomer(selectedCustomer.id, netForm);
-    setSelectedCustomer(prev => prev ? { ...prev, ...netForm } : null);
+    const chosenPkg = livePackages.find(p => p.name === netForm.package || p.name.split("—")[0].trim() === (netForm.package || "").split("—")[0].trim());
+    const updates: Partial<Customer> = {
+      ...netForm,
+      profile: chosenPkg?.mikrotikProfile || (netForm.package ? netForm.package.split(/[—\-]/)[0].trim() : selectedCustomer.profile),
+      speed: chosenPkg ? `${chosenPkg.down}/${chosenPkg.up}` : selectedCustomer.speed,
+      downloadSpeedMbps: chosenPkg?.down || selectedCustomer.downloadSpeedMbps,
+      uploadSpeedMbps: chosenPkg?.up || selectedCustomer.uploadSpeedMbps,
+      price: chosenPkg?.price !== undefined ? chosenPkg.price : selectedCustomer.price,
+      monthlyBill: chosenPkg?.price !== undefined ? chosenPkg.price : selectedCustomer.monthlyBill,
+    };
+    updateCustomer(selectedCustomer.id, updates);
+    setSelectedCustomer(prev => prev ? { ...prev, ...updates } : null);
     setTimeout(() => {
       setIsSavingDrawer(false);
       setToast(`Network & Product Info updated and saved for ${selectedCustomer.name}!`);
@@ -445,16 +534,41 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     setIsSavingDrawer(true);
     const updates: Partial<Customer> = {
       ...serviceForm,
-      price: Number(serviceForm.monthlyBill) || selectedCustomer.price,
+      price: Number(serviceForm.monthlyBill) !== undefined && !isNaN(Number(serviceForm.monthlyBill)) ? Number(serviceForm.monthlyBill) : selectedCustomer.price,
+      monthlyBill: Number(serviceForm.monthlyBill) !== undefined && !isNaN(Number(serviceForm.monthlyBill)) ? Number(serviceForm.monthlyBill) : selectedCustomer.monthlyBill,
       status: serviceForm.disabledInMikrotik ? "suspended" : "active",
       netStatus: serviceForm.disabledInMikrotik ? "offline" : "online",
       endDate: serviceForm.expireDate || selectedCustomer.endDate,
+      expireDate: serviceForm.expireDate || selectedCustomer.expireDate,
     };
     updateCustomer(selectedCustomer.id, updates);
     setSelectedCustomer(prev => prev ? { ...prev, ...updates } : null);
     setTimeout(() => {
       setIsSavingDrawer(false);
       setToast(`Service Information updated and saved for ${selectedCustomer.name}!`);
+      setTimeout(() => setToast(""), 3500);
+    }, 400);
+  };
+
+  const handleSaveCredentials = () => {
+    if (isReadOnly || !canEdit) {
+      setToast("Access Restricted: View Only Mode. Modifying credentials is restricted.");
+      setTimeout(() => setToast(""), 3000);
+      return;
+    }
+    if (!selectedCustomer) return;
+    setIsSavingDrawer(true);
+    const updates: Partial<Customer> = {
+      pppUser: credForm.pppUser.trim(),
+      pppPass: credForm.pppPass.trim(),
+      passcode: credForm.passcode.trim(),
+    };
+    updateCustomer(selectedCustomer.id, updates);
+    setSelectedCustomer(prev => prev ? { ...prev, ...updates } : null);
+    setTimeout(() => {
+      setIsSavingDrawer(false);
+      setIsEditingCredentials(false);
+      setToast(`Credentials successfully updated and saved for ${selectedCustomer.name}!`);
       setTimeout(() => setToast(""), 3500);
     }, 400);
   };
@@ -477,6 +591,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
   });
 
   useEffect(() => {
+    billingStore.syncLivePackages();
     const unsubB = billingStore.subscribe(() => setLivePackages(billingStore.getPackages()));
     const unsubN = networkStore.subscribe(() => {
       const s = networkStore.getMikrotik().map(m => m.name);
@@ -489,6 +604,47 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       unsubN();
     };
   }, []);
+
+  // Keep selectedCustomer reactive to live updates and edits
+  useEffect(() => {
+    if (selectedCustomer) {
+      const match = customers.find(c => c.id === selectedCustomer.id || c.clientCode === selectedCustomer.clientCode);
+      if (match && (
+        match.name !== selectedCustomer.name ||
+        match.phone !== selectedCustomer.phone ||
+        match.email !== selectedCustomer.email ||
+        match.address !== selectedCustomer.address ||
+        match.package !== selectedCustomer.package ||
+        match.price !== selectedCustomer.price ||
+        match.monthlyBill !== selectedCustomer.monthlyBill ||
+        match.status !== selectedCustomer.status ||
+        match.netStatus !== selectedCustomer.netStatus ||
+        match.dueAmount !== selectedCustomer.dueAmount ||
+        match.endDate !== selectedCustomer.endDate ||
+        match.expireDate !== selectedCustomer.expireDate ||
+        match.pppUser !== selectedCustomer.pppUser ||
+        match.pppPass !== selectedCustomer.pppPass ||
+        match.passcode !== selectedCustomer.passcode ||
+        match.mac !== selectedCustomer.mac ||
+        match.macBound !== selectedCustomer.macBound ||
+        match.zone !== selectedCustomer.zone ||
+        match.subzone !== selectedCustomer.subzone ||
+        match.box !== selectedCustomer.box ||
+        match.connectionType !== selectedCustomer.connectionType ||
+        match.splitterBox !== selectedCustomer.splitterBox ||
+        match.splitterPort !== selectedCustomer.splitterPort ||
+        match.cableMetre !== selectedCustomer.cableMetre ||
+        match.fiberCode !== selectedCustomer.fiberCode ||
+        match.coreNumber !== selectedCustomer.coreNumber ||
+        match.coreColor !== selectedCustomer.coreColor ||
+        match.deviceType !== selectedCustomer.deviceType ||
+        match.deviceSerial !== selectedCustomer.deviceSerial ||
+        match.deviceVendor !== selectedCustomer.deviceVendor
+      )) {
+        setSelectedCustomer(match);
+      }
+    }
+  }, [customers, selectedCustomer]);
 
   const [selectedNewPkg, setSelectedNewPkg] = useState<IspPackage | null>(() => billingStore.getPackages()[0] || null);
   const [applyImmediately, setApplyImmediately] = useState(true);
@@ -785,14 +941,25 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
           valA = a.box || a.tjBox || "";
           valB = b.box || b.tjBox || "";
           break;
-        case "connectionType":
-          valA = a.connectionType || a.connectivityType || "Optical Fiber";
-          valB = b.connectionType || b.connectivityType || "Optical Fiber";
+        case "createdAt":
+          valA = a.createdAt || 0;
+          valB = b.createdAt || 0;
           break;
-        case "serverName":
-          valA = liveMatchA?.server_name || a.serverName || a.mikrotik || "";
-          valB = liveMatchB?.server_name || b.serverName || b.mikrotik || "";
+        case "dueDate": {
+          const parseDate = (d: string | undefined) => {
+            if (!d) return 0;
+            const parts = d.split('/');
+            if (parts.length === 3) {
+              const dt = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              if (!isNaN(dt.getTime())) return dt.getTime();
+            }
+            const dt2 = new Date(d);
+            return isNaN(dt2.getTime()) ? 0 : dt2.getTime();
+          };
+          valA = parseDate(a.expireDate || a.endDate);
+          valB = parseDate(b.expireDate || b.endDate);
           break;
+        }
         case "package":
           valA = a.package || "";
           valB = b.package || "";
@@ -825,6 +992,32 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / (itemsPerPage >= 9999 ? sorted.length || 1 : itemsPerPage)));
   const paginated = itemsPerPage >= 9999 ? sorted : sorted.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  // ── Deleted Customers Filtering & Pagination ──
+  const filteredDeleted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return deletedCustomers.filter(c => {
+      const matchSearch =
+        !q ||
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.clientCode || "").toLowerCase().includes(q) ||
+        (c.id || "").toLowerCase().includes(q) ||
+        (c.phone || "").includes(q) ||
+        (c.pppUser || "").toLowerCase().includes(q) ||
+        (c.mac || "").toLowerCase().includes(q) ||
+        (c.zone || "").toLowerCase().includes(q) ||
+        (c.subzone || "").toLowerCase().includes(q) ||
+        (c.deletionReason || "").toLowerCase().includes(q);
+
+      const matchZone = zoneFilter === "all" || c.zone === zoneFilter || c.subzone === zoneFilter;
+      const matchPackage = packageFilter === "all" || c.package === packageFilter;
+
+      return matchSearch && matchZone && matchPackage;
+    });
+  }, [deletedCustomers, search, zoneFilter, packageFilter]);
+
+  const totalDeletedPages = Math.max(1, Math.ceil(filteredDeleted.length / (itemsPerPage >= 9999 ? filteredDeleted.length || 1 : itemsPerPage)));
+  const paginatedDeleted = itemsPerPage >= 9999 ? filteredDeleted : filteredDeleted.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   const handleAction = async (label: string, action: () => void) => {
     setActionLoading(label);
@@ -943,6 +1136,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     due: customers.filter(c => c.status === "due" && c.userType !== "free").length,
     suspended: customers.filter(c => c.status === "suspended").length,
     disconnected: customers.filter(c => c.status === "disconnected").length,
+    deleted: deletedCustomers.length,
     free: customers.filter(c => c.userType === "free").length,
     unlimited: customers.filter(c => c.userType === "unlimited").length,
   };
@@ -985,7 +1179,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
           </button>
 
           <button
-            onClick={() => exportCSV(filtered)}
+            onClick={() => exportCSV(statusFilter === "deleted" ? filteredDeleted : filtered)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl border bg-card text-foreground text-xs font-bold hover:bg-muted cursor-pointer"
             style={{ borderColor: "var(--border)" }}>
             <Download size={14} /> {t("Export CSV")}
@@ -1008,20 +1202,32 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       </div>
 
       {/* Stats strip */}
-      <div className="grid gap-3 mb-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        {([["all", "Total Subscribers", customers.length, "#8B2020"], ["active", "Active Connected", counts.active, "#16A34A"], ["due", "Payment Due", counts.due, "#D97706"], ["suspended", "Suspended Lines", counts.suspended, "#DC2626"], ["disconnected", "Disconnected", counts.disconnected, "#6B7280"]] as const).map(([key, label, val, color]) => (
+      <div className="grid gap-3 mb-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        {([
+          ["all", "Total Subscribers", customers.length, "#8B2020"],
+          ["active", "Active Connected", counts.active, "#16A34A"],
+          ["due", "Payment Due", counts.due, "#D97706"],
+          ["suspended", "Suspended Lines", counts.suspended, "#DC2626"],
+          ["disconnected", "Disconnected", counts.disconnected, "#6B7280"],
+          ["deleted", "Deleted Archive", counts.deleted, "#E11D48"],
+        ] as const).map(([key, label, val, color]) => (
           <button
             key={key}
             onClick={() => { setStatusFilter(key as any); setPage(1); }}
-            className="rounded-2xl p-4 text-left transition-all border cursor-pointer"
+            className="rounded-2xl p-4 text-left transition-all border cursor-pointer relative"
             style={{
               background: statusFilter === key ? "var(--primary)" : "var(--card)",
               borderColor: statusFilter === key ? "var(--primary)" : "var(--border)",
               boxShadow: statusFilter === key ? "0 4px 14px rgba(139,32,32,0.25)" : "none"
             }}>
-            <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, color: statusFilter === key ? "#fff" : color, lineHeight: 1.1 }}>
-              {bnNum(val.toLocaleString())}
-            </p>
+            <div className="flex items-center justify-between">
+              <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, color: statusFilter === key ? "#fff" : color, lineHeight: 1.1 }}>
+                {bnNum(val.toLocaleString())}
+              </p>
+              {key === "deleted" && (
+                <Archive size={16} className={statusFilter === key ? "text-white/80" : "text-rose-500"} />
+              )}
+            </div>
             <p style={{ fontSize: 12, fontWeight: 500, color: statusFilter === key ? "rgba(255,255,255,0.8)" : "var(--muted-foreground)", marginTop: 4 }}>
               {t(label)}
             </p>
@@ -1077,7 +1283,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               {/* Live Filter Indicator Pill */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-bold text-primary shadow-2xs">
                 <Filter size={12} />
-                <span>Filtered: <span className="font-mono font-black">{filtered.length}</span> / <span className="font-mono">{customers.length}</span></span>
+                <span>Filtered: <span className="font-mono font-black">{statusFilter === "deleted" ? filteredDeleted.length : filtered.length}</span> / <span className="font-mono">{statusFilter === "deleted" ? deletedCustomers.length : customers.length}</span></span>
               </div>
             </div>
 
@@ -1250,9 +1456,213 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
           </div>
         )}
 
-        {/* Table Contents */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* ── TOP FULL-WIDTH HORIZONTAL SCROLL BAR ── */}
+        <div className="px-4 py-2.5 bg-muted/40 border-b flex items-center select-none" style={{ borderColor: "var(--border)" }}>
+          <input
+            ref={sliderRef}
+            type="range"
+            min={0}
+            defaultValue={0}
+            onInput={handleSliderInput}
+            className="w-full table-scroll-slider cursor-pointer"
+            title="Drag or click to scroll table sideways"
+          />
+        </div>
+
+        {statusFilter === "deleted" ? (
+          /* ── DELETED ACCOUNTS ARCHIVE VIEW ── */
+          <div>
+            <div className="p-4 bg-rose-500/5 border-b flex items-center justify-between flex-wrap gap-3" style={{ borderColor: "var(--border)" }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20">
+                  <Archive size={17} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-foreground flex items-center gap-2">
+                    <span>Deleted Accounts Archive</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                      {deletedCustomers.length} Archived
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Subscribers terminated & de-provisioned from MikroTik/OLT. Data is securely retained for audit and full 1-click restoration.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto" ref={tableScrollRef} onScroll={handleTableScroll}>
+              <table className="w-full text-left text-xs text-foreground">
+                <thead className="border-b bg-muted/40 font-semibold" style={{ borderColor: "var(--border)" }}>
+                  <tr>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">Client ID</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">Subscriber Name & Contact</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">PPPoE Username</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">Former Package & Rate</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">Zone & Splitter Box</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">Deleted On</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap font-bold text-foreground">Deletion Reason</th>
+                    <th className="py-3 px-3.5 tracking-wider whitespace-nowrap text-right font-bold text-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedDeleted.map((c, i) => (
+                    <tr
+                      key={c.id}
+                      style={{ borderBottom: i < paginatedDeleted.length - 1 ? "1px solid var(--border)" : "none" }}
+                      className="hover:bg-muted/40 transition-colors">
+                      {/* Client Code */}
+                      <td className="px-3.5 py-3 whitespace-nowrap font-mono text-xs font-bold text-rose-600 dark:text-rose-400">
+                        {c.clientCode || c.id}
+                      </td>
+
+                      {/* Name & Phone */}
+                      <td className="px-3.5 py-3">
+                        <div>
+                          <p className="text-xs font-bold text-foreground">{c.name}</p>
+                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
+                            <Phone size={10} />
+                            <span>{c.phone || "—"}</span>
+                          </div>
+                          {c.address && (
+                            <p className="text-[10px] text-muted-foreground truncate max-w-[160px]">{c.address}</p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* PPPoE User */}
+                      <td className="px-3.5 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-foreground">
+                          <span>{c.pppUser || "—"}</span>
+                          {c.pppUser && (
+                            <button
+                              onClick={() => copyToClipboard(c.pppUser, `del-user-${c.id}`)}
+                              className="text-muted-foreground hover:text-foreground">
+                              {copiedKey === `del-user-${c.id}` ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Package */}
+                      <td className="px-3.5 py-3 whitespace-nowrap">
+                        <span className="font-semibold text-foreground">{c.package}</span>
+                        <span className="text-muted-foreground text-[11px] block font-mono">৳{c.price || c.monthlyBill || 500}/mo</span>
+                      </td>
+
+                      {/* Zone & Box */}
+                      <td className="px-3.5 py-3 whitespace-nowrap">
+                        <div className="text-xs text-foreground font-medium">{c.zone}</div>
+                        <div className="text-[11px] text-muted-foreground">{c.subzone || "—"} {c.splitterBox ? `· Box: ${c.splitterBox}` : (c.box ? `· Box: ${c.box}` : "")}</div>
+                      </td>
+
+                      {/* Deleted Date */}
+                      <td className="px-3.5 py-3 whitespace-nowrap">
+                        <div className="text-xs text-foreground font-medium flex items-center gap-1">
+                          <Clock size={11} className="text-muted-foreground" />
+                          <span>{c.deletedDate || (c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : "—")}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground block">By: {c.deletedBy || "Admin"}</span>
+                      </td>
+
+                      {/* Reason */}
+                      <td className="px-3.5 py-3">
+                        <span className="inline-block max-w-[200px] truncate px-2 py-0.5 rounded bg-muted text-[11px] text-foreground font-medium border border-border" title={c.deletionReason}>
+                          {c.deletionReason || "Admin manual deletion"}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-3.5 py-3 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            disabled={isReadOnly}
+                            onClick={() => setRestoreConfirmCust(c)}
+                            title={isReadOnly ? "View Only: Restoration restricted" : "Restore Account to Active & MikroTik"}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-bold transition-all cursor-pointer shadow-2xs">
+                            <RotateCcw size={12} />
+                            <span>Restore</span>
+                          </button>
+
+                          <button
+                            onClick={() => { setSelectedCustomer(c); setDrawerTab("Overview"); }}
+                            title="View Full Profile Details"
+                            className="p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shadow-2xs">
+                            <Eye size={13} />
+                          </button>
+
+                          <button
+                            disabled={isReadOnly}
+                            onClick={() => setPurgeConfirmCust(c)}
+                            title={isReadOnly ? "View Only: Permanent delete restricted" : "Permanently Purge Record"}
+                            className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer shadow-2xs">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {paginatedDeleted.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-16 text-center text-muted-foreground text-xs">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Archive size={32} className="opacity-30" />
+                          <p className="font-semibold text-sm">No Deleted Accounts Found</p>
+                          <p className="text-[11px] max-w-sm">When an account is deleted from the active list, it is de-provisioned from MikroTik and safely stored here.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Deleted Pagination Footer */}
+            {filteredDeleted.length > 0 && (
+              <div className="flex items-center justify-between px-5 py-3.5 border-t flex-wrap gap-3" style={{ borderColor: "var(--border)" }}>
+                <span className="text-xs text-muted-foreground font-medium">
+                  Showing <span className="font-bold text-foreground">{(page - 1) * (itemsPerPage >= 9999 ? filteredDeleted.length : itemsPerPage) + 1}</span>–<span className="font-bold text-foreground">{Math.min(page * (itemsPerPage >= 9999 ? filteredDeleted.length : itemsPerPage), filteredDeleted.length)}</span> of <span className="font-bold text-foreground">{filteredDeleted.length}</span> archived accounts (Total {deletedCustomers.length})
+                </span>
+                {totalDeletedPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      disabled={page === 1}
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className="px-2.5 py-1.5 flex items-center gap-1 rounded-lg border bg-card text-xs font-semibold text-foreground disabled:opacity-40 hover:bg-muted cursor-pointer shadow-2xs"
+                      style={{ borderColor: "var(--border)" }}>
+                      <ChevronLeft size={13} /> Prev
+                    </button>
+                    {Array.from({ length: Math.min(7, totalDeletedPages) }, (_, i) => {
+                      const pageNum = i + 1;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setPage(pageNum)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            page === pageNum ? "bg-primary text-white border-primary shadow-2xs" : "bg-card text-foreground border-border hover:bg-muted"
+                          }`}>
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    <button
+                      disabled={page === totalDeletedPages}
+                      onClick={() => setPage(p => Math.min(totalDeletedPages, p + 1))}
+                      className="px-2.5 py-1.5 flex items-center gap-1 rounded-lg border bg-card text-xs font-semibold text-foreground disabled:opacity-40 hover:bg-muted cursor-pointer shadow-2xs"
+                      style={{ borderColor: "var(--border)" }}>
+                      Next <ChevronRight size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Table Contents */
+          <>
+          <div className="overflow-x-auto" ref={tableScrollRef} onScroll={handleTableScroll}>
+            <table className="w-full">
             <thead>
               <tr className="bg-muted/80 text-foreground border-b border-border font-bold select-none text-xs">
                 <th className="px-3.5 py-3 w-10">
@@ -1375,14 +1785,14 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                   </div>
                 </th>
 
-                {/* Connection Type */}
+                {/* Start Date */}
                 <th
-                  onClick={() => handleSort("connectionType")}
+                  onClick={() => handleSort("createdAt")}
                   className="py-3 px-3.5 tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-1 font-bold text-foreground">
-                    <span>Connection Type</span>
-                    {sortKey === "connectionType" ? (
+                    <span>Start Date</span>
+                    {sortKey === "createdAt" ? (
                       sortDirection === "asc" ? <ArrowUp size={12} className="text-primary font-bold" /> : <ArrowDown size={12} className="text-primary font-bold" />
                     ) : (
                       <ArrowUpDown size={11} className="opacity-40" />
@@ -1390,14 +1800,14 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                   </div>
                 </th>
 
-                {/* Server Name */}
+                {/* Expired Date */}
                 <th
-                  onClick={() => handleSort("serverName")}
+                  onClick={() => handleSort("dueDate")}
                   className="py-3 px-3.5 tracking-wider whitespace-nowrap cursor-pointer hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-1 font-bold text-foreground">
-                    <span>Server Name</span>
-                    {sortKey === "serverName" ? (
+                    <span>Expired Date</span>
+                    {sortKey === "dueDate" ? (
                       sortDirection === "asc" ? <ArrowUp size={12} className="text-primary font-bold" /> : <ArrowDown size={12} className="text-primary font-bold" />
                     ) : (
                       <ArrowUpDown size={11} className="opacity-40" />
@@ -1567,18 +1977,57 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                       </span>
                     </td>
 
-                    {/* Connection Type */}
+                    {/* Start Date */}
                     <td className="px-3.5 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                        {c.connectionType || c.connectivityType || "Optical Fiber"}
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}
                       </span>
                     </td>
 
-                    {/* Server Name */}
+                    {/* Expired Date & Recharge */}
                     <td className="px-3.5 py-3 whitespace-nowrap">
-                      <span className="font-mono text-[11px] text-foreground font-semibold px-2 py-0.5 rounded bg-muted/70 border border-border/50">
-                        {liveMatch?.server_name || c.serverName || c.mikrotik || "MK-01"}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-bold text-foreground">
+                            {c.expireDate || c.endDate || "—"}
+                          </span>
+                          {!isReadOnly && (
+                            <button
+                              title="Recharge / Extend Date Manually"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCustomer(c);
+                                // Convert existing date to YYYY-MM-DD for input[type="date"] if possible
+                                let initDate = "";
+                                const existingDate = c.expireDate || c.endDate;
+                                if (existingDate) {
+                                  const parts = existingDate.split('/');
+                                  if (parts.length === 3) {
+                                    initDate = `${parts[2]}-${parts[1]}-${parts[0]}`; // assuming DD/MM/YYYY
+                                  } else {
+                                    try {
+                                      const d = new Date(existingDate);
+                                      if (!isNaN(d.getTime())) {
+                                        initDate = d.toISOString().split('T')[0];
+                                      }
+                                    } catch (e) {}
+                                  }
+                                }
+                                setRechargeDate(initDate || new Date().toISOString().split('T')[0]);
+                                setRechargeModalOpen(true);
+                              }}
+                              className="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold shadow-sm transition-colors cursor-pointer"
+                            >
+                              Recharge
+                            </button>
+                          )}
+                        </div>
+                        {c.graceDays && c.graceExpiryDate && (
+                          <div className="flex items-center gap-1 text-[10px] font-extrabold text-cyan-700 dark:text-cyan-400">
+                            <span>🎁 +{c.graceDays}d Bonus Gift (until {c.graceExpiryDate})</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Package & Speed */}
@@ -1798,6 +2247,8 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
             )}
           </div>
         )}
+        </>
+      )}
       </div>
 
       {/* ── CUSTOMER DRAWER ── */}
@@ -2531,17 +2982,24 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                         />
                       </div>
 
-                      {/* Grant Extra Days */}
+                      {/* Grant Extra Days (Bonus Gift Matrix) */}
                       <div className="col-span-2 p-3 mt-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex flex-col gap-2">
                         <div>
                           <label className="block text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">
-                            Emergency Extension
+                            Bonus Gift / Emergency Extension
                           </label>
-                          <p className="text-[10px] text-muted-foreground">Grant extra days to keep line active without full payment.</p>
+                          <p className="text-[10px] text-muted-foreground">Grant extra days to keep line active without changing the base monthly billing expired date (Bonus Gift Matrix).</p>
+                          {selectedCustomer.graceDays && selectedCustomer.graceExpiryDate && (
+                            <p className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 mt-0.5">
+                              🎁 Active Gift: +{selectedCustomer.graceDays} days grace (Access permitted until {selectedCustomer.graceExpiryDate})
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <input
                             type="number"
+                            min="1"
+                            max="30"
                             value={extraDays}
                             onChange={e => setExtraDays(e.target.value)}
                             className="w-20 px-3 py-1.5 text-xs rounded-lg bg-card border border-border text-foreground outline-none focus:border-indigo-500 font-bold font-mono"
@@ -2552,7 +3010,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                             className={`px-4 py-1.5 rounded-lg font-bold text-xs text-white shadow-sm flex items-center gap-1 transition-all ${
                               isReadOnly ? "bg-muted-foreground opacity-50 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
                             }`}
-                            title={isReadOnly ? "View Only: Extending grace period is restricted" : "Grant Extra Days"}
+                            title={isReadOnly ? "View Only: Extending grace period is restricted" : "Grant Bonus Extra Days"}
                           >
                             <Clock size={12} />
                             Grant Extra Days
@@ -2601,62 +3059,139 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                     <div className="p-5 rounded-2xl border bg-muted/30 space-y-3" style={{ borderColor: "var(--border)" }}>
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                          <Lock size={16} className="text-primary" /> Subscriber Login Passcode
+                          <Lock size={16} className="text-primary" /> Subscriber Login Passcode & PPPoE
                         </h3>
-                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
-                          Default Auto-Generated
-                        </span>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-[11px] font-bold text-muted-foreground block mb-1">USER / CUSTOMER ID</label>
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
-                            <span>{selectedCustomer.id}</span>
+                        <div className="flex items-center gap-2">
+                          {!isEditingCredentials ? (
                             <button
-                              onClick={() => copyToClipboard(selectedCustomer.id, "drawer-cust-id")}
-                              className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
-                              {copiedKey === "drawer-cust-id" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy ID
+                              onClick={() => {
+                                if (isReadOnly || !canEdit) {
+                                  setToast("Access Restricted: View Only Mode. Modifying credentials is restricted.");
+                                  setTimeout(() => setToast(""), 3000);
+                                  return;
+                                }
+                                setIsEditingCredentials(true);
+                              }}
+                              className="px-2.5 py-1 rounded-lg border text-xs font-semibold bg-card hover:bg-muted flex items-center gap-1.5 shadow-sm transition-all"
+                              style={{ borderColor: "var(--border)" }}>
+                              <Edit2 size={12} className="text-primary" /> Edit Credentials
                             </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-muted-foreground block mb-1">DEFAULT PORTAL PASSCODE</label>
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
-                            <span>{(selectedCustomer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(selectedCustomer.clientCode || selectedCustomer.id).replace(/\D/g, "")}`}</span>
+                          ) : (
                             <button
-                              onClick={() => copyToClipboard((selectedCustomer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(selectedCustomer.clientCode || selectedCustomer.id).replace(/\D/g, "")}`, "drawer-cust-pass")}
-                              className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
-                              {copiedKey === "drawer-cust-pass" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy Passcode
+                              onClick={() => setIsEditingCredentials(false)}
+                              className="px-2.5 py-1 rounded-lg border text-xs font-semibold bg-muted hover:bg-muted/80 flex items-center gap-1"
+                              style={{ borderColor: "var(--border)" }}>
+                              <X size={12} /> Cancel
                             </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-muted-foreground block mb-1">PPPOE CONNECTION USERNAME</label>
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
-                            <span>{selectedCustomer.pppUser || selectedCustomer.name}</span>
-                            <button
-                              onClick={() => copyToClipboard(selectedCustomer.pppUser || selectedCustomer.name, "drawer-cust-pppuser")}
-                              className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
-                              {copiedKey === "drawer-cust-pppuser" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy Username
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-muted-foreground block mb-1">PPPOE CONNECTION PASSWORD</label>
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
-                            <span>{selectedCustomer.pppPass}</span>
-                            <button
-                              onClick={() => copyToClipboard(selectedCustomer.pppPass, "drawer-cust-pppoe")}
-                              className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
-                              {copiedKey === "drawer-cust-pppoe" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy PPPoE
-                            </button>
-                          </div>
+                          )}
                         </div>
                       </div>
+
+                      {isEditingCredentials ? (
+                        <div className="space-y-3 pt-2">
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">PORTAL PASSCODE</label>
+                            <input
+                              type="text"
+                              value={credForm.passcode}
+                              onChange={e => setCredForm(p => ({ ...p, passcode: e.target.value }))}
+                              placeholder="e.g. mbn@10001"
+                              className="w-full px-3 py-2 rounded-xl bg-card border font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              style={{ borderColor: "var(--border)" }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">PPPOE CONNECTION USERNAME</label>
+                            <input
+                              type="text"
+                              value={credForm.pppUser}
+                              onChange={e => setCredForm(p => ({ ...p, pppUser: e.target.value }))}
+                              placeholder="e.g. mbn0001"
+                              className="w-full px-3 py-2 rounded-xl bg-card border font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              style={{ borderColor: "var(--border)" }}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">PPPOE CONNECTION PASSWORD</label>
+                            <input
+                              type="text"
+                              value={credForm.pppPass}
+                              onChange={e => setCredForm(p => ({ ...p, pppPass: e.target.value }))}
+                              placeholder="PPPoE secret password"
+                              className="w-full px-3 py-2 rounded-xl bg-card border font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                              style={{ borderColor: "var(--border)" }}
+                            />
+                          </div>
+
+                          <div className="pt-2 flex justify-end gap-2">
+                            <button
+                              onClick={() => setIsEditingCredentials(false)}
+                              className="px-4 py-2 rounded-xl border text-xs font-bold hover:bg-muted transition-all"
+                              style={{ borderColor: "var(--border)" }}>
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleSaveCredentials}
+                              disabled={isSavingDrawer}
+                              className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:opacity-95 shadow-sm flex items-center gap-1.5 transition-all">
+                              <Save size={14} />
+                              <span>{isSavingDrawer ? "Saving..." : "Save Credentials"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">USER / CUSTOMER ID</label>
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
+                              <span>{selectedCustomer.id}</span>
+                              <button
+                                onClick={() => copyToClipboard(selectedCustomer.id, "drawer-cust-id")}
+                                className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
+                                {copiedKey === "drawer-cust-id" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy ID
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">DEFAULT PORTAL PASSCODE</label>
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
+                              <span>{(selectedCustomer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(selectedCustomer.clientCode || selectedCustomer.id).replace(/\D/g, "")}`}</span>
+                              <button
+                                onClick={() => copyToClipboard((selectedCustomer.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${(selectedCustomer.clientCode || selectedCustomer.id).replace(/\D/g, "")}`, "drawer-cust-pass")}
+                                className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
+                                {copiedKey === "drawer-cust-pass" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy Passcode
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">PPPOE CONNECTION USERNAME</label>
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
+                              <span>{selectedCustomer.pppUser || selectedCustomer.name}</span>
+                              <button
+                                onClick={() => copyToClipboard(selectedCustomer.pppUser || selectedCustomer.name, "drawer-cust-pppuser")}
+                                className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
+                                {copiedKey === "drawer-cust-pppuser" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy Username
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground block mb-1">PPPOE CONNECTION PASSWORD</label>
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-card border font-mono font-bold text-foreground text-sm" style={{ borderColor: "var(--border)" }}>
+                              <span>{selectedCustomer.pppPass}</span>
+                              <button
+                                onClick={() => copyToClipboard(selectedCustomer.pppPass, "drawer-cust-pppoe")}
+                                className="px-2.5 py-1 rounded-lg border text-xs bg-muted hover:bg-muted/80 flex items-center gap-1 font-sans">
+                                {copiedKey === "drawer-cust-pppoe" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />} Copy PPPoE
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* MAC Address & PPPoE Calling-Station-Id Lock */}
@@ -3247,6 +3782,65 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 disabled={!payAmount}
                 className="w-1/2 py-2.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:opacity-95 shadow-md disabled:opacity-50">
                 Confirm ৳{Number(payAmount || 0).toLocaleString()}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── RECHARGE DATE EXTENSION MODAL ── */}
+      {rechargeModalOpen && selectedCustomer && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div
+            className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border p-6 space-y-4"
+            style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-foreground">Recharge Account</h3>
+              <button onClick={() => setRechargeModalOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-muted/40 border text-xs" style={{ borderColor: "var(--border)" }}>
+              <div>Subscriber: <strong className="text-foreground">{selectedCustomer.name}</strong></div>
+              <div className="text-muted-foreground">User ID: {selectedCustomer.id} · Package: {selectedCustomer.package}</div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-muted-foreground block mb-2">SELECT NEW EXPIRATION DATE</label>
+              <input
+                type="date"
+                value={rechargeDate}
+                onChange={e => setRechargeDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border bg-muted/40 outline-none text-sm font-bold text-foreground cursor-pointer focus:border-primary transition-colors"
+                style={{ borderColor: "var(--border)" }}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setRechargeModalOpen(false)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs border bg-card text-foreground transition-colors hover:bg-muted">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (rechargeDate) {
+                    // Convert back to DD/MM/YYYY for consistency with existing data format
+                    const parts = rechargeDate.split('-');
+                    let formattedDate = rechargeDate;
+                    if (parts.length === 3) {
+                      formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    }
+                    const updatedCust = { ...selectedCustomer, expireDate: formattedDate, endDate: formattedDate, dueAmount: 0, status: "active" as any };
+                    updateCustomer(selectedCustomer.id, updatedCust);
+                    showToast(`Recharged and extended date to ${formattedDate} for ${selectedCustomer.name}`);
+                  }
+                  setRechargeModalOpen(false);
+                }}
+                disabled={!rechargeDate}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:opacity-95 shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 transition-opacity">
+                Confirm Recharge
               </button>
             </div>
           </div>
@@ -3951,7 +4545,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               </div>
               <div>
                 <h3 className="text-base font-black text-foreground">Terminate & Delete Subscriber?</h3>
-                <p className="text-xs text-muted-foreground">Permanent action on ISP CRM & RouterOS</p>
+                <p className="text-xs text-muted-foreground">De-provision from MikroTik & move to Archive</p>
               </div>
             </div>
 
@@ -3970,16 +4564,37 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Package / Rate:</span>
-                <span className="text-foreground">{deleteConfirmCust.package} (৳{deleteConfirmCust.price || deleteConfirmCust.monthlyBill})</span>
+                <span className="text-foreground">{deleteConfirmCust.package} (৳{deleteConfirmCust.price || deleteConfirmCust.monthlyBill || 500})</span>
               </div>
             </div>
 
-            <p className="text-xs text-rose-600 dark:text-rose-400 font-medium leading-relaxed flex items-start gap-1.5">
-              <AlertTriangle size={15} className="text-rose-500 shrink-0 mt-0.5" />
-              <span>Warning: This will permanently remove the subscriber from Cloud Firestore, Billing records, and deprovision / remove the PPPoE secret on MikroTik RouterOS.</span>
-            </p>
+            {/* Deletion Reason Selector / Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground block">Reason for Deletion / Disconnection:</label>
+              <select
+                value={deleteReason}
+                onChange={e => setDeleteReason(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-muted/50 text-xs font-medium text-foreground outline-none focus:border-primary">
+                <option value="Customer relocation / service discontinued">Customer relocation / service discontinued</option>
+                <option value="Non-payment default / overdue cutoff">Non-payment default / overdue cutoff</option>
+                <option value="Customer request for line termination">Customer request for line termination</option>
+                <option value="Switched to different ISP provider">Switched to different ISP provider</option>
+                <option value="Temporary hold / Seasonal disconnection">Temporary hold / Seasonal disconnection</option>
+                <option value="Duplicate or test account cleanup">Duplicate or test account cleanup</option>
+              </select>
+            </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-700 dark:text-rose-300 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <ShieldAlert size={14} className="shrink-0" />
+                <span>MikroTik & OLT Action:</span>
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                The PPPoE secret will be deleted from MikroTik DC-CA RouterOS, optical splitter port released, and customer profile preserved safely inside the <strong>Deleted Accounts Archive</strong> for full restoration anytime.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-1">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmCust(null)}
@@ -3992,6 +4607,125 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 className="w-1/2 py-2.5 rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
                 <Trash2 size={14} />
                 <span>Confirm & Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Confirm Restore Subscriber ──────────────────────────── */}
+      {restoreConfirmCust && (
+        <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-emerald-500/30 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-emerald-500">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <RotateCcw size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-foreground">Restore Subscriber Account?</h3>
+                <p className="text-xs text-muted-foreground">Re-provision on MikroTik & restore active status</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-muted/40 border border-border text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subscriber Name:</span>
+                <strong className="text-foreground">{restoreConfirmCust.name}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Client ID:</span>
+                <strong className="font-mono text-primary">{restoreConfirmCust.clientCode || restoreConfirmCust.id}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">PPPoE User:</span>
+                <strong className="font-mono text-foreground">{restoreConfirmCust.pppUser || "—"}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Package / Rate:</span>
+                <span className="text-foreground">{restoreConfirmCust.package} (৳{restoreConfirmCust.price || restoreConfirmCust.monthlyBill || 500})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Zone:</span>
+                <span className="text-foreground">{restoreConfirmCust.zone} · {restoreConfirmCust.subzone}</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="shrink-0" />
+                <span>Automatic Re-provisioning:</span>
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                The account will be moved back to the Active Subscribers pool, secret enabled on MikroTik DC-CA RouterOS, and billing schedule restored.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setRestoreConfirmCust(null)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs border border-border bg-card text-foreground hover:bg-muted cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRestoreCustomer(restoreConfirmCust)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
+                <RotateCcw size={14} />
+                <span>Confirm & Restore</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Confirm Permanent Purge ─────────────────────────────── */}
+      {purgeConfirmCust && (
+        <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-rose-600/40 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-12 h-12 rounded-2xl bg-rose-600/10 border border-rose-600/20 flex items-center justify-center">
+                <ShieldAlert size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-foreground">Permanently Purge Record?</h3>
+                <p className="text-xs text-muted-foreground">Irreversible database record removal</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subscriber:</span>
+                <strong className="text-foreground">{purgeConfirmCust.name}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Client ID:</span>
+                <strong className="font-mono text-primary">{purgeConfirmCust.clientCode || purgeConfirmCust.id}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">PPPoE User:</span>
+                <span className="font-mono text-foreground">{purgeConfirmCust.pppUser || "—"}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-rose-600 dark:text-rose-400 font-medium leading-relaxed flex items-start gap-1.5">
+              <AlertTriangle size={15} className="text-rose-500 shrink-0 mt-0.5" />
+              <span>Warning: This will permanently delete this subscriber record from the archive database. This action CANNOT be undone.</span>
+            </p>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setPurgeConfirmCust(null)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs border border-border bg-card text-foreground hover:bg-muted cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePurgeCustomer(purgeConfirmCust)}
+                className="w-1/2 py-2.5 rounded-xl font-bold text-xs bg-rose-700 hover:bg-rose-800 text-white shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
+                <Trash2 size={14} />
+                <span>Permanently Purge</span>
               </button>
             </div>
           </div>
