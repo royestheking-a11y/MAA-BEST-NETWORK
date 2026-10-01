@@ -223,7 +223,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       customers.forEach(c => {
         (c.paymentHistory || []).forEach(p => {
           const d = parseSafeDate(p.date);
-          if (d && d.getMonth() === m && d.getFullYear() === y && p.status !== "refunded") {
+          if (d && d.getMonth() === m && d.getFullYear() === y && p.status === "verified") {
             monthCollected += Number(p.amount) || 0;
           }
         });

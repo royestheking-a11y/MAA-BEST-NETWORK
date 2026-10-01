@@ -273,10 +273,10 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       return null;
     };
 
-    // Filter out duplicates and legacy template accounts so every subscriber appears exactly once
+    // Filter out duplicates so every subscriber appears exactly once
     const seenUsernames = new Set<string>();
     const deduplicatedCustomers = customers
-      .filter(c => c && c.id && !c.id.startsWith("CUST-"))
+      .filter(c => c && c.id)
       .filter(c => {
         const u = normalizeU(c.pppUser || c.name || c.id || "");
         if (!u) return true;

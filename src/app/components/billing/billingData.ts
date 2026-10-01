@@ -119,24 +119,31 @@ import { REAL_ISP_CUSTOMERS, REAL_BILLING_PAYMENTS } from "../../data/realIspDat
 export const INITIAL_INVOICES: Invoice[] = REAL_ISP_CUSTOMERS.flatMap(c => {
   return (c.invoices || []).map(inv => {
     const isPaid = inv.status === "paid";
-    const isSep = (inv.month || "").includes("September");
+    // Use actual payment date if available, otherwise use today for proper period labeling
+    const paidDateStr = inv.paidDate || (isPaid ? new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : undefined);
+    const periodDate = paidDateStr ? new Date(paidDateStr.split("/").reverse().join("-")) : new Date();
+    if (isNaN(periodDate.getTime())) periodDate.setTime(Date.now());
+    const periodLabel = periodDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    const dueDate = new Date(periodDate);
+    dueDate.setDate(dueDate.getDate() + 10);
+    const dueDateStr = dueDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     return {
       id: inv.id,
       customer: c.name,
       custId: c.clientCode || c.id,
       phone: c.phone,
       zone: c.zone || "DHAKA DIVISION",
-      pkgName: c.package || "20Mbps",
+      pkgName: c.package || "35M",
       subtotal: inv.amount || c.price || 500,
       vat: 0,
       discount: 0,
       amount: inv.amount || c.price || 500,
-      period: inv.month || (isSep ? "September 2026" : "August 2026"),
-      issued: isSep ? "01 Sep 2026" : "01 Aug 2026",
-      due: inv.dueDate || (isSep ? "10 Sep 2026" : "10 Aug 2026"),
+      period: inv.month || periodLabel,
+      issued: paidDateStr || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      due: inv.dueDate || dueDateStr,
       status: isPaid ? ("paid" as const) : ("overdue" as const),
       method: isPaid ? (inv.paymentMethod || "bKash") : null,
-      paidAt: inv.paidDate || (isPaid ? (isSep ? "01 Sep 2026" : "05 Aug 2026") : undefined),
+      paidAt: paidDateStr,
       trxId: inv.trxId
     };
   });
@@ -167,8 +174,8 @@ export const INITIAL_PACKAGES: IspPackage[] = [
 ];
 
 export const INITIAL_DISCOUNT_RULES: DiscountRule[] = [
-  { id: "DISC-101", code: "SUMMER2026", name: "Summer Speed Boost", type: "percentage", value: 15, scope: "specific_pkg", minPackageSpeed: 20, durationMonths: 3, usageCount: 1, maxUsage: 500, validUntil: "31 Aug 2026", status: "active" },
-  { id: "DISC-102", code: "REFERFRIEND", name: "Referral Bonus Credit", type: "fixed", value: 200, scope: "all", durationMonths: 1, usageCount: 0, maxUsage: 500, validUntil: "30 Sep 2026", status: "active" },
+  { id: "DISC-101", code: "FIBER2026", name: "Fiber Subscriber Offer", type: "percentage", value: 10, scope: "specific_pkg", minPackageSpeed: 35, durationMonths: 3, usageCount: 0, maxUsage: 500, validUntil: "31 Dec 2026", status: "active" },
+  { id: "DISC-102", code: "REFERFRIEND", name: "Referral Bonus Credit", type: "fixed", value: 200, scope: "all", durationMonths: 1, usageCount: 0, maxUsage: 500, validUntil: "31 Dec 2026", status: "active" },
 ];
 
 export const INITIAL_ADJUSTMENTS: CustomerAdjustment[] = [];
