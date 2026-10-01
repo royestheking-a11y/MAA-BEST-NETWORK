@@ -382,7 +382,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const clean = parsed
-            .filter((c: any) => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
+            .filter((c: any) => c && c.id && !c.id.toLowerCase().includes("test") && !(c.name && c.name.toLowerCase().includes("test")))
             .filter((c: any) => !delSet.has((c.id || "").toLowerCase()) && !(c.clientCode && delSet.has(c.clientCode.toLowerCase())) && !(c.pppUser && delSet.has(c.pppUser.toLowerCase())))
             .map((c: any) => normalizeCustomerPackage(c));
 
@@ -450,7 +450,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         }
 
         const clean = cloudCustomers
-          .filter(c => c && c.id && !c.id.startsWith("CUST-") && !c.id.toLowerCase().includes("test") && !c.name.toLowerCase().includes("test"))
+          .filter(c => c && c.id && !c.id.toLowerCase().includes("test") && !(c.name && c.name.toLowerCase().includes("test")))
           .filter(c => !delSet.has((c.id || "").toLowerCase()) && !(c.clientCode && delSet.has(c.clientCode.toLowerCase())) && !(c.pppUser && delSet.has(c.pppUser.toLowerCase())));
 
         if (clean.length > 0) {
@@ -946,7 +946,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       if (customers && customers.length > 0) {
-        const clean = customers.filter(c => c && c.id && !c.id.startsWith("CUST-"));
+        const clean = customers.filter(c => c && c.id);
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(clean));
       }
     } catch (e) {
@@ -2047,6 +2047,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           graceDays: undefined,
           graceExpiryDate: undefined,
           daysRemaining: Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+          updatedAt: Date.now(), // Grace period: billing engine won't cut off this paid customer for 120s
           invoices: updatedInvoices,
           paymentHistory: [newPayment, ...c.paymentHistory],
         };

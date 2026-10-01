@@ -198,15 +198,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return result.length > 0 ? result : [{ zone: "Mirpur-10", collected: monthlyRevenue, due: totalDue }];
   }, [customers, monthlyRevenue, totalDue]);
 
-  // Dynamic revenue view starting from operational cycle (Sep & Oct)
+  // Fully dynamic revenue chart: calculates up to 3 months based on current real date
   const revenueData = useMemo(() => {
-    const sepExpected = Math.round(monthlyRevenue * 0.98);
-    const sepCollected = Math.round(monthlyRevenue * 0.95);
-    return [
-      { month: "Sep 2026", revenue: sepExpected, collection: sepCollected },
-      { month: "Oct 2026", revenue: monthlyRevenue, collection: todayCollected }
-    ];
-  }, [monthlyRevenue, todayCollected]);
+    const months: Array<{ month: string; revenue: number; collection: number }> = [];
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth(); // 0-indexed
+
+    // Operational start: October 2026 (month index 9)
+    const opStartYear = 2026;
+    const opStartMonth = 9; // October
+
+    // Show up to last 2 months + current month
+    for (let offset = -2; offset <= 0; offset++) {
+      let m = curMonth + offset;
+      let y = curYear;
+      if (m < 0) { m += 12; y -= 1; }
+      // Skip months before operational start
+      if (y < opStartYear || (y === opStartYear && m < opStartMonth)) continue;
+
+      const monthLabel = new Date(y, m, 1).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+
+      // Collect actual payments for this month from customer payment histories
+      let monthCollected = 0;
+      customers.forEach(c => {
+        (c.paymentHistory || []).forEach(p => {
+          const d = parseSafeDate(p.date);
+          if (d && d.getMonth() === m && d.getFullYear() === y && p.status !== "refunded") {
+            monthCollected += Number(p.amount) || 0;
+          }
+        });
+      });
+      // Also check billing store payments
+      billingPayments.forEach(p => {
+        const d = parseSafeDate(p.date);
+        if (d && d.getMonth() === m && d.getFullYear() === y && p.status !== "refunded") {
+          monthCollected += Number(p.amount) || 0;
+        }
+      });
+
+      const isCurrentMonth = (m === curMonth && y === curYear);
+      months.push({
+        month: monthLabel,
+        revenue: monthlyRevenue, // expected monthly based on current subscriber base
+        collection: isCurrentMonth ? todayCollected : (monthCollected > 0 ? monthCollected : 0),
+      });
+    }
+
+    // Ensure at least the current month is shown
+    if (months.length === 0) {
+      const monthLabel = now.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+      months.push({ month: monthLabel, revenue: monthlyRevenue, collection: todayCollected });
+    }
+
+    return months;
+  }, [customers, billingPayments, monthlyRevenue, todayCollected, now]);
 
   const networkDevices = useMemo(() => {
     const netxOlt1 = oltServers.find(s => s.name === 'OLT1');

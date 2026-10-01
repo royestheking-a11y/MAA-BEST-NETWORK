@@ -61,7 +61,9 @@ export function subscribeToCustomers(
       const docs: Customer[] = [];
       snapshot.forEach(docSnap => {
         const raw = docSnap.data() as any;
-        if (!raw || !raw.id || raw.id.startsWith("CUST-")) return;
+        // Only skip documents that have no id at all — do NOT filter by id prefix.
+        // Previously, raw.id.startsWith("CUST-") incorrectly excluded valid customers.
+        if (!raw || !raw.id) return;
         const data: Customer = {
           ...raw,
           price: typeof raw.price === "number" ? raw.price : (Number(raw.price) || 0),
