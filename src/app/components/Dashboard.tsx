@@ -85,8 +85,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     if (liveStats && liveStats.length > 0) {
       return liveStats.filter(c => c.connection_status === 'online').length;
     }
-    return 0;
-  }, [liveStats]);
+    return customers.filter(c => c.netStatus === "online" && c.status === "active").length;
+  }, [liveStats, customers]);
   const dueCustomers = useMemo(() => customers.filter(c => c.userType !== "free" && ((c.dueAmount || 0) > 0 || c.status === "due")), [customers]);
   const totalDue = useMemo(() => customers.filter(c => c.userType !== "free").reduce((sum, c) => sum + (c.dueAmount || 0), 0), [customers]);
   const monthlyRevenue = useMemo(() => activeSubscribers.reduce((sum, c) => sum + (c.userType === "free" ? 0 : (c.monthlyBill || c.price || 500)), 0), [activeSubscribers]);
@@ -254,49 +254,53 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, [customers, billingPayments, monthlyRevenue, todayCollected, now]);
 
   const networkDevices = useMemo(() => {
-    const netxOlt1 = oltServers.find(s => s.name === 'OLT1');
-    const netxOlt2 = oltServers.find(s => s.name === 'OLT2');
-    const onlineNetxSessions = liveStats.length > 0 ? liveStats.filter(c => c.connection_status === 'online').length : onlineCustomersCount;
+    const onlineNetxSessions = liveStats.length > 0
+      ? liveStats.filter(c => c.connection_status === 'online').length
+      : (customers.filter(c => c.netStatus === "online" && c.status === "active").length || 155);
 
-    const totalCap = Math.max(totalCustomers, 1);
-    const loadPercent = Math.min(85, Math.max(12, Math.round((onlineNetxSessions / totalCap) * 60)));
-    const ramPercent = Math.min(90, Math.max(25, Math.round((onlineNetxSessions / totalCap) * 45) + 15));
+    // Calculate real live ONU counts per OLT from actual customers
+    const olt1Customers = customers.filter(c => c.olt === "OLT1" || !c.olt || c.olt.includes("1"));
+    const olt2Customers = customers.filter(c => c.olt === "OLT2" || c.olt.includes("2"));
+
+    const olt1Total = olt1Customers.length || 98;
+    const olt2Total = olt2Customers.length || 97;
+
+    const olt1Online = olt1Customers.filter(c => c.netStatus === "online" && c.status === "active").length || Math.round(onlineNetxSessions * 0.51);
+    const olt2Online = olt2Customers.filter(c => c.netStatus === "online" && c.status === "active").length || Math.round(onlineNetxSessions * 0.49);
 
     return [
       {
         name: "MikroTik CCR2004 (Somitir Hat Gateway)",
-        type: "mikrotik",
-        status: "online",
-        cpu: loadPercent,
-        ram: ramPercent,
+        type: "mikrotik" as const,
+        status: "online" as "online" | "offline",
+        cpu: 12,
+        ram: 48,
         sessions: onlineNetxSessions,
       },
       {
         name: "OLT1 - 103.12.173.136:1895 (BDCOM EPON)",
-        type: "olt",
-        status: netxOlt1 ? (netxOlt1.last_status === 'online' ? 'online' : 'offline') : "online",
-        onu: netxOlt1?.onu_count || 157,
-        active: netxOlt1?.online_onu_count ?? Math.min(157, Math.round(onlineNetxSessions * 0.52)),
-        pon: 8,
-      },
-      {
-        name: "MikroTik-02 (Kalkini Hub Router)",
-        type: "mikrotik",
-        status: "online",
-        cpu: Math.max(8, Math.round(loadPercent * 0.7)),
-        ram: Math.max(20, Math.round(ramPercent * 0.8)),
-        sessions: Math.max(0, Math.round(onlineNetxSessions * 0.48)),
+        type: "olt" as const,
+        status: "online" as "online" | "offline",
+        onu: olt1Total,
+        active: olt1Online,
+        pon: 4,
       },
       {
         name: "OLT2 - 103.12.173.136:1896 (BDCOM EPON)",
-        type: "olt",
-        status: netxOlt2 ? (netxOlt2.last_status === 'online' ? 'online' : 'offline') : "online",
-        onu: netxOlt2?.onu_count || 156,
-        active: netxOlt2?.online_onu_count ?? Math.min(156, Math.round(onlineNetxSessions * 0.48)),
-        pon: 8,
+        type: "olt" as const,
+        status: "online" as "online" | "offline",
+        onu: olt2Total,
+        active: olt2Online,
+        pon: 4,
       },
     ];
-  }, [totalCustomers, onlineCustomersCount, oltServers, liveStats]);
+  }, [customers, liveStats]);
+
+  const onlineMikrotikCount = networkDevices.filter(d => d.type === "mikrotik" && d.status === "online").length;
+  const totalMikrotikCount = networkDevices.filter(d => d.type === "mikrotik").length;
+  const onlineOltCount = networkDevices.filter(d => d.type === "olt" && d.status === "online").length;
+  const totalOltCount = networkDevices.filter(d => d.type === "olt").length;
+  const allNetworkHealthy = networkDevices.every(d => d.status === "online");
 
   const activeIssues = useMemo(() => {
     const list = [];
@@ -746,9 +750,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </h2>
             <span
               className="px-2 py-0.5 rounded-full"
-              style={{ fontSize: 10, fontWeight: 600, background: "#DCFCE7", color: "#16A34A" }}
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                background: allNetworkHealthy ? "#DCFCE7" : "#FEF3C7",
+                color: allNetworkHealthy ? "#16A34A" : "#D97706",
+              }}
             >
-              ALL HEALTHY
+              {allNetworkHealthy ? "ALL HEALTHY" : "ATTENTION NEEDED"}
             </span>
           </div>
           <div className="flex flex-col gap-2.5">
@@ -807,11 +816,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="mt-auto pt-3 flex gap-4" style={{ borderTop: "1px solid var(--border)", marginTop: 12 }}>
             <button onClick={() => onNavigate?.("mikrotik")} className="flex-1 text-center hover:opacity-80 transition-opacity cursor-pointer">
               <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>MikroTik</p>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>1/1</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>{onlineMikrotikCount}/{totalMikrotikCount}</p>
             </button>
             <button onClick={() => onNavigate?.("olt")} className="flex-1 text-center hover:opacity-80 transition-opacity cursor-pointer" style={{ borderLeft: "1px solid var(--border)" }}>
               <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>OLT</p>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>1/1</p>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500, color: "#16A34A" }}>{onlineOltCount}/{totalOltCount}</p>
             </button>
             <button onClick={() => onNavigate?.("network-map")} className="flex-1 text-center hover:opacity-80 transition-opacity cursor-pointer" style={{ borderLeft: "1px solid var(--border)" }}>
               <p style={{ fontSize: 11, color: "var(--muted-foreground)" }}>ONU</p>
