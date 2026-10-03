@@ -781,7 +781,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
   };
 
   const copyLoginBundle = (c: Customer) => {
-    const bundle = `=== MAA BEST NETWORK Subscriber Login ===\nPortal: portal.maabestnetwork.com\nUser ID: ${c.id}\nDefault Passcode: ${c.passcode}\nPhone: ${c.phone}\nPackage: ${c.package}\nPayment Method: bKash / Nagad Direct`;
+    const bundle = `=== MAA BEST NETWORK Subscriber Login ===\nPortal: portal.maabestnetwork.com\nUser ID: ${c.clientCode || c.id}\nDefault Passcode: ${c.passcode}\nPhone: ${c.phone}\nPackage: ${c.package}\nPayment Method: bKash / Nagad Direct`;
     navigator.clipboard.writeText(bundle);
     setCopiedKey(`bundle-${c.id}`);
     showToast(`Copied Login Bundle for ${c.name}`);
@@ -2272,7 +2272,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 <div>
                   <h2 className="text-base font-extrabold text-foreground">{selectedCustomer.name}</h2>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="font-mono text-xs font-bold text-primary">{selectedCustomer.id}</span>
+                    <span className="font-mono text-xs font-bold text-primary">{selectedCustomer.clientCode || selectedCustomer.id}</span>
                     <button
                       onClick={() => setDrawerTab("Identity & ID")}
                       title="Edit Subscriber ID"
@@ -2339,7 +2339,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                   <>
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { label: "User ID", value: selectedCustomer.id, mono: true, copyKey: "id" },
+                        { label: "User ID", value: selectedCustomer.clientCode || selectedCustomer.id, mono: true, copyKey: "id" },
                         { label: "Default Passcode", value: selectedCustomer.passcode, mono: true, copyKey: "pass" },
                         { label: "Phone", value: selectedCustomer.phone },
                         { label: "Email", value: selectedCustomer.email },
@@ -3679,7 +3679,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
             <div className="flex flex-wrap gap-1.5">
               {[
-                { label: "Login Credentials", text: `Your MAA BEST NETWORK Login:\nPortal: portal.maabestnetwork.com\nUser ID: ${selectedCustomer.id}\nPasscode: ${selectedCustomer.passcode}` },
+                { label: "Login Credentials", text: `Your MAA BEST NETWORK Login:\nPortal: portal.maabestnetwork.com\nUser ID: ${selectedCustomer.clientCode || selectedCustomer.id}\nPasscode: ${selectedCustomer.passcode}` },
                 { label: "Bill Due Reminder", text: `Dear ${selectedCustomer.name}, your monthly bill of ৳${selectedCustomer.price} is due. Please pay via bKash to avoid disconnection.` },
                 { label: "Payment Received", text: `Payment of ৳${selectedCustomer.price} received successfully! Your account is active. Thank you for choosing MAA BEST NETWORK.` }
               ].map(tpl => (
@@ -3733,7 +3733,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
             <div className="p-3 rounded-xl bg-muted/40 border text-xs" style={{ borderColor: "var(--border)" }}>
               <div>Subscriber: <strong className="text-foreground">{selectedCustomer.name}</strong></div>
-              <div className="text-muted-foreground">User ID: {selectedCustomer.id} · Due: ৳{selectedCustomer.dueAmount}</div>
+              <div className="text-muted-foreground">User ID: {selectedCustomer.clientCode || selectedCustomer.id} · Due: ৳{selectedCustomer.dueAmount}</div>
             </div>
 
             <div>
@@ -3806,7 +3806,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
 
             <div className="p-3 rounded-xl bg-muted/40 border text-xs" style={{ borderColor: "var(--border)" }}>
               <div>Subscriber: <strong className="text-foreground">{selectedCustomer.name}</strong></div>
-              <div className="text-muted-foreground">User ID: {selectedCustomer.id} · Package: {selectedCustomer.package}</div>
+              <div className="text-muted-foreground">User ID: {selectedCustomer.clientCode || selectedCustomer.id} · Package: {selectedCustomer.package}</div>
             </div>
 
             <div>
@@ -3818,6 +3818,28 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 className="w-full px-3 py-2.5 rounded-xl border bg-muted/40 outline-none text-sm font-bold text-foreground cursor-pointer focus:border-primary transition-colors"
                 style={{ borderColor: "var(--border)" }}
               />
+            </div>
+            
+            <div>
+              <label className="text-[11px] font-bold text-muted-foreground block mb-2">ADD CUSTOM DAYS</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  placeholder="e.g. 5"
+                  min="1"
+                  className="w-24 px-3 py-2 rounded-xl border bg-muted/40 outline-none text-sm font-bold text-foreground focus:border-primary transition-colors"
+                  style={{ borderColor: "var(--border)" }}
+                  onChange={(e) => {
+                    const days = parseInt(e.target.value);
+                    if (!isNaN(days) && days > 0) {
+                      const d = new Date();
+                      d.setDate(d.getDate() + days);
+                      setRechargeDate(d.toISOString().split('T')[0]);
+                    }
+                  }}
+                />
+                <span className="text-sm font-bold text-muted-foreground">days from today</span>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
