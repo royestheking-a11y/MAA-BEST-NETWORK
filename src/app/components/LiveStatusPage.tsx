@@ -42,9 +42,9 @@ function formatLastRefresh(date: Date): string {
   return date.toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function parseUptimeToSeconds(uptimeStr?: string, seedIndex: number = 0): number {
+export function parseUptimeToSeconds(uptimeStr?: string, _seedIndex: number = 0): number {
   if (!uptimeStr || uptimeStr === "—" || uptimeStr === "Offline" || uptimeStr.includes("Active")) {
-    return 14400 + ((seedIndex * 4127 + 1205) % 259200); // 4h to 3d
+    return 0; // Unknown uptime — do not fabricate a number
   }
   let totalSecs = 0;
   const dMatch = uptimeStr.match(/(\d+)\s*d/i);
@@ -57,10 +57,7 @@ export function parseUptimeToSeconds(uptimeStr?: string, seedIndex: number = 0):
   if (mMatch) totalSecs += parseInt(mMatch[1], 10) * 60;
   if (sMatch) totalSecs += parseInt(sMatch[1], 10);
 
-  if (totalSecs === 0) {
-    return 28400 + ((seedIndex * 3721 + 950) % 350000);
-  }
-  return totalSecs;
+  return totalSecs; // Return 0 if nothing parsed — no fake fallback
 }
 
 export function formatTickingUptime(seconds: number): string {
@@ -78,55 +75,46 @@ export function formatTickingUptime(seconds: number): string {
   return parts.join(" ");
 }
 
-export function computeLiveBandwidth(
-  pkgDown: number,
-  pkgUp: number,
-  isOnline: boolean,
-  seed: number,
-  tickCount: number
-) {
-  if (!isOnline) {
+/**
+ * Derives real session bandwidth from NetX API cumulative byte counters.
+ * Returns session totals or "—" if no real data is available.
+ * NEVER generates fake animated numbers.
+ */
+export function computeRealSessionBandwidth(liveMatch: NetxLiveCustomer | null | undefined, isOnline: boolean) {
+  const rxBytes: number = liveMatch?.live_rx_bytes ?? 0;
+  const txBytes: number = liveMatch?.live_tx_bytes ?? 0;
+
+  if (!isOnline || !liveMatch || (!rxBytes && !txBytes)) {
     return {
       liveDownMbps: 0,
       liveUpMbps: 0,
-      liveDownFormatted: "0.0 Mbps",
-      liveUpFormatted: "0.0 Mbps",
+      liveDownFormatted: "—",
+      liveUpFormatted: "—",
       downPercent: 0,
       upPercent: 0,
+      hasRealData: false,
     };
   }
 
-  // Realistic per-subscriber temporal variation
-  // Combines a base consumption profile + dynamic traffic pulse
-  const phase = (tickCount * 0.45) + (seed * 1.83);
-  const wave1 = Math.sin(phase) * 0.28;
-  const wave2 = Math.cos(phase * 0.4 + seed) * 0.16;
-  const noise = (((seed * 31 + tickCount * 7) % 23) - 11) / 100;
-
-  // Base utilization between 20% and 80%
-  const baseProfile = 0.28 + ((seed * 13) % 40) / 100;
-  const factor = Math.min(0.95, Math.max(0.04, baseProfile + wave1 + wave2 + noise));
-
-  const downMbps = Math.max(0.1, Math.round(pkgDown * factor * 10) / 10);
-  // Upload traffic is typically 15% - 40% of download
-  const upFactor = Math.min(0.92, Math.max(0.03, (factor * 0.35) + (((seed * 9) % 25) / 100)));
-  const upMbps = Math.max(0.1, Math.round(pkgUp * upFactor * 10) / 10);
-
-  const downPercent = Math.min(100, Math.round((downMbps / pkgDown) * 100));
-  const upPercent = Math.min(100, Math.round((upMbps / pkgUp) * 100));
-
-  const formatRate = (rate: number) => {
-    if (rate >= 1.0) return `${rate.toFixed(1)} Mbps`;
-    return `${Math.round(rate * 1000)} Kbps`;
+  const toDisplay = (bytes: number): string => {
+    if (bytes === 0) return "—";
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`;
+    if (mb >= 1) return `${mb.toFixed(1)} MB`;
+    return `${Math.round(bytes / 1024)} KB`;
   };
 
+  const rxMb = rxBytes / (1024 * 1024);
+  const txMb = txBytes / (1024 * 1024);
+
   return {
-    liveDownMbps: downMbps,
-    liveUpMbps: upMbps,
-    liveDownFormatted: formatRate(downMbps),
-    liveUpFormatted: formatRate(upMbps),
-    downPercent,
-    upPercent,
+    liveDownMbps: rxMb,
+    liveUpMbps: txMb,
+    liveDownFormatted: toDisplay(rxBytes),
+    liveUpFormatted: toDisplay(txBytes),
+    downPercent: 0, // No per-second rate from API
+    upPercent: 0,
+    hasRealData: true,
   };
 }
 
@@ -256,28 +244,33 @@ export function LiveStatusPage() {
       // 1. DIRECT 1-TO-1 MAPPING TO REAL REGISTERED CUSTOMERS IN FIRESTORE
       return customers.map((c, idx) => {
         const liveMatch = getLiveMatch(c);
-        const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+        const netxLoaded = Array.isArray(liveStats) && liveStats.length > 0;
+        // Only trust NetX API for status; fall back to local flags only if no data loaded
+        const isOnline = liveMatch
+          ? (liveMatch.connection_status === "online")
+          : (!netxLoaded && c.netStatus === "online" && c.status === "active");
         const realRx = liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null
           ? Number(liveMatch.onu_rx_power)
           : (c.onuSignal && !isNaN(parseFloat(c.onuSignal)) ? parseFloat(c.onuSignal) : null);
 
-        const rxStr = realRx !== null ? `${realRx.toFixed(1)} dBm` : "—";
+        const rxStr = isOnline ? (realRx !== null ? `${realRx.toFixed(1)} dBm` : "—") : "Offline";
         const pkgDown = c.downloadSpeedMbps || 20;
         const pkgUp = c.uploadSpeedMbps || 10;
-        const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || c.sessionUptime || c.duration, idx) : 0;
-        const bw = computeLiveBandwidth(pkgDown, pkgUp, isOnline, idx, 0);
+        const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || c.sessionUptime || c.duration) : 0;
+        // Use REAL session byte data from NetX API only
+        const bw = computeRealSessionBandwidth(liveMatch, isOnline);
 
         return {
           customer: c.name,
           id: c.clientCode || c.id,
           user: c.pppUser || c.clientCode || c.id,
           status: isOnline ? ("online" as const) : ("offline" as const),
-          uptime: isOnline ? formatTickingUptime(initialUptimeSec) : "—",
+          uptime: isOnline ? (initialUptimeSec > 0 ? formatTickingUptime(initialUptimeSec) : "Active") : "Offline",
           uptimeSeconds: initialUptimeSec,
           ip: isOnline ? (liveMatch?.live_ip || c.ipAddress || "—") : "—",
           mac: liveMatch?.live_mac || c.mac || "—",
           rxPower: rxStr,
-          rxPowerNum: realRx !== null ? Number(realRx.toFixed(1)) : 0,
+          rxPowerNum: isOnline && realRx !== null ? Number(realRx.toFixed(1)) : -35,
           ponPort: c.ponPort || `epon 0/${(idx % 4) + 1}`,
           olt: c.olt?.includes("OLT2") ? "OLT2" : "OLT1",
           up: isOnline ? `${pkgUp} Mbps` : "—",
@@ -290,7 +283,7 @@ export function LiveStatusPage() {
           upPercent: bw.upPercent,
           pkgDown,
           pkgUp,
-          totalTransferredMb: 1240 + ((idx * 832) % 15000),
+          totalTransferredMb: liveMatch ? ((liveMatch.live_rx_bytes ?? 0) + (liveMatch.live_tx_bytes ?? 0)) / (1024 * 1024) : 0,
           mikrotik: c.mikrotik || c.serverName || "MikroTik-MBN-Core",
           pkg: c.package || `${pkgDown} Mbps Fiber Standard`,
           isHardwareOnly: false,
@@ -313,27 +306,33 @@ export function LiveStatusPage() {
         const matched = macMap.get(cleanMac) || custMap.get(cleanCust);
         const liveMatch = liveMap.get(o.customer.toLowerCase());
 
-        const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (o.status === "online");
-        const realRxPower = (liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null)
-          ? `${liveMatch.onu_rx_power} dBm`
-          : (matched?.onuSignal && matched.onuSignal !== "—" && matched.onuSignal.toLowerCase() !== "offline" ? matched.onuSignal : "—");
+        const netxLoaded = Array.isArray(liveStats) && liveStats.length > 0;
+        const isOnline = liveMatch
+          ? (liveMatch.connection_status === "online")
+          : (!netxLoaded && o.status === "online");
+        const realRxPower = isOnline
+          ? ((liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null)
+            ? `${liveMatch.onu_rx_power} dBm`
+            : (matched?.onuSignal && matched.onuSignal !== "—" && matched.onuSignal.toLowerCase() !== "offline" ? matched.onuSignal : "—"))
+          : "Offline";
 
         const pkgDown = matched?.downloadSpeedMbps || 20;
         const pkgUp = matched?.uploadSpeedMbps || 10;
-        const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || matched?.sessionUptime, idx) : 0;
-        const bw = computeLiveBandwidth(pkgDown, pkgUp, isOnline, idx, 0);
+        const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || matched?.sessionUptime) : 0;
+        // Real session data only
+        const bw = computeRealSessionBandwidth(liveMatch, isOnline);
 
         return {
           customer: o.customer !== "— Unassigned —" ? (matched?.name || o.customer) : "— Unassigned Hardware ONU —",
           id: matched?.clientCode || matched?.id || `MBN-${(idx + 1).toString().padStart(4, "0")}`,
           user: o.customer !== "— Unassigned —" ? (matched?.pppUser || o.customer) : `Unassigned-ONU-${idx + 1}`,
           status: isOnline ? ("online" as const) : ("offline" as const),
-          uptime: isOnline ? formatTickingUptime(initialUptimeSec) : "—",
+          uptime: isOnline ? (initialUptimeSec > 0 ? formatTickingUptime(initialUptimeSec) : "Active") : "Offline",
           uptimeSeconds: initialUptimeSec,
-          ip: isOnline ? (liveMatch?.live_ip || matched?.ipAddress || `100.64.10.${(idx % 250) + 2}`) : "—",
+          ip: isOnline ? (liveMatch?.live_ip || matched?.ipAddress || "—") : "—",
           mac: liveMatch?.live_mac || o.mac,
           rxPower: realRxPower,
-          rxPowerNum: parseFloat(realRxPower) || -20,
+          rxPowerNum: isOnline ? (parseFloat(realRxPower) || 0) : -35,
           ponPort: o.ponPort,
           olt: o.oltServer,
           up: isOnline ? `${pkgUp} Mbps` : "—",
@@ -346,7 +345,7 @@ export function LiveStatusPage() {
           upPercent: bw.upPercent,
           pkgDown,
           pkgUp,
-          totalTransferredMb: 850 + ((idx * 512) % 12000),
+          totalTransferredMb: liveMatch ? ((liveMatch.live_rx_bytes ?? 0) + (liveMatch.live_tx_bytes ?? 0)) / (1024 * 1024) : 0,
           mikrotik: matched?.mikrotik || "MikroTik-MBN-Core",
           pkg: matched?.package || `${pkgDown} Mbps Fiber Standard`,
           isHardwareOnly: o.customer === "— Unassigned —",
@@ -373,26 +372,13 @@ export function LiveStatusPage() {
           prev.map((s, idx) => {
             if (s.status !== "online") return s;
 
-            const nextUptime = s.uptimeSeconds + 1;
-            const bw = computeLiveBandwidth(s.pkgDown, s.pkgUp, true, idx, nextTick);
-
-            // Subtle optical laser drift (±0.03 dBm) only when active signal reading exists
-            const rxDrift = (s.rxPowerNum !== 0) ? (((idx * 13 + nextTick) % 7) - 3) * 0.015 : 0;
-            const newRxNum = s.rxPowerNum !== 0 ? Number((s.rxPowerNum + rxDrift).toFixed(1)) : 0;
+        const nextUptime = s.status === "online" ? s.uptimeSeconds + 1 : s.uptimeSeconds;
 
             return {
               ...s,
               uptimeSeconds: nextUptime,
-              uptime: formatTickingUptime(nextUptime),
-              rxPowerNum: newRxNum,
-              rxPower: newRxNum !== 0 ? `${newRxNum.toFixed(1)} dBm` : s.rxPower,
-              liveDownMbps: bw.liveDownMbps,
-              liveUpMbps: bw.liveUpMbps,
-              liveDownFormatted: bw.liveDownFormatted,
-              liveUpFormatted: bw.liveUpFormatted,
-              downPercent: bw.downPercent,
-              upPercent: bw.upPercent,
-              totalTransferredMb: s.totalTransferredMb + (bw.liveDownMbps + bw.liveUpMbps) / 8,
+              uptime: nextUptime > 0 ? formatTickingUptime(nextUptime) : (s.status === "online" ? "Active" : "—"),
+              // DO NOT recalculate bandwidth — session byte totals only change when the API refreshes
             };
           })
         );
@@ -419,25 +405,16 @@ export function LiveStatusPage() {
     refreshNetx();
     setLiveTick(t => t + 5);
 
+    // Bandwidth and signal update from the real API (refreshNetx above).
+    // Only tick uptime locally — do not fabricate fake bandwidth numbers here.
     setSessions(prev =>
-      prev.map((s, idx) => {
+      prev.map(s => {
         if (s.status !== "online") return s;
-        const bw = computeLiveBandwidth(s.pkgDown, s.pkgUp, true, idx + 5, liveTick + 7);
-        const rxDrift = (((idx * 17) % 7) - 3) * 0.03;
-        const newRxNum = Number((s.rxPowerNum + rxDrift).toFixed(1));
-
+        const nextUptime = s.uptimeSeconds + 1;
         return {
           ...s,
-          uptimeSeconds: s.uptimeSeconds + 1,
-          uptime: formatTickingUptime(s.uptimeSeconds + 1),
-          rxPowerNum: newRxNum,
-          rxPower: `${newRxNum.toFixed(1)} dBm`,
-          liveDownMbps: bw.liveDownMbps,
-          liveUpMbps: bw.liveUpMbps,
-          liveDownFormatted: bw.liveDownFormatted,
-          liveUpFormatted: bw.liveUpFormatted,
-          downPercent: bw.downPercent,
-          upPercent: bw.upPercent,
+          uptimeSeconds: nextUptime,
+          uptime: nextUptime > 0 ? formatTickingUptime(nextUptime) : "Active",
         };
       })
     );
@@ -877,16 +854,22 @@ export function LiveStatusPage() {
 
                       {/* Optical Signal */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`font-mono text-xs font-bold px-2 py-0.5 rounded-full border ${
-                            s.rxPowerNum >= -24
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                              : s.rxPowerNum >= -27
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                              : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                          }`}>
-                          {s.rxPower}
-                        </span>
+                        {s.status === "online" && s.rxPower !== "Offline" && s.rxPower !== "—" ? (
+                          <span
+                            className={`font-mono text-xs font-bold px-2 py-0.5 rounded-full border ${
+                              s.rxPowerNum >= -24
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                : s.rxPowerNum >= -27
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                            }`}>
+                            {s.rxPower}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted border border-border">
+                            {s.status === "online" ? "—" : "Offline"}
+                          </span>
+                        )}
                       </td>
 
                       {/* OLT Server */}
@@ -903,21 +886,25 @@ export function LiveStatusPage() {
 
                       {/* Live Download Speed */}
                       <td className="px-4 py-3 whitespace-nowrap min-w-[130px]">
-                        {s.status === "online" ? (
+                        {s.status === "online" && s.liveDownFormatted !== "—" ? (
                           <div>
                             <div className="flex items-center gap-1 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
-                              <span>{s.liveDownFormatted || s.down}</span>
+                              <span>{s.liveDownFormatted}</span>
                             </div>
-                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                              <span>Cap: {s.pkgDown}M</span>
-                              <span>{s.downPercent}%</span>
-                            </div>
-                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
-                              <div
-                                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, Math.max(5, s.downPercent))}%` }}
-                              />
-                            </div>
+                            {s.downPercent > 0 && (
+                              <>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
+                                  <span>Cap: {s.pkgDown}M</span>
+                                  <span>{s.downPercent}%</span>
+                                </div>
+                                <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
+                                  <div
+                                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                                    style={{ width: `${Math.min(100, Math.max(2, s.downPercent))}%` }}
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <span className="font-mono text-xs text-muted-foreground">—</span>
@@ -926,21 +913,25 @@ export function LiveStatusPage() {
 
                       {/* Live Upload Speed */}
                       <td className="px-4 py-3 whitespace-nowrap min-w-[130px]">
-                        {s.status === "online" ? (
+                        {s.status === "online" && s.liveUpFormatted !== "—" ? (
                           <div>
                             <div className="flex items-center gap-1 font-mono text-xs font-black text-sky-600 dark:text-sky-400">
-                              <span>{s.liveUpFormatted || s.up}</span>
+                              <span>{s.liveUpFormatted}</span>
                             </div>
-                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                              <span>Cap: {s.pkgUp}M</span>
-                              <span>{s.upPercent}%</span>
-                            </div>
-                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
-                              <div
-                                className="h-full bg-sky-500 rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, Math.max(5, s.upPercent))}%` }}
-                              />
-                            </div>
+                            {s.upPercent > 0 && (
+                              <>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
+                                  <span>Cap: {s.pkgUp}M</span>
+                                  <span>{s.upPercent}%</span>
+                                </div>
+                                <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
+                                  <div
+                                    className="h-full bg-sky-500 rounded-full transition-all duration-300"
+                                    style={{ width: `${Math.min(100, Math.max(2, s.upPercent))}%` }}
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <span className="font-mono text-xs text-muted-foreground">—</span>
@@ -961,11 +952,11 @@ export function LiveStatusPage() {
                             <>
                               <Clock size={12} className="text-emerald-500 animate-spin" style={{ animationDuration: "10s" }} />
                               <span className="text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 text-[11px] whitespace-nowrap">
-                                {s.uptime}
+                                {s.uptime && s.uptime !== "—" ? s.uptime : "Active"}
                               </span>
                             </>
                           ) : (
-                            <span className="text-muted-foreground text-xs">{s.uptime}</span>
+                            <span className="text-muted-foreground text-xs font-medium">Offline</span>
                           )}
                         </div>
                       </td>

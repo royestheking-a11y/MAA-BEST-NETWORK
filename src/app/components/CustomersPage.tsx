@@ -134,9 +134,18 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     const map = new Map<string, NetxLiveCustomer>();
     if (Array.isArray(liveStats)) {
       liveStats.forEach(ls => {
-        if (ls.pppoe_username) map.set(ls.pppoe_username.toLowerCase(), ls);
-        if (ls.full_name) map.set(ls.full_name.toLowerCase(), ls);
-        if (ls.user_id) map.set(ls.user_id.toLowerCase(), ls);
+        const candidates = [ls.pppoe_username, ls.full_name, ls.user_id];
+        candidates.forEach(cand => {
+          if (cand) {
+            const clean = String(cand).toLowerCase().trim();
+            map.set(clean, ls);
+            map.set(clean.replace(/@/g, ""), ls);
+            map.set(clean.replace(/[^a-z0-9]/g, ""), ls);
+            if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+              map.set("mbn@" + clean.slice(3), ls);
+            }
+          }
+        });
       });
     }
     return map;
@@ -402,6 +411,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
         serverName: selectedCustomer.serverName || "",
         protocolType: selectedCustomer.protocolType || selectedCustomer.service || "pppoe",
         profile: selectedCustomer.profile || selectedCustomer.package || "",
+        ipAddress: selectedCustomer.ipAddress || "",
         zone: selectedCustomer.zone || "",
         subzone: selectedCustomer.subzone || "",
         box: selectedCustomer.box || "",
@@ -508,6 +518,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     const chosenPkg = livePackages.find(p => p.name === netForm.package || p.name.split("—")[0].trim() === (netForm.package || "").split("—")[0].trim());
     const updates: Partial<Customer> = {
       ...netForm,
+      ipAddress: (netForm.ipAddress || "").trim(),
       profile: chosenPkg?.mikrotikProfile || (netForm.package ? netForm.package.split(/[—\-]/)[0].trim() : selectedCustomer.profile),
       speed: chosenPkg ? `${chosenPkg.down}/${chosenPkg.up}` : selectedCustomer.speed,
       downloadSpeedMbps: chosenPkg?.down || selectedCustomer.downloadSpeedMbps,
@@ -537,7 +548,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
       price: Number(serviceForm.monthlyBill) !== undefined && !isNaN(Number(serviceForm.monthlyBill)) ? Number(serviceForm.monthlyBill) : selectedCustomer.price,
       monthlyBill: Number(serviceForm.monthlyBill) !== undefined && !isNaN(Number(serviceForm.monthlyBill)) ? Number(serviceForm.monthlyBill) : selectedCustomer.monthlyBill,
       status: serviceForm.disabledInMikrotik ? "suspended" : "active",
-      netStatus: serviceForm.disabledInMikrotik ? "offline" : "online",
+      netStatus: serviceForm.disabledInMikrotik ? "offline" : selectedCustomer.netStatus,
       endDate: serviceForm.expireDate || selectedCustomer.endDate,
       expireDate: serviceForm.expireDate || selectedCustomer.expireDate,
     };
@@ -666,7 +677,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     id: "",
     name: "", phone: "", email: "", address: "", zone: "Madaripur Sadar", subzone: "Puran Bazar",
     pppUser: "mbn_10012", pppPass: "mbn@8492", passcode: "mbn@8492", mac: "",
-    ipAddress: "192.10.10.100",
+    ipAddress: "10.215.35.2",
     package: "8 Mbps Economy — ৳600",
     speed: "8/4",
     price: 600,
@@ -1087,7 +1098,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
     // IP Address Format Validation
     const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     if (!ipRegex.test(addForm.ipAddress.trim())) {
-      showToast("Validation Error: Please enter a valid IPv4 address (e.g. 192.10.10.100).");
+      showToast("Validation Error: Please enter a valid IPv4 address (e.g. 10.215.35.15).");
       return;
     }
 
@@ -1877,12 +1888,12 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                 const liveMatch = liveStatsMap.get(cleanUser) || liveStatsMap.get((c.name || "").toLowerCase());
                 const isCustDis = c.disabledInMikrotik || c.disabledInSystem || c.netStatus === "offline" || c.status === "suspended";
                 const isOnline = isCustDis ? false : (liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online"));
-                const displayIp = liveMatch?.live_ip || c.ipAddress || "10.200.201.50";
+                const displayIp = liveMatch?.live_ip || c.ipAddress || "—";
                 const rawRx = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
                   ? `${liveMatch.onu_rx_power} dBm`
                   : (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—" ? c.onuSignal : "");
-                const displayRx = rawRx && rawRx.toLowerCase() !== "offline" && rawRx !== "—" ? rawRx : "";
-                const realMac = (liveMatch?.live_mac || c.mac || c.callingStationId || c.boundMac || "4c:46:d1:0d:1d:49").toLowerCase();
+                const displayRx = isOnline && rawRx && rawRx.toLowerCase() !== "offline" && rawRx !== "—" ? rawRx : (isOnline ? "—" : "Offline");
+                const realMac = (liveMatch?.live_mac || c.mac || c.callingStationId || c.boundMac || "—").toLowerCase();
                 const isBound = c.macBound !== false && Boolean(realMac && realMac.trim() && realMac !== "—");
 
                 return (
@@ -2644,6 +2655,40 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                           onChange={e => setNetForm(prev => ({ ...prev, profile: e.target.value }))}
                           className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none font-mono"
                         />
+                      </div>
+
+                      {/* Framed / Static IP Address (MikroTik Remote Address) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-foreground uppercase">
+                            IP Address / Remote Address
+                          </label>
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            Pool-35 / Static
+                          </span>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={netForm.ipAddress || ""}
+                            onChange={e => setNetForm(prev => ({ ...prev, ipAddress: e.target.value.trim() }))}
+                            placeholder="e.g. 10.215.35.15"
+                            className="w-full px-3 py-2 text-xs rounded-lg bg-muted border border-border text-foreground outline-none font-mono focus:border-primary font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const pool = IP_POOLS[0];
+                              const nextIp = generateNextSequentialIp(pool.prefix, pool.startHost);
+                              setNetForm(prev => ({ ...prev, ipAddress: nextIp }));
+                              setToast(`✓ Auto-assigned next IP from ${pool.name}: ${nextIp}`);
+                              setTimeout(() => setToast(""), 3500);
+                            }}
+                            className="px-2.5 py-1 text-[10px] rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                            title="Auto-assign next free IP in Pool-35">
+                            <RefreshCw size={11} /> Auto
+                          </button>
+                        </div>
                       </div>
 
                       {/* Connection Type */}
@@ -3549,7 +3594,7 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                       <input
                         value={addForm.ipAddress}
                         onChange={e => setAddForm(p => ({ ...p, ipAddress: e.target.value }))}
-                        placeholder="192.10.10.100"
+                        placeholder="10.215.35.2"
                         className={`${inputCls} font-mono font-bold text-foreground`}
                         style={inputStyle}
                       />

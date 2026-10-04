@@ -312,7 +312,7 @@ function realtimeTelemetryPlugin() {
       server.middlewares.use('/api/mikrotik/user/update', async (req: any, res: any) => {
         try {
           const body = await readBody(req);
-          const { username, customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone } = body;
+          const { username, customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone, ipAddress, remoteAddress, ip } = body;
           if (!username && !customerId) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
@@ -321,7 +321,9 @@ function realtimeTelemetryPlugin() {
           }
           const { updatePppoeSecret } = await import('./server/telemetry-service.js');
           const result = await updatePppoeSecret(username || customerId, {
-            customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone
+            customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone,
+            ipAddress: ipAddress || remoteAddress || ip,
+            remoteAddress: remoteAddress || ipAddress || ip
           });
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');

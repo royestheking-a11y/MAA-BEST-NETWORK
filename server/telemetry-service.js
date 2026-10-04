@@ -1475,6 +1475,7 @@ export async function createPppoeSecret(username, password, profile = 'default',
   }
 
   // 2. Direct RouterOS fallback
+  const remoteIp = (extraData.ipAddress || extraData.remoteAddress || extraData.ip || '').trim();
   let words = [
     '/ppp/secret/add',
     `=name=${username}`,
@@ -1482,6 +1483,7 @@ export async function createPppoeSecret(username, password, profile = 'default',
     `=service=pppoe`,
     `=profile=${cleanProfile}`,
   ];
+  if (remoteIp) words.push(`=remote-address=${remoteIp}`);
   if (comment) words.push(`=comment=${comment}`);
   let result = await executeRouterOsCommand(words);
 
@@ -1495,26 +1497,29 @@ export async function createPppoeSecret(username, password, profile = 'default',
       `=service=pppoe`,
       `=profile=default`,
     ];
+    if (remoteIp) defaultWords.push(`=remote-address=${remoteIp}`);
     if (comment) defaultWords.push(`=comment=${comment}`);
     result = await executeRouterOsCommand(defaultWords);
     if (result.success) {
-      console.log(`[RouterOS] PPPoE secret created with fallback profile "default": ${username}`);
-      return { success: true, username, profile: 'default', error: null };
+      console.log(`[RouterOS] PPPoE secret created with fallback profile "default": ${username} (remote-address: ${remoteIp || 'pool'})`);
+      return { success: true, username, profile: 'default', remoteAddress: remoteIp || null, error: null };
     }
   }
 
   if (!result.success && result.error && result.error.includes('already have secret')) {
     const updateWords = ['/ppp/secret/set', `=numbers=${username}`, `=password=${password}`, `=profile=${cleanProfile}`];
+    if (remoteIp) updateWords.push(`=remote-address=${remoteIp}`);
     if (comment) updateWords.push(`=comment=${comment}`);
     result = await executeRouterOsCommand(updateWords);
     if (!result.success && result.error && result.error.includes('profile')) {
       const updateDefault = ['/ppp/secret/set', `=numbers=${username}`, `=password=${password}`, `=profile=default`];
+      if (remoteIp) updateDefault.push(`=remote-address=${remoteIp}`);
       if (comment) updateDefault.push(`=comment=${comment}`);
       result = await executeRouterOsCommand(updateDefault);
     }
     if (result.success) {
-      console.log(`[RouterOS] PPPoE secret updated existing: ${username} (profile: ${cleanProfile})`);
-      return { success: true, username, profile: cleanProfile, alreadyExisted: true, error: null };
+      console.log(`[RouterOS] PPPoE secret updated existing: ${username} (profile: ${cleanProfile}, remote-address: ${remoteIp || 'pool'})`);
+      return { success: true, username, profile: cleanProfile, remoteAddress: remoteIp || null, alreadyExisted: true, error: null };
     }
   }
 
@@ -1526,17 +1531,19 @@ export async function createPppoeSecret(username, password, profile = 'default',
   return { success: result.success, username, profile: cleanProfile, error: result.error };
 }
 
-// ─── Update a PPPoE Secret (modify subscriber profile/password/status) ────────
+// ─── Update a PPPoE Secret (modify subscriber profile/password/status/IP) ────
 export async function updatePppoeSecret(username, updates = {}) {
   const { newUsername, password, profile, package: pkg, comment, disabled, customerId, phone, name, address, zone } = updates;
+  const remoteIp = (updates.ipAddress || updates.remoteAddress || updates.ip || '').trim();
   const identifier = customerId || username;
 
   if (disabled !== undefined) {
     const toggleRes = await netxToggleCustomer(identifier, disabled);
-    if (toggleRes.success) return toggleRes;
+    if (toggleRes.success && !remoteIp && !newUsername && !password) return toggleRes;
   }
 
   // 1. Primary: NetX MAC Reseller API for package/password/profile updates
+  let netxSuccess = false;
   if (profile || pkg || password || name || phone || address || zone) {
     const netxEditRes = await netxEditCustomer(identifier, {
       profile: profile || pkg,
@@ -1548,24 +1555,30 @@ export async function updatePppoeSecret(username, updates = {}) {
       zone
     });
     if (netxEditRes.success) {
-      return { success: true, username, customer: netxEditRes.customer };
+      netxSuccess = true;
+      if (!remoteIp && !newUsername) {
+        return { success: true, username, customer: netxEditRes.customer };
+      }
     } else if (netxEditRes.error && (netxEditRes.error.includes('Package change is disabled') || netxEditRes.error.includes('ISP Admin'))) {
-      return {
-        success: false,
-        policyRestricted: true,
-        error: netxEditRes.error,
-        username
-      };
+      if (!remoteIp) {
+        return {
+          success: false,
+          policyRestricted: true,
+          error: netxEditRes.error,
+          username
+        };
+      }
     }
   }
 
-  // 2. Direct RouterOS fallback
+  // 2. Direct RouterOS synchronization (for remote-address static IP, password, profile, comment, etc.)
   const words = ['/ppp/secret/set', `=numbers=${username}`];
   if (password) words.push(`=password=${password}`);
   if (profile || pkg) words.push(`=profile=${profile || pkg}`);
   if (comment) words.push(`=comment=${comment}`);
   if (disabled !== undefined) words.push(`=disabled=${disabled ? 'yes' : 'no'}`);
   if (newUsername && newUsername !== username) words.push(`=name=${newUsername}`);
+  if (remoteIp) words.push(`=remote-address=${remoteIp}`);
 
   let result = await executeRouterOsCommand(words);
   if (!result.success) {
@@ -1576,13 +1589,15 @@ export async function updatePppoeSecret(username, updates = {}) {
     if (comment) altWords.push(`=comment=${comment}`);
     if (disabled !== undefined) altWords.push(`=disabled=${disabled ? 'yes' : 'no'}`);
     if (newUsername && newUsername !== alt) altWords.push(`=name=${newUsername}`);
+    if (remoteIp) altWords.push(`=remote-address=${remoteIp}`);
     result = await executeRouterOsCommand(altWords);
   }
 
   if (result.success) {
-    console.log(`[RouterOS] PPPoE secret updated: ${username} -> ${JSON.stringify(updates)}`);
+    console.log(`[RouterOS] PPPoE secret updated: ${username} (remote-address: ${remoteIp || 'unchanged'}) -> ${JSON.stringify(updates)}`);
+    return { success: true, username, remoteAddress: remoteIp || null, error: null };
   }
-  return { success: result.success, username, error: result.error };
+  return { success: result.success || netxSuccess, username, remoteAddress: remoteIp || null, error: result.error };
 }
 
 // ─── Delete a PPPoE Secret (terminate subscriber) ────────────────────────────
@@ -1710,7 +1725,7 @@ export async function rebootOnuHardware(oltServer = 'OLT1', macOrPort = '') {
 // Require 3 consecutive failed probes before marking OLT offline.
 let olt1FailCount = 0;
 let olt2FailCount = 0;
-const OLT_OFFLINE_THRESHOLD = 3; // Number of consecutive failures before showing offline
+const OLT_OFFLINE_THRESHOLD = 1; // Immediate truthful offline reporting
 
 export async function refreshLiveHardwareTelemetry() {
   const [p1, p2, mStatus] = await Promise.all([

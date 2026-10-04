@@ -44,7 +44,7 @@ export function LeakageDetectorPage({ onNavigate }: { onNavigate?: (page: string
 
     customers.forEach((c, index) => {
       // 1. Unbound MAC Risk on Online Active Lines
-      if ((c.netStatus === "online" || c.status === "active") && !c.macBound && !c.boundMac) {
+      if (c.netStatus === "online" && !c.macBound && !c.boundMac) {
         list.push({
           id: `LEAK-MAC-${c.id}`,
           type: "unbound_mac",

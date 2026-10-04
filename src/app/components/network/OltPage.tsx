@@ -251,7 +251,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
             mac: c.mac && c.mac !== "—" ? c.mac : `50:65:F3:11:88:${(c.clientCode || c.id).replace(/\D/g, "").slice(-2) || "99"}`,
             ponPort: c.ponPort || (effectiveOlt === "OLT2" ? "gpon 0/1" : "epon 0/1"),
             status: isOnline ? "online" : "offline",
-            rxPower: c.onuSignal && c.onuSignal !== "—" && c.onuSignal.toLowerCase() !== "offline" ? c.onuSignal : (isOnline ? "-19.2 dBm" : "—"),
+            rxPower: c.onuSignal && c.onuSignal !== "—" && c.onuSignal.toLowerCase() !== "offline" ? c.onuSignal : "—",
             customer: c.name || c.pppUser || "New Subscriber",
             customerId: c.clientCode || c.id,
             oltServer: effectiveOlt,
@@ -698,7 +698,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
           ...item,
           adminDisabled: nextDisabled,
           status: nextDisabled ? "offline" : "online",
-          rxPower: nextDisabled ? "—" : "-22.5 dBm"
+          rxPower: nextDisabled ? "—" : (item.rxPower && item.rxPower !== "—" ? item.rxPower : "—")
         };
       }
       return item;
@@ -940,7 +940,7 @@ export function OltPage({ onNavigate }: OltPageProps) {
       .filter(o => o.status === "online" && o.rxPower && o.rxPower !== "—")
       .map(o => parseFloat(o.rxPower.replace(/[^0-9.-]/g, '')))
       .filter(n => !isNaN(n));
-    if (valid.length === 0) return "-20.8 dBm";
+    if (valid.length === 0) return "—";
     const sum = valid.reduce((a, b) => a + b, 0);
     return `${(sum / valid.length).toFixed(1)} dBm`;
   }, [onuList]);

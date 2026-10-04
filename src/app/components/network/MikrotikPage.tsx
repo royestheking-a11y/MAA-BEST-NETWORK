@@ -57,26 +57,29 @@ function computeLiveBandwidth(pkgDown: number, pkgUp: number, isOnline: boolean,
     return {
       liveDownMbps: 0,
       liveUpMbps: 0,
-      liveDownFormatted: "0.00 Mbps/s",
-      liveUpFormatted: "0.00 Mbps/s",
+      liveDownFormatted: "—",
+      liveUpFormatted: "—",
       downPercent: 0,
       upPercent: 0,
     };
   }
 
-  const downRate = realRx ? Math.max(0, Number((realRx / 125000).toFixed(2))) : 0;
-  const upRate = realTx ? Math.max(0, Number((realTx / 125000).toFixed(2))) : 0;
+  const downMb = realRx ? Number((realRx / (1024 * 1024)).toFixed(1)) : 0;
+  const upMb = realTx ? Number((realTx / (1024 * 1024)).toFixed(1)) : 0;
 
-  const downPercent = pkgDown > 0 ? Math.min(100, Math.round((downRate / pkgDown) * 100)) : 0;
-  const upPercent = pkgUp > 0 ? Math.min(100, Math.round((upRate / pkgUp) * 100)) : 0;
+  const toDisplay = (mb: number) => {
+    if (mb <= 0) return "—";
+    if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`;
+    return `${mb} MB`;
+  };
 
   return {
-    liveDownMbps: downRate,
-    liveUpMbps: upRate,
-    liveDownFormatted: downRate >= 1 ? `${downRate.toFixed(2)} Mbps/s` : `${Math.round(downRate * 1024)} Kbps/s`,
-    liveUpFormatted: upRate >= 1 ? `${upRate.toFixed(2)} Mbps/s` : `${Math.round(upRate * 1024)} Kbps/s`,
-    downPercent,
-    upPercent,
+    liveDownMbps: downMb,
+    liveUpMbps: upMb,
+    liveDownFormatted: toDisplay(downMb),
+    liveUpFormatted: toDisplay(upMb),
+    downPercent: 0,
+    upPercent: 0,
   };
 }
 
@@ -183,7 +186,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
     pppUser: "",
     pppPass: "maa12345",
     profile: "20M/10M Standard",
-    remoteIp: "10.200.201.75",
+    remoteIp: "10.215.35.25",
     subzone: "KALKINI SOMITIR HAT",
     splitterBox: "SOMITIR HAT BAZAR",
     olt: "OLT1",
@@ -296,7 +299,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
         ? routerMatch.isOnline
         : liveMatch
         ? (liveMatch.connection_status === "online")
-        : (c.netStatus === "online" || c.status === "active");
+        : (c.netStatus === "online");
       
       // Match with real router name:
       const assignedRouter = 
@@ -548,7 +551,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       subzone: provisionData.subzone,
       box: provisionData.splitterBox,
       status: "active",
-      netStatus: "online",
+      netStatus: "offline",
       downloadSpeedMbps: 20,
       uploadSpeedMbps: 10,
       onuSignal: "—",
@@ -563,7 +566,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
       pppUser: "",
       pppPass: "maa12345",
       profile: "20M/10M Standard",
-      remoteIp: `10.200.201.50`,
+      remoteIp: "10.215.35.25",
       subzone: "KALKINI SOMITIR HAT",
       splitterBox: "SOMITIR HAT BAZAR",
       olt: "OLT1",
@@ -1876,7 +1879,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                   <input
                     value={provisionData.remoteIp}
                     onChange={e => setProvisionData({ ...provisionData, remoteIp: e.target.value })}
-                    placeholder="10.200.201.75"
+                    placeholder="10.215.35.25"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-muted/40 text-foreground font-mono outline-none"
                   />
                 </div>

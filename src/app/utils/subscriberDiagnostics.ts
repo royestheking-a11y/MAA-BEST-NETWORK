@@ -108,7 +108,7 @@ export function diagnoseSubscriberStatus(
 ): SubscriberDiagnosis {
   const isOnline = liveMatch
     ? liveMatch.connection_status === "online"
-    : (customer.netStatus === "online" && customer.status === "active");
+    : (customer.netStatus === "online" && !customer.disabledInMikrotik && customer.status !== "suspended");
 
   const rawPower = liveMatch?.onu_rx_power !== undefined && liveMatch.onu_rx_power !== null
     ? liveMatch.onu_rx_power

@@ -590,10 +590,19 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         const macMap = new Map<string, any>();
         if (Array.isArray(liveList)) {
           liveList.forEach(ls => {
-            if (ls.pppoe_username) liveMap.set(ls.pppoe_username.toLowerCase(), ls);
-            if (ls.full_name) liveMap.set(ls.full_name.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
-            if (ls.user_id) liveMap.set(ls.user_id.toLowerCase().replace(/[^a-z0-9]/g, ""), ls);
-            if (ls.live_mac) macMap.set(ls.live_mac.toLowerCase().trim(), ls);
+            const candidates = [ls.pppoe_username, ls.full_name, ls.user_id];
+            candidates.forEach(cand => {
+              if (cand) {
+                const clean = String(cand).toLowerCase().trim();
+                liveMap.set(clean, ls);
+                liveMap.set(clean.replace(/@/g, ""), ls);
+                liveMap.set(clean.replace(/[^a-z0-9]/g, ""), ls);
+                if (clean.startsWith("mbn") && !clean.startsWith("mbn@")) {
+                  liveMap.set("mbn@" + clean.slice(3), ls);
+                }
+              }
+            });
+            if (ls.live_mac) macMap.set(String(ls.live_mac).toLowerCase().trim(), ls);
           });
         }
 
@@ -632,13 +641,18 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           const updated = prev
             .filter(c => !delSet.has((c.id || "").toLowerCase()) && !(c.clientCode && delSet.has(c.clientCode.toLowerCase())) && !(c.pppUser && delSet.has(c.pppUser.toLowerCase())))
             .map(c => {
-            const pppKey = (c.pppUser || "").toLowerCase();
+            const pppKey = (c.pppUser || "").toLowerCase().trim();
             const nameKey = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
             const macKey = (c.mac || "").toLowerCase().trim();
-            const codeKey = (c.clientCode || "").toLowerCase();
-            const idKey = (c.id || "").toLowerCase();
+            const codeKey = (c.clientCode || "").toLowerCase().trim();
+            const idKey = (c.id || "").toLowerCase().trim();
 
-            const liveMatch = liveMap.get(pppKey) || macMap.get(macKey) || liveMap.get(nameKey);
+            const liveMatch = liveMap.get(pppKey) || 
+                              (pppKey ? liveMap.get(pppKey.replace(/@/g, "")) : null) ||
+                              macMap.get(macKey) || 
+                              liveMap.get(nameKey) ||
+                              liveMap.get(codeKey) ||
+                              liveMap.get(idKey);
             const netxMatch = custMap.get(pppKey) || custMap.get(codeKey) || custMap.get(idKey) || custMap.get(c.phone) || custMap.get(nameKey);
 
             if (netxMatch && netxMatch.id) {
@@ -680,23 +694,32 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 ? (c.disabledInMikrotik === true)
                 : (c.disabledInMikrotik === true || (apiSaysDisabled && c.disabledInMikrotik !== false));
 
-            const newNetStatus: "online" | "offline" = isLineDisabled
-              ? "offline"
-              : isPaidOrFree
-                ? (liveMatch?.connection_status === "offline" ? (c.netStatus || "online") : "online")
-                : (liveMatch?.connection_status === "online" || netxMatch?.connection_status === "online")
-                  ? "online"
-                  : liveMatch?.connection_status === "offline"
-                    ? "offline"
-                    : c.netStatus;
+            // ── ACCURATE PHYSICAL & PPPOE NETWORK STATUS ──
+            // Network online status is strictly physical/session state from MikroTik & NetX live telemetry.
+            // A customer having an active billing account (isPaidOrFree) does NOT mean their router is on!
+            // If router is off, wifi is disabled, fiber is unplugged, or session is dropped -> OFFLINE.
+            let newNetStatus: "online" | "offline" = "offline";
+            if (isLineDisabled) {
+              newNetStatus = "offline";
+            } else if (liveMatch) {
+              newNetStatus = liveMatch.connection_status === "online" ? "online" : "offline";
+            } else if (netxMatch && netxMatch.connection_status) {
+              newNetStatus = netxMatch.connection_status === "online" ? "online" : "offline";
+            } else if (Array.isArray(liveList) && liveList.length > 0) {
+              // Live stats from MikroTik are loaded, but this customer has NO active session -> OFFLINE
+              newNetStatus = "offline";
+            } else {
+              // Fallback only if live stats endpoint failed to respond
+              newNetStatus = c.netStatus === "online" ? "online" : "offline";
+            }
 
             const cleanSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
             const newSignal = (liveMatch?.onu_rx_power !== null && liveMatch?.onu_rx_power !== undefined)
               ? `${liveMatch.onu_rx_power} dBm`
-              : (cleanSignal || "—");
-            const newIp = liveMatch?.live_ip || c.ipAddress;
+              : (newNetStatus === "online" ? (cleanSignal || "—") : "—");
+            const newIp = liveMatch?.live_ip || c.ipAddress || "";
             const newMac = liveMatch?.live_mac || netxMatch?.onu_mac || c.mac;
-            const newUptime = liveMatch?.live_uptime || c.sessionUptime;
+            const newUptime = newNetStatus === "online" ? (liveMatch?.live_uptime || c.sessionUptime || "0m") : "Offline";
 
             // Live MikroTik package & pricing — if customer was recently edited by admin or is free/unlimited, preserve admin's package & price!
             const effectivePkg = isRecentlyEdited || c.userType === "free" || c.userType === "unlimited"
@@ -887,7 +910,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 startDate: nc.activation_date || new Date().toLocaleDateString('en-GB'),
                 endDate: expDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
                 daysRemaining: daysRem,
-                ipAddress: liveMatch?.live_ip || '10.200.201.1',
+                ipAddress: liveMatch?.live_ip || nc.ip_address || '',
                 mac: liveMatch?.live_mac || nc.onu_mac || '',
                 pppUser: nc.pppoe_username,
                 pppPass: nc.pppoe_password || '123456',
@@ -895,7 +918,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
                 serverName: 'DC-CA',
                 olt: nc.olt_server || 'OLT1',
                 onuSignal: liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : '—',
-                sessionUptime: liveMatch?.live_uptime || '0d',
+                sessionUptime: liveMatch?.live_uptime || 'Offline',
                 monthlyUsageGB: 0,
                 joinDate: nc.created_at ? new Date(nc.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
                 clientType: 'Home',
@@ -1065,7 +1088,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       price: isFree ? 0 : (data.price || data.monthlyBill || 500),
       monthlyBill: isFree ? 0 : (data.monthlyBill || data.price || 500),
       status: isFree ? "active" : (data.status || "active"),
-      netStatus: isFree ? "online" : (data.netStatus || "online"),
+      netStatus: data.netStatus || "offline",
       billingDate: data.billingDate || 1,
       startDate: data.startDate || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
       endDate: isFree || isUnlimited ? "Permanent / Lifetime" : (data.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })),
@@ -1097,7 +1120,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       createdAt: Date.now(), // Grace period: syncNetx won't override for 120s
       disabledInMikrotik: wantDisabled ? true : false,
       disabledInSystem: wantDisabled ? true : false,
-      ...(isFree ? { dueAmount: 0, due: 0, price: 0, monthlyBill: 0, status: "active", netStatus: "online" } : {}),
+      ...(isFree ? { dueAmount: 0, due: 0, price: 0, monthlyBill: 0, status: "active", netStatus: data.netStatus || "offline" } : {}),
     };
 
     const updatedList = [newCustomer, ...customers];
@@ -1123,7 +1146,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             name: newCustomer.name,
             phone: newCustomer.phone,
             dropMeters: typeof newCustomer.cableMetre === "number" ? newCustomer.cableMetre : 45,
-            rxPowerDbm: newCustomer.onuSignal ? parseFloat(newCustomer.onuSignal) : -19.0,
+            rxPowerDbm: newCustomer.onuSignal && !isNaN(parseFloat(newCustomer.onuSignal)) ? parseFloat(newCustomer.onuSignal) : (matchedBox?.outputEstimatedPowerDbm || -20.0),
           });
         }
       } catch (err) {
@@ -1158,7 +1181,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           zone: newCustomer.zone,
           olt: newCustomer.olt,
           ponPort: newCustomer.ponPort,
-          mac: newCustomer.mac
+          mac: newCustomer.mac,
+          ipAddress: newCustomer.ipAddress,
+          remoteAddress: newCustomer.ipAddress
         }),
       })
       .then(r => r.json())
@@ -1232,7 +1257,9 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           zone: newCustomer.zone,
           olt: newCustomer.olt,
           ponPort: newCustomer.ponPort,
-          mac: newCustomer.mac
+          mac: newCustomer.mac,
+          ipAddress: newCustomer.ipAddress,
+          remoteAddress: newCustomer.ipAddress
         }),
         signal: AbortSignal.timeout(35000), // 35s to allow for Render cold wake up if asleep
       });
@@ -1292,7 +1319,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         price: data.price || data.monthlyBill || 500,
         monthlyBill: data.monthlyBill || data.price || 500,
         status: data.status || "active",
-        netStatus: data.netStatus || "online",
+        netStatus: data.netStatus || "offline",
         billingDate: data.billingDate || 1,
         startDate: data.startDate || new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
         endDate: data.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
@@ -1451,6 +1478,10 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       }
       if (updates.name) {
         mkUpdates.comment = `${updates.name} (${newId}) — Updated via ISP Portal`;
+      }
+      if (updates.ipAddress !== undefined) {
+        mkUpdates.ipAddress = updates.ipAddress;
+        mkUpdates.remoteAddress = updates.ipAddress;
       }
 
       if (Object.keys(mkUpdates).length > 0) {

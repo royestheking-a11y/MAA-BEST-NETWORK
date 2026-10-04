@@ -66,7 +66,7 @@ export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
     const total = customers.length;
     const online = liveStats && liveStats.length > 0
       ? liveStats.filter(c => c.connection_status === "online").length
-      : customers.filter(c => c.netStatus === "online" || c.status === "active").length;
+      : customers.filter(c => c.netStatus === "online").length;
     const offline = Math.max(0, total - online);
 
     // Sum allocated customer speeds (Mbps)
@@ -709,13 +709,13 @@ export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
                 const portStr = `epon 0/${p}`;
                 const cleanPort = `epon0${p}`;
                 const matching = customers.filter(c => (c.olt || "OLT1").includes("OLT1") && (c.ponPort || "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanPort));
-                const activeCount = matching.filter(c => c.netStatus === "online" || c.status === "active").length;
+                const activeCount = matching.filter(c => c.netStatus === "online").length;
                 
                 const validSignals = matching
-                  .filter(c => (c.netStatus === "online" || c.status === "active") && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
+                  .filter(c => c.netStatus === "online" && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
                   .map(c => parseFloat(c.onuSignal!));
                 const avgNum = validSignals.length > 0 ? (validSignals.reduce((a, b) => a + b, 0) / validSignals.length) : null;
-                const avgSignal = avgNum !== null ? `${avgNum.toFixed(1)} dBm` : (activeCount > 0 ? "-19.5 dBm" : "Offline");
+                const avgSignal = avgNum !== null ? `${avgNum.toFixed(1)} dBm` : (activeCount > 0 ? "—" : "Offline");
                 const signalColor = avgNum === null ? "text-muted-foreground" : avgNum >= -24 ? "text-emerald-500" : avgNum >= -27 ? "text-amber-500" : "text-rose-500";
 
                 return (
@@ -751,13 +751,13 @@ export function MonitoringPage({ onNavigate }: MonitoringPageProps) {
                 const portStr = `gpon 0/${p}`;
                 const cleanPort = `gpon0${p}`;
                 const matching = customers.filter(c => ((c.olt || "").includes("OLT2") || (c.olt || "").includes("Kalkini")) && (c.ponPort || "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanPort));
-                const activeCount = matching.filter(c => c.netStatus === "online" || c.status === "active").length;
+                const activeCount = matching.filter(c => c.netStatus === "online").length;
                 
                 const validSignals = matching
-                  .filter(c => (c.netStatus === "online" || c.status === "active") && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
+                  .filter(c => c.netStatus === "online" && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
                   .map(c => parseFloat(c.onuSignal!));
                 const avgNum = validSignals.length > 0 ? (validSignals.reduce((a, b) => a + b, 0) / validSignals.length) : null;
-                const avgSignal = avgNum !== null ? `${avgNum.toFixed(1)} dBm` : (activeCount > 0 ? "-20.2 dBm" : "Offline");
+                const avgSignal = avgNum !== null ? `${avgNum.toFixed(1)} dBm` : (activeCount > 0 ? "—" : "Offline");
                 const signalColor = avgNum === null ? "text-muted-foreground" : avgNum >= -24 ? "text-emerald-500" : avgNum >= -27 ? "text-amber-500" : "text-rose-500";
 
                 return (

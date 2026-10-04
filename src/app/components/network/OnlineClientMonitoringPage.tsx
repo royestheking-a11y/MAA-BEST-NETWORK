@@ -61,34 +61,53 @@ function formatTickingUptime(totalSec: number): string {
   return `${mins}m ${pad(secs)}s`;
 }
 
-function computeLiveBandwidth(pkgDown: number, pkgUp: number, isOnline: boolean, salt: number, tick: number) {
-  if (!isOnline) {
+/**
+ * Derives real bandwidth values from NetX live session byte counters.
+ * live_tx_bytes and live_rx_bytes are cumulative session totals in bytes.
+ * We can only show a meaningful value if the API provides rate data directly.
+ * Falls back to showing "—" (no data) rather than fake animated numbers.
+ */
+function computeRealBandwidth(liveMatch: any | null, isOnline: boolean) {
+  if (!isOnline || !liveMatch) {
     return {
-      liveDownMbps: 0,
-      liveUpMbps: 0,
-      liveDownFormatted: "0.00 Mbps/s",
-      liveUpFormatted: "0.00 Mbps/s",
+      liveDownFormatted: "—",
+      liveUpFormatted: "—",
       downPercent: 0,
       upPercent: 0,
+      hasRealData: false,
     };
   }
 
-  const wave = Math.sin((tick * 0.4) + salt * 1.7) * 0.35 + Math.cos((tick * 0.15) + salt * 3.1) * 0.25;
-  const factor = Math.max(0.12, Math.min(0.95, 0.45 + wave));
+  // NetX API may provide live_rx_rate_mbps / live_tx_rate_mbps in future;
+  // currently we derive from cumulative bytes and uptime as an approximation.
+  const rxBytes: number = liveMatch.live_rx_bytes ?? 0;
+  const txBytes: number = liveMatch.live_tx_bytes ?? 0;
 
-  const downRate = Math.max(0.1, Number((pkgDown * factor).toFixed(2)));
-  const upRate = Math.max(0.05, Number((pkgUp * (factor * 0.45 + 0.1)).toFixed(2)));
+  if (!rxBytes && !txBytes) {
+    return {
+      liveDownFormatted: "—",
+      liveUpFormatted: "—",
+      downPercent: 0,
+      upPercent: 0,
+      hasRealData: false,
+    };
+  }
 
-  const downPercent = Math.min(100, Math.round((downRate / Math.max(1, pkgDown)) * 100));
-  const upPercent = Math.min(100, Math.round((upRate / Math.max(1, pkgUp)) * 100));
+  // Convert session total bytes to human-readable
+  const toDisplay = (bytes: number): string => {
+    if (bytes === 0) return "—";
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB (session)`;
+    if (mb >= 1) return `${mb.toFixed(1)} MB (session)`;
+    return `${Math.round(bytes / 1024)} KB (session)`;
+  };
 
   return {
-    liveDownMbps: downRate,
-    liveUpMbps: upRate,
-    liveDownFormatted: downRate >= 1 ? `${downRate.toFixed(2)} Mbps/s` : `${Math.round(downRate * 1024)} Kbps/s`,
-    liveUpFormatted: upRate >= 1 ? `${upRate.toFixed(2)} Mbps/s` : `${Math.round(upRate * 1024)} Kbps/s`,
-    downPercent,
-    upPercent,
+    liveDownFormatted: toDisplay(rxBytes),
+    liveUpFormatted: toDisplay(txBytes),
+    downPercent: 0, // No rate %, only session totals
+    upPercent: 0,
+    hasRealData: true,
   };
 }
 
@@ -277,7 +296,13 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
       const liveMatch = getLiveMatch(c);
-      const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+      // Online status: ONLY trust the live NetX API when data is available.
+      // If NetX data is loaded and this customer has no live match => they are offline.
+      // Only fall back to local flags when NetX hasn't loaded any data at all.
+      const netxDataLoaded = Array.isArray(liveStats) && liveStats.length > 0;
+      const isOnline = liveMatch
+        ? (liveMatch.connection_status === "online")
+        : (!netxDataLoaded && (c.netStatus === "online" && c.status === "active"));
 
       // Tab check
       if (activeTab === "disabled_sys_enabled_mk") {
@@ -334,6 +359,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
     });
   }, [
     customers,
+    liveStats,
     liveStatsMap,
     activeTab,
     serverFilter,
@@ -364,10 +390,15 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       let valB: any = "";
 
       const liveMatchA = getLiveMatch(a);
-      const isOnlineA = liveMatchA ? (liveMatchA.connection_status === "online") : (a.netStatus === "online" || a.status === "active");
+      const netxLoaded = Array.isArray(liveStats) && liveStats.length > 0;
+      const isOnlineA = liveMatchA
+        ? (liveMatchA.connection_status === "online")
+        : (!netxLoaded && a.netStatus === "online" && a.status === "active");
 
       const liveMatchB = getLiveMatch(b);
-      const isOnlineB = liveMatchB ? (liveMatchB.connection_status === "online") : (b.netStatus === "online" || b.status === "active");
+      const isOnlineB = liveMatchB
+        ? (liveMatchB.connection_status === "online")
+        : (!netxLoaded && b.netStatus === "online" && b.status === "active");
 
       switch (sortKey) {
         case "clientCode":
@@ -458,12 +489,16 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
   // Statistics counters (100% dynamic from live customer dataset)
   const totalUsersCount = customers.length;
   const onlineUsersCount = useMemo(() => {
+    // Always trust live NetX data as the source of truth
     if (Array.isArray(liveStats) && liveStats.length > 0) {
       return liveStats.filter(c => c.connection_status === 'online').length;
     }
+    // No live data yet — use local flags only as a temporary loading state
     return customers.filter(c => {
       const liveMatch = getLiveMatch(c);
-      return liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+      return liveMatch
+        ? (liveMatch.connection_status === "online")
+        : (c.netStatus === "online" && c.status === "active"); // strict AND
     }).length;
   }, [liveStats, customers, getLiveMatch]);
 
@@ -492,7 +527,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
 
     const rows = sortedCustomers.map(c => {
       const liveMatch = getLiveMatch(c);
-      const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+      const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online");
       const displayIp = liveMatch?.live_ip || (isConnected ? c.ipAddress : "—");
       const displayDuration = liveMatch?.live_uptime || (isConnected ? (c.duration || "Active") : "—");
       const cleanCustSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
@@ -1231,7 +1266,10 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                 paginatedCustomers.map((c, idx) => {
                   const liveMatch = getLiveMatch(c);
                   const diagnosis = diagnoseSubscriberStatus(c, liveMatch);
-                  const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+                  const netxDataLoaded = Array.isArray(liveStats) && liveStats.length > 0;
+                  const isConnected = liveMatch
+                    ? (liveMatch.connection_status === "online")
+                    : (!netxDataLoaded && c.netStatus === "online" && c.status === "active");
                   const displayIp = liveMatch?.live_ip || (isConnected ? (c.ipAddress || "Dynamic IP") : "—");
                   const baseUptimeSec = parseUptimeToSeconds(liveMatch?.live_uptime || c.duration || c.sessionUptime, idx + 1);
                   const currentUptimeSec = isConnected ? baseUptimeSec + liveTick : 0;
@@ -1482,7 +1520,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       {selectedClientForTopology && (() => {
         const c = selectedClientForTopology;
         const liveMatch = getLiveMatch(c);
-        const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+        const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online");
         const cleanCustSignal = (c.onuSignal && c.onuSignal.toLowerCase() !== "offline" && c.onuSignal !== "—") ? c.onuSignal : null;
         const displaySignal = isConnected
           ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (cleanCustSignal || "—"))
@@ -1589,8 +1627,11 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
       {selectedClientForGraph && (() => {
         const c = selectedClientForGraph;
         const liveMatch = getLiveMatch(c);
-        const isConnected = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
-        const displayIp = liveMatch?.live_ip || (isConnected ? (c.ipAddress || "10.200.201.51") : "—");
+        const netxDataLoadedModal = Array.isArray(liveStats) && liveStats.length > 0;
+        const isConnected = liveMatch
+          ? (liveMatch.connection_status === "online")
+          : (!netxDataLoadedModal && c.netStatus === "online" && c.status === "active");
+        const displayIp = liveMatch?.live_ip || (isConnected ? (c.ipAddress || "—") : "—");
         let modalOfflineSec = 0;
         if (!isConnected) {
           let disconnectMs = 0;
@@ -1605,9 +1646,8 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
         const displaySignal = isConnected
           ? (liveMatch?.onu_rx_power ? `${liveMatch.onu_rx_power} dBm` : (cleanCustSignal || "—"))
           : "LOS / Offline";
-        const pkgDown = c.downloadSpeedMbps || 35;
-        const pkgUp = c.uploadSpeedMbps || 20;
-        const liveBw = computeLiveBandwidth(pkgDown, pkgUp, isConnected, 7, liveTick);
+        // Use REAL session data from NetX API — no fake animated numbers
+        const realBw = computeRealBandwidth(liveMatch, isConnected);
 
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1629,37 +1669,31 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
               </div>
 
               <div className="space-y-3 text-xs">
-                {/* Live Speed gauges */}
+                {/* Session Data from OLT/MikroTik — real values only */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-center">
                     <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-                      <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                      <span>Live Download (/s)</span>
+                      <span className="w-2 h-2 rounded-full bg-teal-500" />
+                      <span>Session Download</span>
                     </div>
                     <p className="text-xl font-black text-teal-600 dark:text-teal-400 mt-1 font-mono">
-                      {liveBw.liveDownFormatted}
+                      {realBw.liveDownFormatted}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                      {liveBw.downPercent}% of {pkgDown} Mbps Plan Limit
+                      {realBw.hasRealData ? "Cumulative session total" : isConnected ? "No data from API" : "Offline"}
                     </p>
-                    <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1.5">
-                      <div className="h-full bg-teal-500 rounded-full transition-all duration-300" style={{ width: `${liveBw.downPercent}%` }} />
-                    </div>
                   </div>
                   <div className="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
                     <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-                      <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
-                      <span>Live Upload (/s)</span>
+                      <span className="w-2 h-2 rounded-full bg-sky-500" />
+                      <span>Session Upload</span>
                     </div>
                     <p className="text-xl font-black text-sky-600 dark:text-sky-400 mt-1 font-mono">
-                      {liveBw.liveUpFormatted}
+                      {realBw.liveUpFormatted}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                      {liveBw.upPercent}% of {pkgUp} Mbps Plan Limit
+                      {realBw.hasRealData ? "Cumulative session total" : isConnected ? "No data from API" : "Offline"}
                     </p>
-                    <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1.5">
-                      <div className="h-full bg-sky-500 rounded-full transition-all duration-300" style={{ width: `${liveBw.upPercent}%` }} />
-                    </div>
                   </div>
                 </div>
 
@@ -1667,10 +1701,16 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                 <div className="p-3 rounded-xl bg-muted/40 space-y-2 border border-border">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Session Uptime (Live):</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1">
-                      <Clock size={12} className="text-emerald-500 animate-spin" style={{ animationDuration: "10s" }} />
-                      {displayDuration}
-                    </span>
+                    {isConnected ? (
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1">
+                        <Clock size={12} className="text-emerald-500 animate-spin" style={{ animationDuration: "10s" }} />
+                        {displayDuration}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">
+                        {displayDuration}
+                      </span>
+                    )}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Assigned IP:</span>
@@ -1682,7 +1722,7 @@ export function OnlineClientMonitoringPage({ onNavigate }: OnlineClientMonitorin
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">ONU Optical RX:</span>
-                    <span className="font-bold text-emerald-500 font-mono">{displaySignal}</span>
+                    <span className={`font-bold font-mono ${isConnected ? "text-emerald-500" : "text-rose-500"}`}>{displaySignal}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">MikroTik RouterOS:</span>

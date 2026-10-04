@@ -133,7 +133,7 @@ export function ONUEventHistoryPage({ onNavigate }: ONUEventHistoryPageProps) {
       const cleanUser = (c.pppUser || c.name || "").toLowerCase();
       const liveMatch = liveMap.get(cleanUser) || liveMap.get((c.name || "").toLowerCase()) || liveMap.get((c.clientCode || c.id || "").toLowerCase());
 
-      const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+      const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online");
       const realRxNum = liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null
         ? Number(liveMatch.onu_rx_power)
         : (c.onuSignal && !isNaN(parseFloat(c.onuSignal)) ? parseFloat(c.onuSignal) : (isOnline ? -27.5 : -35));

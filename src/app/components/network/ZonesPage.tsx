@@ -99,7 +99,7 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
 
       const activeCount = liveOnlineUsers !== null
         ? liveOnlineUsers.length
-        : zoneCustomers.filter(c => c.netStatus === "online" || c.status === "active").length;
+        : zoneCustomers.filter(c => c.netStatus === "online").length;
 
       const dueCount = zoneCustomers.filter(c =>
         (c.daysRemaining !== undefined && c.daysRemaining <= 3) ||
@@ -632,7 +632,7 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
                 <div className="text-[10px] uppercase font-bold text-muted-foreground">Subscribers</div>
                 <div className="text-lg font-black text-primary">{selectedZoneCustomers.length} Users</div>
                 <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
-                  {selectedZoneCustomers.filter(c => c.netStatus === "online" || c.status === "active").length} Online Active
+                  {selectedZoneCustomers.filter(c => c.netStatus === "online").length} Online Active
                 </div>
               </div>
               <div className="p-3 rounded-2xl border border-border bg-card text-center">
@@ -832,7 +832,7 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
                     </thead>
                     <tbody className="divide-y divide-border/60">
                       {filteredSelectedCustomers.map((c) => {
-                        const isOnline = c.netStatus === "online" || c.status === "active";
+                        const isOnline = c.netStatus === "online";
                         return (
                           <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                             <td className="py-2.5 px-3 font-mono font-bold text-foreground">{c.clientCode || c.id}</td>
@@ -842,7 +842,7 @@ export function ZonesPage({ onNavigate }: ZonesPageProps) {
                             </td>
                             <td className="py-2.5 px-3 font-mono text-primary font-bold">{c.pppUser || c.id}</td>
                             <td className="py-2.5 px-3 text-muted-foreground">{c.box || c.splitterBox || "TJ-01"}</td>
-                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-500">{c.onuSignal || "-19.2 dBm"}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-500">{isOnline ? (c.onuSignal || "—") : "LOS / Offline"}</td>
                             <td className="py-2.5 px-3">
                               {isOnline ? (
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">

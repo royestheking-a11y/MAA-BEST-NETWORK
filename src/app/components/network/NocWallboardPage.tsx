@@ -28,7 +28,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
     if (liveStats && liveStats.length > 0) {
       return liveStats.filter(c => c.connection_status === "online").length;
     }
-    return customers.filter(c => c.netStatus === "online" || c.status === "active").length;
+    return customers.filter(c => c.netStatus === "online").length;
   }, [liveStats, customers]);
 
   const offlineCustomersCount = Math.max(0, totalCustomersCount - onlineCustomersCount);
@@ -37,7 +37,7 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
   const highLossCustomers = useMemo(() => {
     return customers.filter(c => {
       const sig = c.onuSignal ? parseFloat(c.onuSignal) : -20;
-      return sig < -26.0 && (c.netStatus === "online" || c.status === "active");
+      return sig < -26.0 && (c.netStatus === "online");
     });
   }, [customers]);
 
@@ -144,14 +144,14 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
       });
 
       const total = matchedCustomers.length > 0 ? matchedCustomers.length : (telPort?.total || 32);
-      const active = matchedCustomers.filter(c => c.netStatus === "online" || c.status === "active").length;
+      const active = matchedCustomers.filter(c => c.netStatus === "online").length;
       
       const onlineWithSignal = matchedCustomers
-        .filter(c => (c.netStatus === "online" || c.status === "active") && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
+        .filter(c => c.netStatus === "online" && c.onuSignal && !isNaN(parseFloat(c.onuSignal)))
         .map(c => parseFloat(c.onuSignal!));
       const rxDbm = onlineWithSignal.length > 0
         ? `${(onlineWithSignal.reduce((a, b) => a + b, 0) / onlineWithSignal.length).toFixed(1)} dBm`
-        : (telPort?.rxPowerDbm !== undefined ? `${telPort.rxPowerDbm.toFixed(1)} dBm` : (active > 0 ? "-19.5 dBm" : "Offline"));
+        : (telPort?.rxPowerDbm !== undefined ? `${telPort.rxPowerDbm.toFixed(1)} dBm` : (active > 0 ? "—" : "Offline"));
 
       const status = (telPort?.status === "healthy" || active > 0) ? "optimal" : "warning";
 
@@ -648,13 +648,13 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
                 <div className="p-2.5 rounded-xl border bg-emerald-500/10 border-emerald-500/20 text-center">
                   <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Online Active</div>
                   <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                    {ponSubscribers.filter(c => c.netStatus === "online" || c.status === "active").length}
+                    {ponSubscribers.filter(c => c.netStatus === "online").length}
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl border bg-rose-500/10 border-rose-500/20 text-center">
                   <div className="text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400">Offline / LOS</div>
                   <div className="text-lg font-black text-rose-600 dark:text-rose-400">
-                    {ponSubscribers.filter(c => c.netStatus === "offline" || c.status === "suspended").length}
+                    {ponSubscribers.filter(c => c.netStatus === "offline" || c.status === "suspended" || c.status === "disconnected").length}
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl border bg-card/60 text-center" style={{ borderColor: cardBorder }}>
@@ -702,9 +702,9 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
                       </td>
                     </tr>
                   ) : (
-                    filteredPonSubscribers.map((c, i) => {
-                      const isOnline = c.netStatus === "online" || c.status === "active";
-                      const rxSignal = c.onuSignal || `${(-17.5 - ((i * 3) % 6)).toFixed(1)} dBm`;
+                    filteredPonSubscribers.map((c) => {
+                      const isOnline = c.netStatus === "online";
+                      const rxSignal = c.onuSignal || (isOnline ? "—" : "LOS / Offline");
                       return (
                         <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                           <td className="py-2.5 px-3 font-mono font-bold text-foreground">
@@ -723,13 +723,14 @@ export function NocWallboardPage({ onNavigate }: NocWallboardPageProps) {
                           </td>
                           <td className="py-2.5 px-3 font-mono font-bold">
                             <span className={`px-2 py-0.5 rounded-md text-[11px] ${
-                              parseFloat(rxSignal) < -24 ? "bg-rose-500/15 text-rose-500" : "bg-emerald-500/15 text-emerald-500"
+                              !isOnline ? "bg-muted text-muted-foreground" :
+                              parseFloat(rxSignal) < -24 ? "bg-amber-500/15 text-amber-500" : "bg-emerald-500/15 text-emerald-500"
                             }`}>
-                              {rxSignal}
+                              {isOnline ? rxSignal : "LOS / Offline"}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-mono text-sky-500 text-[11px]">
-                            {c.ipAddress || "10.200.201.50"}
+                            {c.ipAddress || "—"}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">
                             {isOnline ? (

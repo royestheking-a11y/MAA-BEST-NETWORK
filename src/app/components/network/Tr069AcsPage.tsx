@@ -43,7 +43,7 @@ export function Tr069AcsPage({ onNavigate }: Tr069AcsPageProps) {
 
   const cpeDevices: CpeDevice[] = useMemo(() => {
     return customers.map((c, idx) => {
-      const isOnline = c.netStatus === "online" || c.status === "active";
+      const isOnline = c.netStatus === "online";
       const cleanUser = c.pppUser || c.name || `User-${c.id}`;
       const shortUser = cleanUser.replace(/^Mbn@/i, "");
       const mac = c.mac || `50:65:F3:11:${String(Math.floor(idx / 256)).padStart(2, "0")}:${String(idx % 256).padStart(2, "0")}`;

@@ -257,12 +257,12 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       onuSerial: c.deviceSerial || "—",
       vlan: (c as any).vlan || "—",
       serviceProfile: c.profile || "—",
-      rxPower: c.onuSignal || "—",
+      rxPower: c.netStatus === "online" ? (c.onuSignal || "—") : "—",
       txPower: c.netStatus === "online" ? "Normal" : "—",
       distance: c.cableMetre ? `${c.cableMetre}m drop cable` : "Auto-Ranged",
-      currentStatus: (c.netStatus === "online" || c.status === "active" ? "online" : "offline") as any,
-      uptimeSeconds: parseUptimeToSeconds(c.sessionUptime),
-      uptime: formatTickingUptime(parseUptimeToSeconds(c.sessionUptime)),
+      currentStatus: (c.netStatus === "online" ? "online" : "offline") as any,
+      uptimeSeconds: c.netStatus === "online" ? parseUptimeToSeconds(c.sessionUptime) : 0,
+      uptime: c.netStatus === "online" ? formatTickingUptime(parseUptimeToSeconds(c.sessionUptime)) : "Offline",
       package: c.profile || c.package || "—",
       packagePrice: initialPrice,
       billingDate: 1,
@@ -327,12 +327,12 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
         onuSerial: realCustomer.deviceSerial || "—",
         vlan: (realCustomer as any).vlan || "—",
         serviceProfile: realCustomer.profile || "—",
-        rxPower: realCustomer.onuSignal || "—",
+        rxPower: realCustomer.netStatus === "online" ? (realCustomer.onuSignal || "—") : "—",
         txPower: realCustomer.netStatus === "online" ? "Normal" : "—",
         distance: realCustomer.cableMetre ? `${realCustomer.cableMetre}m drop cable` : "Auto-Ranged",
-        currentStatus: (realCustomer.netStatus === "online" || realCustomer.status === "active" ? "online" : "offline") as any,
-        uptimeSeconds: upSec,
-        uptime: formatTickingUptime(upSec),
+        currentStatus: (realCustomer.netStatus === "online" ? "online" : "offline") as any,
+        uptimeSeconds: realCustomer.netStatus === "online" ? upSec : 0,
+        uptime: realCustomer.netStatus === "online" ? formatTickingUptime(upSec) : "Offline",
         package: realCustomer.profile || realCustomer.package || "—",
         packagePrice: pkgPrice,
         billingDate: 1,
@@ -468,6 +468,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
     subZone: "",
     pppoeUsername: "",
     pppoePassword: "",
+    ipAddress: "",
     passcode: "",
   });
 
@@ -483,6 +484,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       subZone: customer.subZone,
       pppoeUsername: customer.pppoeUsername,
       pppoePassword: customer.pppoePassword,
+      ipAddress: realCustomer?.ipAddress || (customer.staticIP !== "—" ? customer.staticIP : ""),
       passcode: (realCustomer?.passcode || "").replace(/^isp@/i, "mbn@") || `mbn@${customer.id.replace(/\D/g, "")}`,
     });
     setShowEditModal(true);
@@ -513,6 +515,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       subzone: editForm.subZone.trim(),
       pppUser: editForm.pppoeUsername.trim(),
       pppPass: editForm.pppoePassword.trim(),
+      ipAddress: editForm.ipAddress.trim(),
       passcode: editForm.passcode.trim(),
     };
 
@@ -528,6 +531,7 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       subZone: editForm.subZone,
       pppoeUsername: editForm.pppoeUsername,
       pppoePassword: editForm.pppoePassword,
+      staticIP: editForm.ipAddress.trim() || prev.staticIP,
     }));
     setShowEditModal(false);
     showToast(`✓ Subscriber ID & profile updated successfully to ${newId}!`);
@@ -1832,6 +1836,16 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
                       value={editForm.pppoePassword}
                       onChange={e => setEditForm(p => ({ ...p, pppoePassword: e.target.value }))}
                       className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Static / Framed IP Address (MikroTik Remote-Address)</label>
+                    <input
+                      type="text"
+                      value={editForm.ipAddress}
+                      onChange={e => setEditForm(p => ({ ...p, ipAddress: e.target.value }))}
+                      placeholder="e.g. 10.215.35.15"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground outline-none focus:border-primary font-mono font-bold"
                     />
                   </div>
                 </div>

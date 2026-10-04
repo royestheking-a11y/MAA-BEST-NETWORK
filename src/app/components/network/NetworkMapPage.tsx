@@ -81,7 +81,7 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
           const z = ((c.zone || "") + " " + (c.subzone || "")).toUpperCase();
           return z.includes("SADAR") || z.includes("SOMITIR");
         });
-        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online" || c.status === "active").length;
+        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online").length;
         const totalCusts = zoneCusts.length || 85;
         return {
           ...node,
@@ -94,7 +94,7 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
           const z = ((c.zone || "") + " " + (c.subzone || "")).toUpperCase();
           return z.includes("CHARMUGURIA") || z.includes("PORT") || z.includes("BAZAR");
         });
-        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online" || c.status === "active").length;
+        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online").length;
         const totalCusts = zoneCusts.length || 65;
         return {
           ...node,
@@ -107,7 +107,7 @@ export function NetworkMapPage({ onNavigate }: NetworkMapPageProps) {
           const z = ((c.zone || "") + " " + (c.subzone || "")).toUpperCase();
           return z.includes("KALKINI") || z.includes("DASHAR") || z.includes("RAJOIR");
         });
-        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online" || c.status === "active").length;
+        const onlineCusts = zoneCusts.filter(c => c.netStatus === "online").length;
         const totalCusts = zoneCusts.length || 145;
         return {
           ...node,

@@ -61,33 +61,29 @@ export interface HardwareTelemetryPayload {
   olt2: LiveOltData;
 }
 
+// Default/initial state — everything starts OFFLINE until real telemetry data arrives.
+// This prevents the UI from showing hardcoded "online" when no live data has been fetched.
 const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
   timestamp: new Date().toISOString(),
-  lastUpdated: Date.now(),
-  isLiveRealtime: true,
+  lastUpdated: 0, // 0 = no data yet
+  isLiveRealtime: false,
   mikrotik: {
     host: "103.12.173.136",
-    status: "online",
+    status: "offline",
     model: "RouterOS x86 (72-Core Xeon Core Server)",
     sysName: "DC-CA",
-    uptime: "43w 5d 5h",
-    uptimeSeconds: 26370000,
+    uptime: "—",
+    uptimeSeconds: 0,
     cpuCores: 72,
-    cpuUsagePercent: 8,
+    cpuUsagePercent: 0,
     totalRamMb: 32064,
-    freeRamMb: 28445,
-    usedRamMb: 3619,
-    latencyMs: 46,
-    temperature: 38,
-    version: "7.11 (stable)",
-    activePppoe: 843,
-    interfaces: [
-      { id: 18, name: "MediaOne-IIG", status: "up", rxMbps: 482.4, txMbps: 128.6, totalRxGb: 472.1, totalTxGb: 125.8 },
-      { id: 21, name: "MediaOne-BDIX", status: "up", rxMbps: 890.1, txMbps: 412.3, totalRxGb: 885.3, totalTxGb: 395.2 },
-      { id: 22, name: "Zappy-IIG", status: "up", rxMbps: 310.5, txMbps: 94.2, totalRxGb: 310.2, totalTxGb: 92.5 },
-      { id: 27, name: "Rampura_POP-BDIX", status: "up", rxMbps: 215.8, txMbps: 45.2, totalRxGb: 210.4, totalTxGb: 44.1 },
-      { id: 41, name: "Malibagh_POP-IIG", status: "up", rxMbps: 185.0, txMbps: 38.6, totalRxGb: 182.5, totalTxGb: 37.9 },
-    ]
+    freeRamMb: 0,
+    usedRamMb: 0,
+    latencyMs: undefined,
+    temperature: undefined,
+    version: "—",
+    activePppoe: 0,
+    interfaces: []
   },
   olt1: {
     id: "olt-1",
@@ -96,17 +92,12 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     port: 1895,
     vendor: "BDCOM",
     type: "EPON",
-    status: "online",
-    latencyMs: 31,
+    status: "offline",
+    latencyMs: null,
     webService: "BDCOM EPON CLI Telnet v1.0",
     activeOnus: 0,
     totalOnus: 0,
-    ports: [
-      { port: "EPON0/1", online: 24, total: 39, rxPowerDbm: -18.4, status: "healthy" },
-      { port: "EPON0/2", online: 23, total: 40, rxPowerDbm: -19.2, status: "healthy" },
-      { port: "EPON0/3", online: 23, total: 39, rxPowerDbm: -17.8, status: "healthy" },
-      { port: "EPON0/4", online: 23, total: 39, rxPowerDbm: -20.5, status: "healthy" },
-    ]
+    ports: []
   },
   olt2: {
     id: "olt-2",
@@ -115,17 +106,12 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
     port: 1894,
     vendor: "BDCOM",
     type: "GPON",
-    status: "online",
-    latencyMs: 33,
+    status: "offline",
+    latencyMs: null,
     webService: "BDCOM GPON CLI Telnet v1.0",
     activeOnus: 0,
     totalOnus: 0,
-    ports: [
-      { port: "GPON0/1", online: 15, total: 39, rxPowerDbm: -19.1, status: "healthy" },
-      { port: "GPON0/2", online: 15, total: 39, rxPowerDbm: -20.3, status: "healthy" },
-      { port: "GPON0/3", online: 15, total: 39, rxPowerDbm: -18.6, status: "healthy" },
-      { port: "GPON0/4", online: 14, total: 39, rxPowerDbm: -21.4, status: "healthy" },
-    ]
+    ports: []
   }
 };
 
@@ -135,8 +121,9 @@ const DEFAULT_TELEMETRY: HardwareTelemetryPayload = {
  */
 export function useRealtimeHardwareTelemetry(pollIntervalMs = 8000) {
   const [telemetry, setTelemetry] = useState<HardwareTelemetryPayload>(DEFAULT_TELEMETRY);
-  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(true);
-  const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString());
+  // Start as false — only flip to true once real data arrives from the backend
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>("—");
 
   useEffect(() => {
     let isMounted = true;
@@ -157,29 +144,8 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 8000) {
     const OFFLINE_THRESHOLD = 3;
 
     function stabilizeOltStatus(data: HardwareTelemetryPayload): HardwareTelemetryPayload {
-      const result = { ...data };
-
-      // OLT1 debounce
-      if (data.olt1.status === 'offline') {
-        olt1OfflineCount++;
-        if (olt1OfflineCount < OFFLINE_THRESHOLD) {
-          result.olt1 = { ...data.olt1, status: 'online' }; // Keep showing online during transient failures
-        }
-      } else {
-        olt1OfflineCount = 0;
-      }
-
-      // OLT2 debounce
-      if (data.olt2.status === 'offline') {
-        olt2OfflineCount++;
-        if (olt2OfflineCount < OFFLINE_THRESHOLD) {
-          result.olt2 = { ...data.olt2, status: 'online' }; // Keep showing online during transient failures
-        }
-      } else {
-        olt2OfflineCount = 0;
-      }
-
-      return result;
+      // Truthful real-time reporting — never mask offline status as online
+      return data;
     }
 
     // 1. Try Zero-Delay Server-Sent Events (SSE) Stream
@@ -227,8 +193,9 @@ export function useRealtimeHardwareTelemetry(pollIntervalMs = 8000) {
         }
       } catch (_) {}
 
-      // Offline fallback: preserve existing real telemetry without synthetic jitter
+      // Backend unreachable: mark as disconnected so the UI shows offline correctly
       if (isMounted) {
+        setIsLiveConnected(false);
         setLastSyncTime(new Date().toLocaleTimeString());
       }
     }

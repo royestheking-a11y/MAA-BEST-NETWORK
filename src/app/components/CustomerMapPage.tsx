@@ -229,7 +229,7 @@ export function CustomerMapPage({ onNavigate }: CustomerMapPageProps) {
       const lng = (c.lng || c.longitude) ? Number(c.lng || c.longitude) : (targetHub.lng + Math.cos(angle) * distanceDeg * 1.15);
 
       // Status & Signal - 100% matched to live RouterOS & OLT sessions
-      const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online" || c.status === "active");
+      const isOnline = liveMatch ? (liveMatch.connection_status === "online") : (c.netStatus === "online");
       const opticalRx = (liveMatch?.onu_rx_power !== undefined && liveMatch?.onu_rx_power !== null)
         ? liveMatch.onu_rx_power
         : (c.onuSignal && !isNaN(parseFloat(c.onuSignal)) ? parseFloat(c.onuSignal) : null);

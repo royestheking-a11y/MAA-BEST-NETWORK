@@ -331,14 +331,16 @@ const server = http.createServer(async (req, res) => {
   // 19. Update (modify) a PPPoE secret on MikroTik
   if (url.pathname === '/api/mikrotik/user/update' && req.method === 'POST') {
     const body = await readBody();
-    const { username, customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone } = body;
+    const { username, customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone, ipAddress, remoteAddress, ip } = body;
     if (!username && !customerId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'username or customerId required' }));
       return;
     }
     const result = await updatePppoeSecret(username || customerId, {
-      customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone
+      customerId, newUsername, password, profile, package: pkg, comment, disabled, phone, name, address, zone,
+      ipAddress: ipAddress || remoteAddress || ip,
+      remoteAddress: remoteAddress || ipAddress || ip
     });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));

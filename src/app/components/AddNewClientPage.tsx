@@ -211,6 +211,25 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
     return `MBN${String(maxExistingNum + 1).padStart(4, "0")}`;
   }, [customers]);
 
+  const [assignedIp, setAssignedIp] = useState("");
+
+  const nextSequentialIp = useMemo(() => {
+    const usedHosts = new Set<number>();
+    customers.forEach(c => {
+      if (c.ipAddress && c.ipAddress.startsWith("10.215.35.")) {
+        const num = parseInt(c.ipAddress.replace("10.215.35.", ""), 10);
+        if (!isNaN(num)) usedHosts.add(num);
+      }
+    });
+    let host = 2;
+    while (usedHosts.has(host) && host < 254) {
+      host++;
+    }
+    return `10.215.35.${host}`;
+  }, [customers]);
+
+  const effectiveIp = assignedIp.trim() || nextSequentialIp;
+
   const effectiveClientCode = (customClientCode.trim() || nextClientCode).toUpperCase();
 
   // Optical core color swatches
@@ -353,23 +372,23 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
       price: userType === "free" ? 0 : (Number(monthlyBill) || (PACKAGES.find(x => x.name === selectedPackage)?.price || 500)),
       monthlyBill: userType === "free" ? 0 : (Number(monthlyBill) || (PACKAGES.find(x => x.name === selectedPackage)?.price || 500)),
       status: userType === "free" ? "active" : (wantDisableClient ? "suspended" : "active"),
-      netStatus: userType === "free" ? "online" : (wantDisableClient ? "offline" : "online"),
+      netStatus: "offline",
       userType: userType,
       billingDate: 1,
       startDate: toDdMmYyyy(joiningDate),
       endDate: userType === "free" || userType === "unlimited" ? "Permanent / Lifetime" : toDdMmYyyy(expireDate),
       daysRemaining: userType === "free" || userType === "unlimited" ? 999 : 30,
       dueAmount: 0,
-      ipAddress: "",
+      ipAddress: effectiveIp,
       mac: deviceSerial ? deviceSerial.trim() : "—",
       passcode: `mbn@${finalClientCode.replace(/\D/g, "") || "0001"}`,
       pppUser: username || `Mbn@client${nextNum}`,
       pppPass: password || "123456",
-      mikrotik: serverName || "MikroTik-MBN-Core",
+      mikrotik: serverName || "DC-CA",
       olt: selectedOlt,
       ponPort: selectedPonPort,
       onuSignal: "—",
-      sessionUptime: "0m",
+      sessionUptime: "Offline",
       monthlyUsageGB: 0,
       joinDate: toDdMmYyyy(joiningDate),
       clientType: clientType,
@@ -1343,6 +1362,37 @@ export function AddNewClientPage({ onNavigate }: AddNewClientPageProps) {
                       {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Static / Framed IP Address (MikroTik Pool-35) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground">
+                    Static / Framed IP Address (MikroTik Remote Address)
+                  </label>
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    Auto-Allocated from Pool-35 (10.215.35.0/24)
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={assignedIp}
+                    onChange={e => setAssignedIp(e.target.value.trim())}
+                    placeholder={nextSequentialIp}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-card border border-border text-foreground outline-none focus:border-primary font-mono font-bold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignedIp(nextSequentialIp);
+                      showToast(`✓ Auto-allocated next free IP: ${nextSequentialIp}`);
+                    }}
+                    className="px-3 py-2 text-xs font-bold rounded-xl border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <RefreshCw size={13} /> Next Free IP
+                  </button>
                 </div>
               </div>
 
