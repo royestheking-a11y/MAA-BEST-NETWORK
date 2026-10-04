@@ -38,6 +38,7 @@ export interface Session {
   mikrotik: string;
   pkg: string;
   isHardwareOnly?: boolean;
+  isMissingInNetx?: boolean;
 }
 
 function formatLastRefresh(date: Date): string {
@@ -383,6 +384,7 @@ export function LiveStatusPage() {
           mikrotik: c.mikrotik || c.serverName || "MikroTik-MBN-Core",
           pkg: c.package || `${pkgDown} Mbps Fiber Standard`,
           isHardwareOnly: false,
+          isMissingInNetx: netxLoaded && !liveMatch,
         };
       });
     } else {
@@ -449,6 +451,7 @@ export function LiveStatusPage() {
           mikrotik: matched?.mikrotik || "MikroTik-MBN-Core",
           pkg: matched?.package || `${pkgDown} Mbps Fiber Standard`,
           isHardwareOnly: o.customer === "— Unassigned —",
+          isMissingInNetx: false,
         };
       });
     }
@@ -907,7 +910,17 @@ export function LiveStatusPage() {
 
                       {/* Customer Name & Code */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <p className="font-bold text-foreground text-xs">{s.customer}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-foreground text-xs">{s.customer}</p>
+                          {s.isMissingInNetx && (
+                            <span 
+                              title="This user exists in your database but not in NetX. Please delete them or create them in NetX." 
+                              className="px-1.5 py-0.5 rounded text-[9px] bg-destructive/10 text-destructive border border-destructive/20 uppercase tracking-wider font-bold"
+                            >
+                              Not in NetX
+                            </span>
+                          )}
+                        </div>
                         <p className="font-mono text-[10px] text-muted-foreground">{s.id}</p>
                       </td>
 
