@@ -28,6 +28,8 @@ export interface Session {
   liveUpMbps: number;
   liveDownFormatted: string;
   liveUpFormatted: string;
+  sessionDownFormatted: string;
+  sessionUpFormatted: string;
   downPercent: number;
   upPercent: number;
   pkgDown: number;
@@ -371,6 +373,8 @@ export function LiveStatusPage() {
           liveUpMbps: bw.liveUpMbps,
           liveDownFormatted: bw.liveDownFormatted,
           liveUpFormatted: bw.liveUpFormatted,
+          sessionDownFormatted: bw.sessionDownFormatted,
+          sessionUpFormatted: bw.sessionUpFormatted,
           downPercent: bw.downPercent,
           upPercent: bw.upPercent,
           pkgDown,
@@ -435,6 +439,8 @@ export function LiveStatusPage() {
           liveUpMbps: bw.liveUpMbps,
           liveDownFormatted: bw.liveDownFormatted,
           liveUpFormatted: bw.liveUpFormatted,
+          sessionDownFormatted: bw.sessionDownFormatted,
+          sessionUpFormatted: bw.sessionUpFormatted,
           downPercent: bw.downPercent,
           upPercent: bw.upPercent,
           pkgDown,
@@ -983,7 +989,7 @@ export function LiveStatusPage() {
                               <span>{s.liveDownMbps > 0 ? `${s.liveDownMbps} Mbps` : s.liveDownFormatted}</span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                              <span>{s.liveDownMbps > 0 ? `Total: ${s.liveDownFormatted}` : `Plan: ${s.pkgDown}M`}</span>
+                              <span>{s.liveDownMbps > 0 ? `Total: ${s.sessionDownFormatted}` : `Plan: ${s.pkgDown}M`}</span>
                               {s.downPercent > 0 && <span className="text-emerald-500 font-semibold">{s.downPercent}%</span>}
                             </div>
                             {s.downPercent > 0 && (
@@ -1009,7 +1015,7 @@ export function LiveStatusPage() {
                               <span>{s.liveUpMbps > 0 ? `${s.liveUpMbps} Mbps` : s.liveUpFormatted}</span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                              <span>{s.liveUpMbps > 0 ? `Total: ${s.liveUpFormatted}` : `Plan: ${s.pkgUp}M`}</span>
+                              <span>{s.liveUpMbps > 0 ? `Total: ${s.sessionUpFormatted}` : `Plan: ${s.pkgUp}M`}</span>
                               {s.upPercent > 0 && <span className="text-sky-500 font-semibold">{s.upPercent}%</span>}
                             </div>
                             {s.upPercent > 0 && (
