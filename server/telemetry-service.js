@@ -1118,7 +1118,8 @@ export async function netxCreateCustomer(data = {}) {
     pppoe_username: username,
     pppoe_password: password,
     package: packageId,
-    zone: zoneId
+    zone: zoneId,
+    static_ip: (data.ipAddress || data.remoteAddress || data.ip || '').trim() || null
   };
 
   try {
