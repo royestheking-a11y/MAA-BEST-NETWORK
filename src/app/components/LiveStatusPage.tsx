@@ -77,15 +77,23 @@ export function formatTickingUptime(seconds: number): string {
 
 /**
  * Derives real session bandwidth from NetX API cumulative byte counters.
- * Returns session totals or "—" if no real data is available.
- * NEVER generates fake animated numbers.
+ * Returns session total data (e.g. 2.91 GB / 15.83 GB) and optional delta rate.
+ * Authentically represents actual session data counters without misleading 'per-second' labeling.
  */
-export function computeRealSessionBandwidth(liveMatch: NetxLiveCustomer | null | undefined, isOnline: boolean) {
+export function computeRealSessionBandwidth(
+  liveMatch: NetxLiveCustomer | null | undefined,
+  isOnline: boolean,
+  deltaRate?: { downMbps: number; upMbps: number } | null,
+  pkgDown: number = 20,
+  pkgUp: number = 10
+) {
   const rxBytes: number = liveMatch?.live_rx_bytes ?? 0;
   const txBytes: number = liveMatch?.live_tx_bytes ?? 0;
 
   if (!isOnline || !liveMatch || (!rxBytes && !txBytes)) {
     return {
+      sessionDownFormatted: "—",
+      sessionUpFormatted: "—",
       liveDownMbps: 0,
       liveUpMbps: 0,
       liveDownFormatted: "—",
@@ -104,22 +112,31 @@ export function computeRealSessionBandwidth(liveMatch: NetxLiveCustomer | null |
     return `${Math.round(bytes / 1024)} KB`;
   };
 
-  const rxMb = rxBytes / (1024 * 1024);
-  const txMb = txBytes / (1024 * 1024);
+  const currentDownMbps = deltaRate ? deltaRate.downMbps : 0;
+  const currentUpMbps = deltaRate ? deltaRate.upMbps : 0;
+
+  const downPercent = pkgDown > 0 && currentDownMbps > 0
+    ? Math.min(100, Math.round((currentDownMbps / pkgDown) * 100))
+    : 0;
+  const upPercent = pkgUp > 0 && currentUpMbps > 0
+    ? Math.min(100, Math.round((currentUpMbps / pkgUp) * 100))
+    : 0;
 
   return {
-    liveDownMbps: rxMb,
-    liveUpMbps: txMb,
+    sessionDownFormatted: toDisplay(rxBytes),
+    sessionUpFormatted: toDisplay(txBytes),
+    liveDownMbps: currentDownMbps,
+    liveUpMbps: currentUpMbps,
     liveDownFormatted: toDisplay(rxBytes),
     liveUpFormatted: toDisplay(txBytes),
-    downPercent: 0, // No per-second rate from API
-    upPercent: 0,
+    downPercent,
+    upPercent,
     hasRealData: true,
   };
 }
 
 function exportCSV(sessions: Session[]) {
-  const headers = ["Customer", "ID", "PPPoE User", "Status", "Optical Rx (dBm)", "PON Port", "OLT Server", "Live Active Uptime", "IP", "MAC", "Live Download Rate", "Live Upload Rate", "Pkg Down Limit", "Pkg Up Limit", "MikroTik", "Package"];
+  const headers = ["Customer", "ID", "PPPoE User", "Status", "Optical Rx (dBm)", "PON Port", "OLT Server", "Live Active Uptime", "IP", "MAC", "Session Download Total", "Session Upload Total", "Pkg Down Limit", "Pkg Up Limit", "MikroTik", "Package"];
   const rows = sessions.map(s => [
     s.customer, s.id, s.user, s.status, s.rxPower, s.ponPort, s.olt, s.uptime, s.ip, s.mac, s.liveDownFormatted, s.liveUpFormatted, `${s.pkgDown} Mbps`, `${s.pkgUp} Mbps`, s.mikrotik, s.pkg
   ]);
@@ -203,6 +220,35 @@ export function LiveStatusPage() {
 
   const isSyncingInitial = isNetxLoading && liveStats.length === 0;
 
+  // Track previous samples to calculate real-time transfer rates (bits/second) from cumulative counters
+  const prevSamplesRef = useRef<Map<string, { rx: number; tx: number; time: number }>>(new Map());
+  const deltaRatesRef = useRef<Map<string, { downMbps: number; upMbps: number }>>(new Map());
+
+  useEffect(() => {
+    if (!Array.isArray(liveStats) || liveStats.length === 0) return;
+    const now = Date.now();
+    liveStats.forEach(sub => {
+      const key = (sub.pppoe_username || sub.full_name || sub.id || "").toLowerCase().trim();
+      if (!key) return;
+      const prev = prevSamplesRef.current.get(key);
+      if (prev && prev.time > 0 && sub.connection_status === "online") {
+        const dt = (now - prev.time) / 1000;
+        if (dt >= 2 && dt <= 120) {
+          const dRx = Math.max(0, (sub.live_rx_bytes || 0) - prev.rx);
+          const dTx = Math.max(0, (sub.live_tx_bytes || 0) - prev.tx);
+          const downMbps = Number(((dRx * 8) / (dt * 1_000_000)).toFixed(2));
+          const upMbps = Number(((dTx * 8) / (dt * 1_000_000)).toFixed(2));
+          deltaRatesRef.current.set(key, { downMbps, upMbps });
+        }
+      }
+      prevSamplesRef.current.set(key, {
+        rx: sub.live_rx_bytes || 0,
+        tx: sub.live_tx_bytes || 0,
+        time: now
+      });
+    });
+  }, [liveStats]);
+
   // ── Build Accurate Real-Time Sessions List ──
   const baseSessions: Session[] = useMemo(() => {
     // Build lookup map from real NetX live telemetry with multi-key normalization
@@ -257,8 +303,12 @@ export function LiveStatusPage() {
         const pkgDown = c.downloadSpeedMbps || 20;
         const pkgUp = c.uploadSpeedMbps || 10;
         const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || c.sessionUptime || c.duration) : 0;
+        
+        const deltaKey = (c.pppUser || c.name || c.id || "").toLowerCase().trim();
+        const deltaRate = deltaRatesRef.current.get(deltaKey) || null;
+
         // Use REAL session byte data from NetX API only
-        const bw = computeRealSessionBandwidth(liveMatch, isOnline);
+        const bw = computeRealSessionBandwidth(liveMatch, isOnline, deltaRate, pkgDown, pkgUp);
 
         return {
           customer: c.name,
@@ -319,8 +369,10 @@ export function LiveStatusPage() {
         const pkgDown = matched?.downloadSpeedMbps || 20;
         const pkgUp = matched?.uploadSpeedMbps || 10;
         const initialUptimeSec = isOnline ? parseUptimeToSeconds(liveMatch?.live_uptime || matched?.sessionUptime) : 0;
+        const deltaKey = (o.customer || matched?.pppUser || matched?.name || "").toLowerCase().trim();
+        const deltaRate = deltaRatesRef.current.get(deltaKey) || null;
         // Real session data only
-        const bw = computeRealSessionBandwidth(liveMatch, isOnline);
+        const bw = computeRealSessionBandwidth(liveMatch, isOnline, deltaRate, pkgDown, pkgUp);
 
         return {
           customer: o.customer !== "— Unassigned —" ? (matched?.name || o.customer) : "— Unassigned Hardware ONU —",
@@ -439,15 +491,11 @@ export function LiveStatusPage() {
   }, [sessions.length, onlineCount]);
   const weakCount = useMemo(() => sessions.filter(s => s.rxPowerNum < -26).length, [sessions]);
 
-  const totalLiveDown = useMemo(
-    () => sessions.filter(s => s.status === "online").reduce((acc, s) => acc + s.liveDownMbps, 0),
+  const totalFleetTrafficMb = useMemo(
+    () => sessions.filter(s => s.status === "online").reduce((acc, s) => acc + s.totalTransferredMb, 0),
     [sessions]
   );
-  const totalLiveUp = useMemo(
-    () => sessions.filter(s => s.status === "online").reduce((acc, s) => acc + s.liveUpMbps, 0),
-    [sessions]
-  );
-  const totalBw = useMemo(() => totalLiveDown + totalLiveUp, [totalLiveDown, totalLiveUp]);
+  const totalFleetTrafficGb = totalFleetTrafficMb / 1024;
 
   // Filtered Sessions
   const filtered = useMemo(() => {
@@ -646,12 +694,12 @@ export function LiveStatusPage() {
             sub: "Terminal power off / LOS"
           },
           {
-            label: "Aggregate Throughput",
-            value: isSyncingInitial ? "..." : `${totalBw.toFixed(1)} Mbps`,
+            label: "Fleet Session Data",
+            value: isSyncingInitial ? "..." : (totalFleetTrafficGb >= 1024 ? `${(totalFleetTrafficGb / 1024).toFixed(2)} TB` : `${totalFleetTrafficGb.toFixed(1)} GB`),
             icon: Activity,
             bg: "rgba(37,99,235,0.12)",
             color: "#2563EB",
-            sub: "Live subscriber streaming"
+            sub: "Cumulative active sessions"
           },
           {
             label: "OLT Fleet Connected",
@@ -775,7 +823,7 @@ export function LiveStatusPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-muted border-b border-border">
-                  {["Status", "Customer / Subscriber", "MAC Address", "MAC Lock", "PON Port", "Optical Signal (RX)", "OLT Server", "PPPoE Username", "Live Download (/s)", "Live Upload (/s)", "IP Address", "Live Uptime", "Actions"].map(h => (
+                  {["Status", "Customer / Subscriber", "MAC Address", "MAC Lock", "PON Port", "Optical Signal (RX)", "OLT Server", "PPPoE Username", "Session Download", "Session Upload", "IP Address", "Live Uptime", "Actions"].map(h => (
                     <th key={h} className="text-left px-4 py-3.5 text-[11px] font-bold text-muted-foreground tracking-wider whitespace-nowrap">
                       {h.toUpperCase()}
                     </th>
@@ -884,26 +932,28 @@ export function LiveStatusPage() {
                         <span className="font-mono text-xs font-semibold text-foreground">{s.user}</span>
                       </td>
 
-                      {/* Live Download Speed */}
+                      {/* Session Download Data */}
                       <td className="px-4 py-3 whitespace-nowrap min-w-[130px]">
                         {s.status === "online" && s.liveDownFormatted !== "—" ? (
                           <div>
                             <div className="flex items-center gap-1 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
                               <span>{s.liveDownFormatted}</span>
                             </div>
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
+                              <span>Session Total</span>
+                              {s.liveDownMbps > 0 ? (
+                                <span className="text-emerald-500 font-semibold">{s.liveDownMbps} Mbps</span>
+                              ) : (
+                                <span>Plan: {s.pkgDown}M</span>
+                              )}
+                            </div>
                             {s.downPercent > 0 && (
-                              <>
-                                <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                                  <span>Cap: {s.pkgDown}M</span>
-                                  <span>{s.downPercent}%</span>
-                                </div>
-                                <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
-                                  <div
-                                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                                    style={{ width: `${Math.min(100, Math.max(2, s.downPercent))}%` }}
-                                  />
-                                </div>
-                              </>
+                              <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
+                                <div
+                                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, Math.max(2, s.downPercent))}%` }}
+                                />
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -911,26 +961,28 @@ export function LiveStatusPage() {
                         )}
                       </td>
 
-                      {/* Live Upload Speed */}
+                      {/* Session Upload Data */}
                       <td className="px-4 py-3 whitespace-nowrap min-w-[130px]">
                         {s.status === "online" && s.liveUpFormatted !== "—" ? (
                           <div>
                             <div className="flex items-center gap-1 font-mono text-xs font-black text-sky-600 dark:text-sky-400">
                               <span>{s.liveUpFormatted}</span>
                             </div>
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
+                              <span>Session Total</span>
+                              {s.liveUpMbps > 0 ? (
+                                <span className="text-sky-500 font-semibold">{s.liveUpMbps} Mbps</span>
+                              ) : (
+                                <span>Plan: {s.pkgUp}M</span>
+                              )}
+                            </div>
                             {s.upPercent > 0 && (
-                              <>
-                                <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                                  <span>Cap: {s.pkgUp}M</span>
-                                  <span>{s.upPercent}%</span>
-                                </div>
-                                <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
-                                  <div
-                                    className="h-full bg-sky-500 rounded-full transition-all duration-300"
-                                    style={{ width: `${Math.min(100, Math.max(2, s.upPercent))}%` }}
-                                  />
-                                </div>
-                              </>
+                              <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
+                                <div
+                                  className="h-full bg-sky-500 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, Math.max(2, s.upPercent))}%` }}
+                                />
+                              </div>
                             )}
                           </div>
                         ) : (

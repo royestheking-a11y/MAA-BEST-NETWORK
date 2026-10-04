@@ -1371,7 +1371,7 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                   <th className="p-3.5">Router Concentrator</th>
                   <th className="p-3.5">Framed IP & MAC</th>
                   <th className="p-3.5">Queue Bandwidth</th>
-                  <th className="p-3.5">Live Rates</th>
+                  <th className="p-3.5">Session Data (DL / UL)</th>
                   <th className="p-3.5">Status & Uptime</th>
                   <th className="p-3.5 text-right">Actions</th>
                 </tr>
@@ -1407,11 +1407,11 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                     <td className="p-3.5 font-mono text-[11px]">
                       <div className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
                         <span>↓ {s.downloadSpeed}</span>
-                        {s.status === "online" && <span className="text-[10px] text-muted-foreground font-normal">({s.downPercent}%)</span>}
+                        {s.status === "online" && <span className="text-[10px] text-muted-foreground font-normal">(Session DL)</span>}
                       </div>
                       <div className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1">
                         <span>↑ {s.uploadSpeed}</span>
-                        {s.status === "online" && <span className="text-[10px] text-muted-foreground font-normal">({s.upPercent}%)</span>}
+                        {s.status === "online" && <span className="text-[10px] text-muted-foreground font-normal">(Session UL)</span>}
                       </div>
                     </td>
 
