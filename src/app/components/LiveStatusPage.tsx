@@ -76,16 +76,21 @@ export function formatTickingUptime(seconds: number): string {
 }
 
 /**
- * Derives real session bandwidth from NetX API cumulative byte counters.
- * Returns session total data (e.g. 2.91 GB / 15.83 GB) and optional delta rate.
- * Authentically represents actual session data counters without misleading 'per-second' labeling.
+ * Computes real bandwidth rates from NetX API session data.
+ *
+ * Priority:
+ *  1. Delta rate: bytes diff between two consecutive polls (most accurate, 2nd+ poll)
+ *  2. Average rate: total session bytes / session uptime (immediate, from 1st poll)
+ *  3. Session totals only (no rate if uptime unknown)
+ * Never fabricates numbers.
  */
 export function computeRealSessionBandwidth(
   liveMatch: NetxLiveCustomer | null | undefined,
   isOnline: boolean,
   deltaRate?: { downMbps: number; upMbps: number } | null,
   pkgDown: number = 20,
-  pkgUp: number = 10
+  pkgUp: number = 10,
+  uptimeSec: number = 0
 ) {
   const rxBytes: number = liveMatch?.live_rx_bytes ?? 0;
   const txBytes: number = liveMatch?.live_tx_bytes ?? 0;
@@ -101,10 +106,11 @@ export function computeRealSessionBandwidth(
       downPercent: 0,
       upPercent: 0,
       hasRealData: false,
+      rateSource: "none",
     };
   }
 
-  const toDisplay = (bytes: number): string => {
+  const toDisplayBytes = (bytes: number): string => {
     if (bytes === 0) return "—";
     const mb = bytes / (1024 * 1024);
     if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`;
@@ -112,26 +118,62 @@ export function computeRealSessionBandwidth(
     return `${Math.round(bytes / 1024)} KB`;
   };
 
-  const currentDownMbps = deltaRate ? deltaRate.downMbps : 0;
-  const currentUpMbps = deltaRate ? deltaRate.upMbps : 0;
+  // 1. Delta rate — most accurate (only available after 2nd poll)
+  if (deltaRate && (deltaRate.downMbps > 0 || deltaRate.upMbps > 0)) {
+    const downMbps = Number(deltaRate.downMbps.toFixed(2));
+    const upMbps = Number(deltaRate.upMbps.toFixed(2));
+    const downPercent = pkgDown > 0 && downMbps > 0 ? Math.min(100, Math.round((downMbps / pkgDown) * 100)) : 0;
+    const upPercent = pkgUp > 0 && upMbps > 0 ? Math.min(100, Math.round((upMbps / pkgUp) * 100)) : 0;
+    return {
+      sessionDownFormatted: toDisplayBytes(rxBytes),
+      sessionUpFormatted: toDisplayBytes(txBytes),
+      liveDownMbps: downMbps,
+      liveUpMbps: upMbps,
+      liveDownFormatted: `${downMbps} Mbps`,
+      liveUpFormatted: `${upMbps} Mbps`,
+      downPercent,
+      upPercent,
+      hasRealData: true,
+      rateSource: "delta",
+    };
+  }
 
-  const downPercent = pkgDown > 0 && currentDownMbps > 0
-    ? Math.min(100, Math.round((currentDownMbps / pkgDown) * 100))
-    : 0;
-  const upPercent = pkgUp > 0 && currentUpMbps > 0
-    ? Math.min(100, Math.round((currentUpMbps / pkgUp) * 100))
-    : 0;
+  // 2. Average rate: total bytes / session duration — available from 1st poll
+  const sessionSec = uptimeSec > 0 ? uptimeSec : parseUptimeToSeconds(liveMatch.live_uptime);
+  if (sessionSec >= 10 && (rxBytes > 0 || txBytes > 0)) {
+    const avgDownMbps = Number(((rxBytes * 8) / (sessionSec * 1_000_000)).toFixed(2));
+    const avgUpMbps = Number(((txBytes * 8) / (sessionSec * 1_000_000)).toFixed(2));
+    // Sanity check: if average far exceeds plan limit, uptime field may be stale
+    if (avgDownMbps <= pkgDown * 5 && avgUpMbps <= pkgUp * 5) {
+      const downPercent = pkgDown > 0 && avgDownMbps > 0 ? Math.min(100, Math.round((avgDownMbps / pkgDown) * 100)) : 0;
+      const upPercent = pkgUp > 0 && avgUpMbps > 0 ? Math.min(100, Math.round((avgUpMbps / pkgUp) * 100)) : 0;
+      return {
+        sessionDownFormatted: toDisplayBytes(rxBytes),
+        sessionUpFormatted: toDisplayBytes(txBytes),
+        liveDownMbps: avgDownMbps,
+        liveUpMbps: avgUpMbps,
+        liveDownFormatted: `${avgDownMbps} Mbps`,
+        liveUpFormatted: `${avgUpMbps} Mbps`,
+        downPercent,
+        upPercent,
+        hasRealData: true,
+        rateSource: "avg",
+      };
+    }
+  }
 
+  // 3. Fallback: session totals only, no rate
   return {
-    sessionDownFormatted: toDisplay(rxBytes),
-    sessionUpFormatted: toDisplay(txBytes),
-    liveDownMbps: currentDownMbps,
-    liveUpMbps: currentUpMbps,
-    liveDownFormatted: toDisplay(rxBytes),
-    liveUpFormatted: toDisplay(txBytes),
-    downPercent,
-    upPercent,
+    sessionDownFormatted: toDisplayBytes(rxBytes),
+    sessionUpFormatted: toDisplayBytes(txBytes),
+    liveDownMbps: 0,
+    liveUpMbps: 0,
+    liveDownFormatted: toDisplayBytes(rxBytes),
+    liveUpFormatted: toDisplayBytes(txBytes),
+    downPercent: 0,
+    upPercent: 0,
     hasRealData: true,
+    rateSource: "session_total",
   };
 }
 
@@ -308,7 +350,7 @@ export function LiveStatusPage() {
         const deltaRate = deltaRatesRef.current.get(deltaKey) || null;
 
         // Use REAL session byte data from NetX API only
-        const bw = computeRealSessionBandwidth(liveMatch, isOnline, deltaRate, pkgDown, pkgUp);
+        const bw = computeRealSessionBandwidth(liveMatch, isOnline, deltaRate, pkgDown, pkgUp, initialUptimeSec);
 
         return {
           customer: c.name,
@@ -372,7 +414,7 @@ export function LiveStatusPage() {
         const deltaKey = (o.customer || matched?.pppUser || matched?.name || "").toLowerCase().trim();
         const deltaRate = deltaRatesRef.current.get(deltaKey) || null;
         // Real session data only
-        const bw = computeRealSessionBandwidth(liveMatch, isOnline, deltaRate, pkgDown, pkgUp);
+        const bw = computeRealSessionBandwidth(liveMatch, isOnline, deltaRate, pkgDown, pkgUp, initialUptimeSec);
 
         return {
           customer: o.customer !== "— Unassigned —" ? (matched?.name || o.customer) : "— Unassigned Hardware ONU —",
@@ -936,16 +978,13 @@ export function LiveStatusPage() {
                       <td className="px-4 py-3 whitespace-nowrap min-w-[130px]">
                         {s.status === "online" && s.liveDownFormatted !== "—" ? (
                           <div>
+                            {/* Primary: show rate if available, else show session total */}
                             <div className="flex items-center gap-1 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
-                              <span>{s.liveDownFormatted}</span>
+                              <span>{s.liveDownMbps > 0 ? `${s.liveDownMbps} Mbps` : s.liveDownFormatted}</span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                              <span>Session Total</span>
-                              {s.liveDownMbps > 0 ? (
-                                <span className="text-emerald-500 font-semibold">{s.liveDownMbps} Mbps</span>
-                              ) : (
-                                <span>Plan: {s.pkgDown}M</span>
-                              )}
+                              <span>{s.liveDownMbps > 0 ? `Total: ${s.liveDownFormatted}` : `Plan: ${s.pkgDown}M`}</span>
+                              {s.downPercent > 0 && <span className="text-emerald-500 font-semibold">{s.downPercent}%</span>}
                             </div>
                             {s.downPercent > 0 && (
                               <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
@@ -965,16 +1004,13 @@ export function LiveStatusPage() {
                       <td className="px-4 py-3 whitespace-nowrap min-w-[130px]">
                         {s.status === "online" && s.liveUpFormatted !== "—" ? (
                           <div>
+                            {/* Primary: show rate if available, else show session total */}
                             <div className="flex items-center gap-1 font-mono text-xs font-black text-sky-600 dark:text-sky-400">
-                              <span>{s.liveUpFormatted}</span>
+                              <span>{s.liveUpMbps > 0 ? `${s.liveUpMbps} Mbps` : s.liveUpFormatted}</span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5 font-mono">
-                              <span>Session Total</span>
-                              {s.liveUpMbps > 0 ? (
-                                <span className="text-sky-500 font-semibold">{s.liveUpMbps} Mbps</span>
-                              ) : (
-                                <span>Plan: {s.pkgUp}M</span>
-                              )}
+                              <span>{s.liveUpMbps > 0 ? `Total: ${s.liveUpFormatted}` : `Plan: ${s.pkgUp}M`}</span>
+                              {s.upPercent > 0 && <span className="text-sky-500 font-semibold">{s.upPercent}%</span>}
                             </div>
                             {s.upPercent > 0 && (
                               <div className="w-full h-1 bg-muted rounded-full overflow-hidden mt-1">
