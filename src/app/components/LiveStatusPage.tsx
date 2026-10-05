@@ -141,29 +141,9 @@ export function computeRealSessionBandwidth(
     };
   }
 
-  // 2. Average rate: total bytes / session duration — available from 1st poll
-  const sessionSec = uptimeSec > 0 ? uptimeSec : parseUptimeToSeconds(liveMatch.live_uptime);
-  if (sessionSec >= 10 && (rxBytes > 0 || txBytes > 0)) {
-    const avgDownMbps = Number(((rxBytes * 8) / (sessionSec * 1_000_000)).toFixed(2));
-    const avgUpMbps = Number(((txBytes * 8) / (sessionSec * 1_000_000)).toFixed(2));
-    // Sanity check: if average far exceeds plan limit, uptime field may be stale
-    if (avgDownMbps <= pkgDown * 5 && avgUpMbps <= pkgUp * 5) {
-      const downPercent = pkgDown > 0 && avgDownMbps > 0 ? Math.min(100, Math.round((avgDownMbps / pkgDown) * 100)) : 0;
-      const upPercent = pkgUp > 0 && avgUpMbps > 0 ? Math.min(100, Math.round((avgUpMbps / pkgUp) * 100)) : 0;
-      return {
-        sessionDownFormatted: toDisplayBytes(rxBytes),
-        sessionUpFormatted: toDisplayBytes(txBytes),
-        liveDownMbps: avgDownMbps,
-        liveUpMbps: avgUpMbps,
-        liveDownFormatted: `${avgDownMbps} Mbps`,
-        liveUpFormatted: `${avgUpMbps} Mbps`,
-        downPercent,
-        upPercent,
-        hasRealData: true,
-        rateSource: "avg",
-      };
-    }
-  }
+  // 2. Average rate fallback REMOVED.
+  // Averaging total bytes over days of uptime results in a static number (e.g. 0.35 Mbps for days)
+  // which looks "fixed/hardcoded" to the user. We only use true real-time delta rates.
 
   // 3. Fallback: session totals only, no rate
   return {
