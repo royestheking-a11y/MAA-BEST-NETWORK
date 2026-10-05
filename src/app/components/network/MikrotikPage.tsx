@@ -989,16 +989,22 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
             const addedAtDateLabel = srv.addedAt || "24 Sep 2026, 05:30 PM";
 
             // Real CPU load directly from RouterOS API:
-            const realCpu = (isPrimary && telemetry.mikrotik?.cpuUsagePercent !== undefined)
+            // null = RouterOS port 8728 not reachable from gateway (firewall). Show — instead of fake value.
+            const realCpu = (isPrimary && telemetry.mikrotik?.cpuUsagePercent != null)
               ? telemetry.mikrotik.cpuUsagePercent
-              : (srv.cpuLoad || 8);
+              : (srv.cpuLoad != null ? srv.cpuLoad : null);
+            const cpuDisplay = realCpu != null ? `${realCpu}%` : "—";
+            const cpuUnavailable = realCpu == null;
 
             // Real Memory directly from RouterOS API:
-            const totalRamMb = (isPrimary && telemetry.mikrotik?.totalRamMb) ? telemetry.mikrotik.totalRamMb : (srv.memoryTotal || 32064);
-            const usedRamMb = (isPrimary && telemetry.mikrotik?.usedRamMb) ? telemetry.mikrotik.usedRamMb : (srv.memoryUsed || 3619);
-            const usedRamGb = (usedRamMb / 1024).toFixed(1);
-            const totalRamGb = Math.round(totalRamMb / 1024);
-            const ramPercent = Math.min(100, Math.round((usedRamMb / totalRamMb) * 100));
+            // null = RouterOS not reachable. Show — instead of fake value.
+            const totalRamMb = (isPrimary && telemetry.mikrotik?.totalRamMb != null) ? telemetry.mikrotik.totalRamMb : (srv.memoryTotal || null);
+            const usedRamMb = (isPrimary && telemetry.mikrotik?.usedRamMb != null) ? telemetry.mikrotik.usedRamMb : (srv.memoryUsed || null);
+            const ramUnavailable = totalRamMb == null || usedRamMb == null;
+            const usedRamGb = ramUnavailable ? "—" : (usedRamMb! / 1024).toFixed(1);
+            const totalRamGb = ramUnavailable ? "—" : Math.round(totalRamMb! / 1024);
+            const ramPercent = ramUnavailable ? null : Math.min(100, Math.round((usedRamMb! / totalRamMb!) * 100));
+            const ramPercentDisplay = ramPercent != null ? `${ramPercent}%` : "—";
 
             // Real Latency directly from RouterOS API probe:
             const latencyMs = (isPrimary && telemetry.mikrotik?.latencyMs) ? telemetry.mikrotik.latencyMs : 46;
@@ -1083,17 +1089,37 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                 {/* Metrics */}
                 <div className="p-5 space-y-4">
                   <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="p-3 rounded-2xl bg-muted/30 border border-border flex flex-col justify-center">
-                      <Cpu size={16} className="mx-auto mb-1 text-primary" />
-                      <p className="font-mono text-sm font-black text-foreground">{realCpu}%</p>
-                      <span className="text-[10px] text-muted-foreground font-bold tracking-wider">CPU LOAD</span>
+                    <div
+                      className={`p-3 rounded-2xl border flex flex-col justify-center ${
+                        cpuUnavailable
+                          ? "bg-amber-500/5 border-amber-500/20"
+                          : "bg-muted/30 border-border"
+                      }`}
+                      title={cpuUnavailable ? "RouterOS API port 8728 is not reachable from the gateway server. Open port 8728 on the MikroTik firewall to enable real-time CPU monitoring." : `CPU Load: ${cpuDisplay}`}
+                    >
+                      <Cpu size={16} className={`mx-auto mb-1 ${cpuUnavailable ? "text-amber-400" : "text-primary"}`} />
+                      <p className={`font-mono text-sm font-black ${
+                        cpuUnavailable ? "text-amber-400" : "text-foreground"
+                      }`}>{cpuDisplay}</p>
+                      <span className="text-[10px] text-muted-foreground font-bold tracking-wider">
+                        {cpuUnavailable ? "API PORT CLOSED" : "CPU LOAD"}
+                      </span>
                     </div>
-                    <div className="p-3 rounded-2xl bg-muted/30 border border-border flex flex-col justify-center">
-                      <MemoryStick size={16} className="mx-auto mb-1 text-blue-500" />
-                      <p className="font-mono text-sm font-black text-foreground">
-                        {ramPercent}%
+                    <div
+                      className={`p-3 rounded-2xl border flex flex-col justify-center ${
+                        ramUnavailable
+                          ? "bg-amber-500/5 border-amber-500/20"
+                          : "bg-muted/30 border-border"
+                      }`}
+                      title={ramUnavailable ? "RouterOS API port 8728 is not reachable. RAM data unavailable until port 8728 is opened on MikroTik firewall." : `RAM: ${usedRamGb} / ${totalRamGb} GB`}
+                    >
+                      <MemoryStick size={16} className={`mx-auto mb-1 ${ramUnavailable ? "text-amber-400" : "text-blue-500"}`} />
+                      <p className={`font-mono text-sm font-black ${
+                        ramUnavailable ? "text-amber-400" : "text-foreground"
+                      }`}>
+                        {ramPercentDisplay}
                       </p>
-                      <span className="text-[10px] text-muted-foreground font-bold tracking-wider">RAM ALLOCATED</span>
+                      <span className="text-[10px] text-muted-foreground font-bold tracking-wider">{ramUnavailable ? "API PORT CLOSED" : "RAM ALLOCATED"}</span>
                     </div>
                     <div 
                       className="p-3 rounded-2xl bg-muted/30 border border-border cursor-pointer hover:bg-muted/50 transition group flex flex-col justify-center"
@@ -1136,20 +1162,32 @@ export function MikrotikPage({ onNavigate }: MikrotikPageProps) {
                     <div>
                       <div className="flex justify-between mb-1 text-[11px]">
                         <span className="text-muted-foreground font-medium">Intel(R) 72-Core Processor Load</span>
-                        <span className="font-mono font-bold text-foreground">{realCpu}%</span>
+                        <span className={`font-mono font-bold ${cpuUnavailable ? "text-amber-400" : "text-foreground"}`}>
+                          {cpuUnavailable ? "Port 8728 closed" : cpuDisplay}
+                        </span>
                       </div>
                       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${realCpu}%` }} />
+                        {cpuUnavailable
+                          ? <div className="h-full rounded-full bg-amber-400/40 w-full animate-pulse" />
+                          : <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${realCpu}%` }} />
+                        }
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between mb-1 text-[11px]">
-                        <span className="text-muted-foreground font-medium">{totalRamGb} GB ECC Memory Pool</span>
-                        <span className="font-mono font-bold text-foreground">{usedRamGb} / {totalRamGb} GB In-Use ({ramPercent}%)</span>
+                        <span className="text-muted-foreground font-medium">
+                          {ramUnavailable ? "ECC Memory Pool" : `${totalRamGb} GB ECC Memory Pool`}
+                        </span>
+                        <span className={`font-mono font-bold ${ramUnavailable ? "text-amber-400" : "text-foreground"}`}>
+                          {ramUnavailable ? "Port 8728 closed" : `${usedRamGb} / ${totalRamGb} GB In-Use (${ramPercent}%)`}
+                        </span>
                       </div>
                       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-blue-600 transition-all duration-300" style={{ width: `${ramPercent}%` }} />
+                        {ramUnavailable
+                          ? <div className="h-full rounded-full bg-amber-400/40 w-full animate-pulse" />
+                          : <div className="h-full rounded-full bg-blue-600 transition-all duration-300" style={{ width: `${ramPercent}%` }} />
+                        }
                       </div>
                     </div>
                   </div>
