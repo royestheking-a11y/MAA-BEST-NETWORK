@@ -8,6 +8,7 @@ import {
   Lock, Key, Bell, Globe, ArrowUpRight, CheckSquare, Square
 } from "lucide-react";
 import { billingStore, syncLiveGatewayPackages } from "./billing/billingData";
+import { useCustomerContext, Customer } from "../context/CustomerContext";
 
 export type BillTab = "invoices" | "payments" | "packages" | "discounts" | "billing-settings";
 
@@ -170,6 +171,7 @@ function exportPaymentsCSV(payments: Payment[]) {
 
 export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab }) {
   const [tab, setTab] = useState<BillTab>(initialTab);
+  const { customers, processPayment } = useCustomerContext();
 
   // Keep internal tab in sync if user clicked a sidebar link
   useEffect(() => {
@@ -217,6 +219,7 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
   const [payStatusFilter, setPayStatusFilter] = useState<string>("all");
   const [showRecordPayment, setShowRecordPayment] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Payment | null>(null);
+  const [showCustSuggestions, setShowCustSuggestions] = useState(false);
   const [newPay, setNewPay] = useState({
     customer: "", custId: "", invoice: "", amount: "500",
     method: "bKash" as Payment["method"], txn: "", channel: "Merchant Checkout",
@@ -367,7 +370,7 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
     const payment: Payment = {
       id: payId,
       customer: newPay.customer,
-      custId: newPay.custId,
+      custId: newPay.custId || newPay.customer,
       invoice: newPay.invoice,
       amount: Number(newPay.amount),
       method: newPay.method,
@@ -380,18 +383,17 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
       notes: newPay.notes,
     };
 
-    setPayments(prev => [payment, ...prev]);
+    billingStore.addPayment(payment);
 
-    // Also mark matching invoice as paid if found
-    setInvoices(prev => prev.map(inv => {
-      if (inv.id === newPay.invoice) {
-        return { ...inv, status: "paid", method: newPay.method, paidAt: formattedDate, trxId: txnGenerated };
-      }
-      return inv;
-    }));
+    // Sync with CustomerContext to clear customer due, extend validity & auto-reconnect line on MikroTik
+    if (processPayment) {
+      const mappedMethod: "Cash" | "bKash" | "Nagad" | "Rocket" | "Card" =
+        newPay.method === "Bank" || newPay.method === "SSLCommerz" ? "Card" : (newPay.method as any);
+      processPayment(newPay.custId || newPay.customer, payment.amount, mappedMethod, payment.txn, now);
+    }
 
     setShowRecordPayment(false);
-    showToast(`Payment ${payId} recorded ৳${payment.amount.toLocaleString()} via ${payment.method}`);
+    showToast(`Payment ${payId} recorded ৳${payment.amount.toLocaleString()} via ${payment.method} for ${payment.customer}`);
   };
 
   const handleCreatePackage = () => {
@@ -2145,15 +2147,59 @@ export function BillingPage({ initialTab = "invoices" }: { initialTab?: BillTab 
             </div>
 
             <div className="space-y-3 text-xs">
-              <div>
+              <div className="relative">
                 <label className="font-semibold text-muted-foreground block mb-1">CUSTOMER NAME & ID</label>
                 <input
                   value={newPay.customer}
-                  onChange={e => setNewPay(p => ({ ...p, customer: e.target.value }))}
-                  placeholder="e.g. Rahim Uddin"
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewPay(p => ({ ...p, customer: val, custId: val }));
+                    setShowCustSuggestions(true);
+                  }}
+                  onFocus={() => setShowCustSuggestions(true)}
+                  placeholder="Search subscriber by name, MBN ID, or phone..."
                   className="w-full px-3 py-2 rounded-lg outline-none"
                   style={inputStyle}
                 />
+                {showCustSuggestions && newPay.customer.trim().length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                    {customers
+                      .filter(c =>
+                        c.name.toLowerCase().includes(newPay.customer.toLowerCase()) ||
+                        c.id.toLowerCase().includes(newPay.customer.toLowerCase()) ||
+                        (c.clientCode && c.clientCode.toLowerCase().includes(newPay.customer.toLowerCase())) ||
+                        (c.phone && c.phone.includes(newPay.customer)) ||
+                        (c.pppUser && c.pppUser.toLowerCase().includes(newPay.customer.toLowerCase()))
+                      )
+                      .slice(0, 6)
+                      .map(c => (
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            setNewPay(p => ({
+                              ...p,
+                              customer: c.name,
+                              custId: c.id,
+                              invoice: c.invoices?.[0]?.id || `INV-${c.id}-AUTO`,
+                              amount: (c.dueAmount > 0 ? c.dueAmount : c.price || 500).toString(),
+                            }));
+                            setShowCustSuggestions(false);
+                          }}
+                          className="px-3 py-2 hover:bg-muted cursor-pointer border-b border-border/50 last:border-0 flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="font-semibold text-foreground text-xs">{c.name}</div>
+                            <div className="font-mono text-[10px] text-muted-foreground">{c.clientCode || c.id} · {c.phone}</div>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-mono text-[11px] font-bold text-emerald-600">
+                              Due: ৳{(c.dueAmount > 0 ? c.dueAmount : 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">

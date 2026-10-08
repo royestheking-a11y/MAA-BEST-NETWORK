@@ -181,6 +181,7 @@ async function runLiveIntegrationSuite() {
     const trxId = 'TRX' + Date.now().toString().slice(-6);
 
     // Call toggle endpoint with disabled: false (reconnect line):
+    await sleep(1500);
     const reconnectRes = await apiRequest('/api/mikrotik/user/toggle', 'POST', {
       customerId: createdCustomerId,
       disabled: false

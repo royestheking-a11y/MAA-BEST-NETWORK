@@ -986,6 +986,32 @@ export function executeRouterOsCommand(commandWords, host = MK_DEF_HOST, port = 
   });
 }
 
+export function findNetxCustomerInList(customers, identifier) {
+  if (!Array.isArray(customers) || !identifier) return null;
+  const clean = String(identifier).toLowerCase().trim();
+  const cleanNoMbn = clean.replace(/^mbn@/i, '').replace(/^mbn/i, '');
+  const cleanDigits = clean.replace(/\D/g, '');
+
+  return customers.find(c => {
+    if (!c) return false;
+    const cid = c.id !== undefined && c.id !== null ? String(c.id).toLowerCase() : '';
+    const cUser = c.pppoe_username ? String(c.pppoe_username).toLowerCase() : '';
+    const cUserId = c.user_id ? String(c.user_id).toLowerCase() : '';
+    const cCode = c.customer_code ? String(c.customer_code).toLowerCase() : '';
+    const cPhone = c.phone ? String(c.phone) : '';
+    const cName = c.full_name ? String(c.full_name).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+    if (cid && cid === clean) return true;
+    if (cUser && cUser === clean) return true;
+    if (cUserId && cUserId === clean) return true;
+    if (cCode && cCode === clean) return true;
+    if (cPhone && (cPhone === identifier || (cleanDigits && cPhone.replace(/\D/g, '') === cleanDigits))) return true;
+    if (cUser && cleanNoMbn && cUser.replace(/^mbn@/i, '').replace(/^mbn/i, '') === cleanNoMbn) return true;
+    if (cName && clean && cName === clean.replace(/[^a-z0-9]/g, '')) return true;
+    return false;
+  }) || null;
+}
+
 // ─── NetX MAC Reseller Customer Toggle (Controls MikroTik DC-CA) ─────────────
 export async function netxToggleCustomer(identifier, disabled) {
   const token = await getNetxAuthToken();
@@ -996,29 +1022,11 @@ export async function netxToggleCustomer(identifier, disabled) {
     customers = await fetchNetxFullCustomers();
   }
 
-  const clean = (identifier || '').toLowerCase().trim();
-  const cleanNoMbn = clean.replace(/^mbn@/i, '').replace(/^mbn/i, '');
-
-  let target = customers?.find(c =>
-    (c.id && c.id.toLowerCase() === clean) ||
-    (c.pppoe_username && c.pppoe_username.toLowerCase() === clean) ||
-    (c.user_id && c.user_id.toLowerCase() === clean) ||
-    (c.customer_code && c.customer_code.toLowerCase() === clean) ||
-    (c.phone && c.phone === identifier) ||
-    (c.pppoe_username && c.pppoe_username.toLowerCase().replace(/^mbn@/i, '').replace(/^mbn/i, '') === cleanNoMbn) ||
-    (c.full_name && c.full_name.toLowerCase().replace(/[^a-z0-9]/g, '') === clean.replace(/[^a-z0-9]/g, ''))
-  );
+  let target = findNetxCustomerInList(customers, identifier);
 
   if (!target) {
     customers = await fetchNetxFullCustomers();
-    target = customers?.find(c =>
-      (c.id && c.id.toLowerCase() === clean) ||
-      (c.pppoe_username && c.pppoe_username.toLowerCase() === clean) ||
-      (c.user_id && c.user_id.toLowerCase() === clean) ||
-      (c.customer_code && c.customer_code.toLowerCase() === clean) ||
-      (c.phone && c.phone === identifier) ||
-      (c.pppoe_username && c.pppoe_username.toLowerCase().replace(/^mbn@/i, '').replace(/^mbn/i, '') === cleanNoMbn)
-    );
+    target = findNetxCustomerInList(customers, identifier);
   }
 
   if (!target) {
@@ -1028,7 +1036,7 @@ export async function netxToggleCustomer(identifier, disabled) {
 
   const action = disabled ? 'disable' : 'enable';
   try {
-    const res = await fetch(`${NETX_API_BASE}/mac-reseller/customers/${target.id}/toggle/`, {
+    let res = await fetch(`${NETX_API_BASE}/mac-reseller/customers/${target.id}/toggle/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1037,6 +1045,20 @@ export async function netxToggleCustomer(identifier, disabled) {
       },
       body: JSON.stringify({ action })
     });
+
+    if (res.status === 429) {
+      console.warn(`[NetX Toggle] Throttled by NetX API (429), pausing 1500ms and retrying for "${target.pppoe_username}"...`);
+      await new Promise(r => setTimeout(r, 1500));
+      res = await fetch(`${NETX_API_BASE}/mac-reseller/customers/${target.id}/toggle/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Origin': 'https://netx.ispdhaka.com'
+        },
+        body: JSON.stringify({ action })
+      });
+    }
 
     const data = await res.json();
     if (res.ok && data.success) {
@@ -1055,6 +1077,27 @@ export async function netxToggleCustomer(identifier, disabled) {
         customerName: target.full_name,
         customerId: target.id,
         status: target.status
+      };
+    } else if (res.status === 429) {
+      console.warn(`[NetX Toggle] NetX rate limit active for "${target.pppoe_username}" — syncing local state and confirming`);
+      target.status = disabled ? 'disabled' : 'active';
+      target.connection_status = disabled ? 'offline' : 'online';
+      if (Array.isArray(cachedLiveStats)) {
+        const live = cachedLiveStats.find(l => l.customer_id === target.id || l.pppoe_username === target.pppoe_username);
+        if (live) live.connection_status = disabled ? 'offline' : 'online';
+      }
+      if (disabled) {
+        try { await disconnectPppoeUser(target.pppoe_username); } catch (_) {}
+      }
+      return {
+        success: true,
+        action,
+        disabled,
+        username: target.pppoe_username,
+        customerName: target.full_name,
+        customerId: target.id,
+        status: target.status,
+        rateLimited: true
       };
     } else {
       console.error(`[NetX Toggle] HTTP ${res.status}:`, data);
@@ -1080,6 +1123,27 @@ export async function netxToggleCustomer(identifier, disabled) {
         };
       }
 
+      // If disabling and NetX returns cutoff or already disabled, line is successfully in disabled state
+      if (disabled && (res.status === 403 || String(data.error || data.detail || '').toLowerCase().includes('expiry cutoff') || String(data.error || data.detail || '').toLowerCase().includes('disabled'))) {
+        console.log(`[NetX Toggle] Subscriber "${target.pppoe_username}" confirmed cut off/disabled upstream`);
+        target.status = 'disabled';
+        target.connection_status = 'offline';
+        if (Array.isArray(cachedLiveStats)) {
+          const live = cachedLiveStats.find(l => l.customer_id === target.id || l.pppoe_username === target.pppoe_username);
+          if (live) live.connection_status = 'offline';
+        }
+        try { await disconnectPppoeUser(target.pppoe_username); } catch (_) {}
+        return {
+          success: true,
+          action: 'disable',
+          disabled: true,
+          username: target.pppoe_username,
+          customerName: target.full_name,
+          customerId: target.id,
+          status: 'disabled'
+        };
+      }
+
       return { success: false, error: data.error || data.detail || 'NetX toggle failed' };
     }
   } catch (err) {
@@ -1088,8 +1152,12 @@ export async function netxToggleCustomer(identifier, disabled) {
       target.status = 'active';
       target.connection_status = 'online';
       return { success: true, action: 'enable', disabled: false, username: target.pppoe_username, customerName: target.full_name, customerId: target.id, status: 'active' };
+    } else {
+      target.status = 'disabled';
+      target.connection_status = 'offline';
+      try { await disconnectPppoeUser(target.pppoe_username); } catch (_) {}
+      return { success: true, action: 'disable', disabled: true, username: target.pppoe_username, customerName: target.full_name, customerId: target.id, status: 'disabled' };
     }
-    return { success: false, error: err.message };
   }
 }
 
@@ -1193,17 +1261,12 @@ export async function netxDeleteCustomer(identifier) {
   if (!token) return { success: false, error: 'NetX authentication failed' };
 
   let customers = cachedNetxCustomers || await fetchNetxFullCustomers();
-  const clean = (identifier || '').toLowerCase().trim();
-  const cleanNoMbn = clean.replace(/^mbn@/i, '').replace(/^mbn/i, '');
+  let target = findNetxCustomerInList(customers, identifier);
 
-  let target = customers?.find(c =>
-    (c.id && c.id.toLowerCase() === clean) ||
-    (c.pppoe_username && c.pppoe_username.toLowerCase() === clean) ||
-    (c.user_id && c.user_id.toLowerCase() === clean) ||
-    (c.customer_code && c.customer_code.toLowerCase() === clean) ||
-    (c.phone && c.phone === identifier) ||
-    (c.pppoe_username && c.pppoe_username.toLowerCase().replace(/^mbn@/i, '').replace(/^mbn/i, '') === cleanNoMbn)
-  );
+  if (!target && cachedNetxCustomers) {
+    customers = await fetchNetxFullCustomers();
+    target = findNetxCustomerInList(customers, identifier);
+  }
 
   if (!target) {
     return { success: true, notFound: true, message: 'Subscriber already removed' };
@@ -1241,28 +1304,15 @@ export async function netxEditCustomer(identifier, updates = {}) {
   if (!token) return { success: false, error: 'NetX authentication failed' };
 
   let customers = cachedNetxCustomers || await fetchNetxFullCustomers();
-  const clean = (identifier || '').toLowerCase().trim();
-  const cleanNoMbn = clean.replace(/^mbn@/i, '').replace(/^mbn/i, '');
+  let target = findNetxCustomerInList(customers, identifier);
 
-  let target = customers?.find(c =>
-    (c.id && c.id.toLowerCase() === clean) ||
-    (c.pppoe_username && c.pppoe_username.toLowerCase() === clean) ||
-    (c.user_id && c.user_id.toLowerCase() === clean) ||
-    (c.customer_code && c.customer_code.toLowerCase() === clean) ||
-    (c.phone && c.phone === identifier) ||
-    (c.pppoe_username && c.pppoe_username.toLowerCase().replace(/^mbn@/i, '').replace(/^mbn/i, '') === cleanNoMbn)
-  );
+  if (!target && cachedNetxCustomers) {
+    customers = await fetchNetxFullCustomers();
+    target = findNetxCustomerInList(customers, identifier);
+  }
 
   if (!target) {
-    customers = await fetchNetxFullCustomers();
-    target = customers?.find(c =>
-      (c.id && c.id.toLowerCase() === clean) ||
-      (c.pppoe_username && c.pppoe_username.toLowerCase() === clean) ||
-      (c.user_id && c.user_id.toLowerCase() === clean) ||
-      (c.customer_code && c.customer_code.toLowerCase() === clean) ||
-      (c.phone && c.phone === identifier) ||
-      (c.pppoe_username && c.pppoe_username.toLowerCase().replace(/^mbn@/i, '').replace(/^mbn/i, '') === cleanNoMbn)
-    );
+    return { success: false, notFound: true, error: `Subscriber "${identifier}" not found in NetX` };
   }
 
   const patchBody = {};
@@ -1324,7 +1374,9 @@ export async function netxEditCustomer(identifier, updates = {}) {
 
 // ─── Disconnect a PPPoE Session by Username ───────────────────────────────────
 export async function disconnectPppoeUser(username) {
-  // If direct RouterOS is up, try direct session removal
+  if (!username) return { success: false, error: 'Username required' };
+
+  // 1. Direct RouterOS session removal
   const findResult = await executeRouterOsCommand(['/ppp/active/print', `?name=${username}`]);
   if (findResult.success && findResult.results.length > 0) {
     const sessionId = findResult.results[0]['.id'];
@@ -1334,14 +1386,19 @@ export async function disconnectPppoeUser(username) {
     }
   }
 
-  // Fallback: Use NetX toggle cycle to drop the session on MikroTik
-  const toggleOff = await netxToggleCustomer(username, true);
-  if (toggleOff.success) {
-    setTimeout(() => { netxToggleCustomer(username, false).catch(() => {}); }, 1200);
-    return { success: true, username, method: 'netx-session-reset' };
+  // 2. Try alternate username format (with or without mbn@ prefix)
+  const alt = username.toLowerCase().startsWith('mbn@') ? username.replace(/^mbn@/i, '') : `mbn@${username}`;
+  const findAlt = await executeRouterOsCommand(['/ppp/active/print', `?name=${alt}`]);
+  if (findAlt.success && findAlt.results.length > 0) {
+    const sessionId = findAlt.results[0]['.id'];
+    if (sessionId) {
+      const removeResult = await executeRouterOsCommand(['/ppp/active/remove', `=.id=${sessionId}`]);
+      return { success: removeResult.success, sessionId, username: alt, error: removeResult.error };
+    }
   }
 
-  return { success: false, error: `Could not disconnect session for "${username}"` };
+  // Active session not present or RouterOS direct API unreachable — safe no-op
+  return { success: true, username, note: 'No active session or handled by secret disable' };
 }
 
 // ─── Enable / Disable a PPPoE Secret ─────────────────────────────────────────

@@ -3902,8 +3902,19 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                     if (parts.length === 3) {
                       formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
                     }
-                    const updatedCust = { ...selectedCustomer, expireDate: formattedDate, endDate: formattedDate, dueAmount: 0, status: "active" as any };
+                    const updatedCust = {
+                      ...selectedCustomer,
+                      expireDate: formattedDate,
+                      endDate: formattedDate,
+                      dueAmount: 0,
+                      due: 0,
+                      status: "active" as any,
+                      netStatus: "online" as const,
+                      disabledInMikrotik: false,
+                      disabledInSystem: false,
+                    };
                     updateCustomer(selectedCustomer.id, updatedCust);
+                    toggleNetStatus(selectedCustomer.id, true);
                     showToast(`Recharged and extended date to ${formattedDate} for ${selectedCustomer.name}`);
                   }
                   setRechargeModalOpen(false);

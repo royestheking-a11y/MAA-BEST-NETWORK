@@ -12,6 +12,8 @@ import {
   deleteCustomerFromFirestore
 } from "../../lib/firestoreService";
 import { activityLogger } from "../services/activityLogger";
+import { billingStore, type Payment } from "../components/billing/billingData";
+import { automationStore } from "../components/automation/automationData";
 
 export type CustomerStatus = "active" | "offline" | "due" | "suspended" | "disconnected";
 
@@ -190,6 +192,29 @@ export function parseSafeDate(dateStr: string | null | undefined): Date | null {
 
   const d = new Date(str);
   return isNaN(d.getTime()) ? null : d;
+}
+
+export function matchesCustomer(c: Customer, query?: string | null): boolean {
+  if (!query) return false;
+  const q = String(query).toLowerCase().trim();
+  const qNoMbn = q.replace(/^mbn@/i, "").replace(/^mbn/i, "");
+  const ppp = (c.pppUser || "").toLowerCase().trim();
+  const pppNoMbn = ppp.replace(/^mbn@/i, "").replace(/^mbn/i, "");
+  const cid = (c.id || "").toLowerCase().trim();
+  const code = (c.clientCode || "").toLowerCase().trim();
+  const nameClean = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const qClean = q.replace(/[^a-z0-9]/g, "");
+  const phone = (c.phone || "").replace(/[^0-9]/g, "");
+  const qPhone = q.replace(/[^0-9]/g, "");
+
+  return (
+    cid === q ||
+    code === q ||
+    ppp === q ||
+    (pppNoMbn.length > 0 && pppNoMbn === qNoMbn) ||
+    (qPhone.length >= 7 && phone === qPhone) ||
+    (nameClean.length > 0 && nameClean === qClean)
+  );
 }
 
 import { REAL_ISP_CUSTOMERS } from "../data/realIspData";
@@ -677,27 +702,28 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Connection & Line State
-            // CRITICAL: If admin manually enabled/edited the customer,
+            // CRITICAL: If admin manually enabled/edited the customer or a payment was received,
             // the NetX API still shows stale data for up to 20–60s while MikroTik syncs.
             // We must NOT let the stale API response re-disable or overwrite the customer.
-            // GRACE PERIOD: Newly created or recently edited customers (within 120s) are immune to API overwrites.
-            const isRecentlyEdited = Boolean((c.updatedAt && (Date.now() - c.updatedAt) < 120000) || (c.createdAt && (Date.now() - c.createdAt) < 120000));
+            // GRACE PERIOD: Newly created, recently edited, or enabled customers (within 180s) are immune to API overwrites.
+            const isRecentlyEdited = Boolean((c.updatedAt && (Date.now() - c.updatedAt) < 180000) || (c.createdAt && (Date.now() - c.createdAt) < 180000));
             const apiSaysDisabled = netxMatch?.status === "disabled";
             const isWithinGrace = Boolean(c.graceExpiryDate && (parseSafeDate(c.graceExpiryDate)?.getTime() ?? 0) >= Date.now());
             const isPaidOrFree = c.userType === "free" || c.userType === "unlimited" || isWithinGrace || ((c.dueAmount === 0 || c.due === 0) && c.status === "active");
 
-            // CRITICAL FIX: If customer has paid their bill (dueAmount === 0), is free/active, or is within active bonus grace,
-            // never let upstream NetX's stale "disabled" (caused by expiry cutoff) override their line to disabled/suspended!
-            const isLineDisabled = isPaidOrFree
-              ? (c.disabledInMikrotik === true && c.status === "suspended" && !isWithinGrace)
-              : isRecentlyEdited
-                ? (c.disabledInMikrotik === true)
-                : (c.disabledInMikrotik === true || (apiSaysDisabled && c.disabledInMikrotik !== false));
+            // CRITICAL FIX: If customer was explicitly enabled (disabledInMikrotik === false), has 0 due,
+            // is in grace period, or was recently updated:
+            // NEVER let upstream NetX's stale "disabled" status re-suspend or shut down their line!
+            const isLineDisabled = isRecentlyEdited
+              ? (c.disabledInMikrotik === true)
+              : isPaidOrFree
+                ? (c.disabledInMikrotik === true && c.status === "suspended" && !isWithinGrace)
+                : (c.disabledInMikrotik === true || (apiSaysDisabled && c.disabledInMikrotik !== false && c.status === "suspended"));
 
             // ── ACCURATE PHYSICAL & PPPOE NETWORK STATUS ──
-            // Network online status is strictly physical/session state from MikroTik & NetX live telemetry.
-            // A customer having an active billing account (isPaidOrFree) does NOT mean their router is on!
-            // If router is off, wifi is disabled, fiber is unplugged, or session is dropped -> OFFLINE.
+            // If the subscriber is administratively disabled, their network is offline.
+            // If active and confirmed online by live telemetry, mark online.
+            // If recently edited / activated, retain their online state while router dials PPPoE.
             let newNetStatus: "online" | "offline" = "offline";
             if (isLineDisabled) {
               newNetStatus = "offline";
@@ -705,6 +731,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               newNetStatus = liveMatch.connection_status === "online" ? "online" : "offline";
             } else if (netxMatch && netxMatch.connection_status) {
               newNetStatus = netxMatch.connection_status === "online" ? "online" : "offline";
+            } else if (isRecentlyEdited) {
+              newNetStatus = c.netStatus === "online" ? "online" : "offline";
             } else if (Array.isArray(liveList) && liveList.length > 0) {
               // Live stats from MikroTik are loaded, but this customer has NO active session -> OFFLINE
               newNetStatus = "offline";
@@ -1365,7 +1393,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     const newId = rawNewId ? rawNewId.trim() : id;
     const isIdChanged = newId !== id && Boolean(newId);
 
-    const target = customers.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
+    const target = customers.find(c => matchesCustomer(c, id));
     const targetName = target ? target.name : id;
     if (updates.userType && target && updates.userType !== target.userType) {
       activityLogger.log({
@@ -1380,7 +1408,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
 
     setCustomers(prev => {
       const updated: Customer[] = prev.map((c): Customer => {
-        if (c.id === id || c.clientCode === id || c.pppUser === id) {
+        if (matchesCustomer(c, id)) {
           const finalUserType = updates.userType !== undefined ? updates.userType : c.userType || "normal";
           const isFree = finalUserType === "free";
           const isUnlimited = finalUserType === "unlimited";
@@ -1720,12 +1748,27 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   
   const bulkUpdateStatus = (customerIds: string[], newStatus: CustomerStatus, newNetStatus: "online" | "offline") => {
     const isEnabling = newNetStatus === "online";
+    const targets = customers.filter(c => customerIds.some(id => matchesCustomer(c, id)));
+
+    // Sync each affected subscriber with MikroTik RouterOS
+    targets.forEach(c => {
+      syncMikrotikUserState(c.pppUser || c.id, !isEnabling, c);
+      if (isEnabling) {
+        const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+        const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+        fetch(`${base}/api/mikrotik/user/disconnect`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: c.pppUser || c.id })
+        }).catch(() => {});
+      }
+    });
+
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (!customerIds.includes(c.id)) return c;
+        if (!customerIds.some(id => matchesCustomer(c, id))) return c;
 
         // When enabling (bulk reconnect): also set disabled flags and extend expired endDate.
-        // Without this, the billing engine re-suspends in the next 60s cycle if endDate is past.
         let endDateExtension: Partial<Customer> = {};
         if (isEnabling) {
           const currentEnd = parseSafeDate(c.endDate);
@@ -1743,11 +1786,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           ...endDateExtension,
           status: newStatus,
           netStatus: newNetStatus,
-          ...(isEnabling ? { disabledInMikrotik: false, disabledInSystem: false, disconnectedAt: undefined, logoutTime: null } : { disabledInMikrotik: true, disabledInSystem: true }),
+          updatedAt: Date.now(),
+          ...(isEnabling ? { disabledInMikrotik: false, disabledInSystem: false, disconnectedAt: undefined, logoutTime: null } : { disabledInMikrotik: true, disabledInSystem: true, disconnectedAt: new Date().toISOString() }),
         };
       });
       // Save all updated targets to firestore
-      updated.filter(c => customerIds.includes(c.id)).forEach(target => saveCustomerToFirestore(target));
+      updated.filter(c => customerIds.some(id => matchesCustomer(c, id))).forEach(target => saveCustomerToFirestore(target));
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
@@ -1765,12 +1809,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const grantExtraDays = (customerId: string, extraDays: number) => {
-    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId);
+    const targetCust = customers.find(c => matchesCustomer(c, customerId));
     let shouldReactivate = false;
 
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id === customerId || c.clientCode === customerId) {
+        if (matchesCustomer(c, customerId)) {
           // Calculate bonus grace end date without changing base billing cycle expiry date
           const baseEnd = parseSafeDate(c.endDate || c.expireDate) || new Date();
           const graceBase = new Date(Math.max(Date.now(), baseEnd.getTime()));
@@ -1795,11 +1839,12 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             disabledInSystem: false,
             disconnectedAt: undefined,
             logoutTime: null,
+            updatedAt: Date.now(),
           };
         }
         return c;
       });
-      const target = updated.find(c => c.id === customerId || c.clientCode === customerId);
+      const target = updated.find(c => matchesCustomer(c, customerId));
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
@@ -1861,15 +1906,25 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleNetStatus = (id: string, enable: boolean) => {
-    const targetCust = customers.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
+    const targetCust = customers.find(c => matchesCustomer(c, id));
     syncMikrotikUserState(targetCust?.pppUser || targetCust?.id || id, !enable, targetCust);
+
+    if (enable && targetCust) {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const base = isLocal ? "" : "https://maa-best-network.onrender.com";
+      fetch(`${base}/api/mikrotik/user/disconnect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: targetCust.pppUser || targetCust.id })
+      }).catch(() => {});
+    }
 
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id !== id && c.clientCode !== id && c.pppUser !== id) return c;
+        if (!matchesCustomer(c, id)) return c;
 
         // When enabling: also extend endDate if it's expired, so the billing engine
-        // doesn't immediately re-suspend this customer in the next 60-second cycle.
+        // doesn't immediately re-suspend this customer in the next cycle.
         let endDateExtension: Partial<typeof c> = {};
         if (enable) {
           const currentEnd = parseSafeDate(c.endDate);
@@ -1884,6 +1939,16 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               daysRemaining: 30,
             };
           }
+          // If customer has an overdue balance, grant courtesy grace days so billing cutoff does not immediately re-disable them
+          const rawDue = c.dueAmount ?? c.due ?? 0;
+          if (rawDue > 0) {
+            const graceBase = new Date();
+            graceBase.setDate(graceBase.getDate() + 3);
+            endDateExtension.graceDays = 3;
+            endDateExtension.graceExpiryDate = graceBase.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+          }
+        } else {
+          endDateExtension.graceExpiryDate = undefined;
         }
 
         return {
@@ -1893,6 +1958,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           status: enable ? "active" as CustomerStatus : "suspended" as CustomerStatus,
           disabledInMikrotik: !enable,
           disabledInSystem: !enable,
+          updatedAt: Date.now(), // CRITICAL: Protect against stale API overwrites
           disconnectedAt: enable ? undefined : new Date().toISOString(),
           logoutTime: enable
             ? null
@@ -1901,7 +1967,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
               new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
       });
-      const target = updated.find(c => c.id === id || c.clientCode === id || c.pppUser === id);
+      const target = updated.find(c => matchesCustomer(c, id));
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));
@@ -1922,6 +1988,21 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const runBillingCutoffEngine = useCallback(() => {
+    // 1. Check if auto-disconnect on MikroTik is enabled in Billing Settings
+    const settings = billingStore.getSettings();
+    if (settings && settings.autoDisconnectOnMikrotik === false) {
+      console.log("[Auto-Billing Engine] Cutoff skipped: autoDisconnectOnMikrotik is toggled OFF in Billing Settings.");
+      return 0;
+    }
+
+    // 2. Check if Auto-Disable workflow in automationStore is enabled
+    const workflows = automationStore.getWorkflows();
+    const cutoffWorkflow = workflows.find(w => w.action === "disable_mikrotik_pppoe" || w.id === "WF-03");
+    if (cutoffWorkflow && cutoffWorkflow.enabled === false) {
+      console.log("[Auto-Billing Engine] Cutoff skipped: Workflow WF-03 (Auto-Disable PPPoE on Expiry) is PAUSED.");
+      return 0;
+    }
+
     let cutoffCount = 0;
     const now = new Date();
 
@@ -1930,7 +2011,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       const updated = prev.map(c => {
         if (c.userType === "free" || c.userType === "unlimited") return c;
         if (c.createdAt && (Date.now() - c.createdAt) < 120000) return c; // Grace period: new customers immune to auto-cutoff
-        if (c.updatedAt && (Date.now() - c.updatedAt) < 120000) return c; // Grace period: recently edited/enabled customers immune
+        if (c.updatedAt && (Date.now() - c.updatedAt) < 180000) return c; // Grace period: recently edited/enabled customers immune (3 mins)
 
         const rawDue = c.dueAmount !== undefined ? c.dueAmount : (c.due !== undefined ? c.due : 0);
         if (rawDue <= 0) return c; // Bill is paid / 0 due — never cutoff!
@@ -1966,6 +2047,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
             netStatus: "offline" as const,
             disabledInMikrotik: true,
             disabledInSystem: true,
+            updatedAt: Date.now(),
             disconnectedAt: c.disconnectedAt || new Date().toISOString(),
             logoutTime: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) +
               " " +
@@ -2036,7 +2118,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       invoiceId,
     };
 
-    const targetCust = customers.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
+    const targetCust = customers.find(c => matchesCustomer(c, customerId));
 
     // Auto-reconnect subscriber on MikroTik RouterOS & drop stale session
     if (targetCust) {
@@ -2059,9 +2141,33 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
+    // Auto-record payment in global billing store (Invoices & Payments)
+    try {
+      const billingPayMethod: "bKash" | "Nagad" | "Bank" | "Cash" | "SSLCommerz" | "Rocket" =
+        method === "Card" ? "SSLCommerz" : (method as any);
+      const globalPayment: Payment = {
+        id: newPayment.id,
+        customer: targetCust?.name || customerId,
+        custId: targetCust?.clientCode || targetCust?.id || customerId,
+        invoice: invoiceId,
+        amount: validAmount,
+        method: billingPayMethod,
+        txn: trxId,
+        date: startDate,
+        time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        addedBy: `${method} Gateway`,
+        channel: `${method} Direct Clearance`,
+        status: "verified",
+        notes: `Automated payment clearance & instant reconnection for ${targetCust?.name || customerId}`,
+      };
+      billingStore.addPayment(globalPayment);
+    } catch (e) {
+      console.warn("[Billing Store Auto-Sync Notice]:", e);
+    }
+
     setCustomers(prev => {
       const updated = prev.map(c => {
-        if (c.id !== customerId && c.clientCode !== customerId && c.pppUser !== customerId) return c;
+        if (!matchesCustomer(c, customerId)) return c;
 
         const updatedInvoices: Invoice[] = [
           {
@@ -2094,13 +2200,13 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
           graceDays: undefined,
           graceExpiryDate: undefined,
           daysRemaining: Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-          updatedAt: Date.now(), // Grace period: billing engine won't cut off this paid customer for 120s
+          updatedAt: Date.now(), // Grace period: billing engine won't cut off this paid customer for 180s
           invoices: updatedInvoices,
           paymentHistory: [newPayment, ...c.paymentHistory],
         };
       });
 
-      const target = updated.find(c => c.id === customerId || c.clientCode === customerId || c.pppUser === customerId);
+      const target = updated.find(c => matchesCustomer(c, customerId));
       if (target) saveCustomerToFirestore(target);
       try {
         localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(updated));

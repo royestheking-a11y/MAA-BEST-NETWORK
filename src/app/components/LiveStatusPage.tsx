@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Circle, Search, RefreshCw, Clock, Wifi, WifiOff, Download, Activity,
   CheckCircle2, Radio, Server, Signal, AlertTriangle, Layers, Users, Cpu,
-  Shield, Lock, Unlock, Copy, Check, X, ArrowDown, ArrowUp, Zap, Gauge, Play, Pause
+  Shield, Lock, Unlock, Copy, Check, X, ArrowDown, ArrowUp, Zap, Gauge, Play, Pause, Power
 } from "lucide-react";
 import { useCustomerContext } from "../context/CustomerContext";
 import { AUTHENTIC_NETX_ONUS } from "../data/netxOnuData";
@@ -176,7 +176,7 @@ function exportCSV(sessions: Session[]) {
 }
 
 export function LiveStatusPage() {
-  const { customers, bindMac, unbindMac } = useCustomerContext();
+  const { customers, bindMac, unbindMac, toggleNetStatus } = useCustomerContext();
   const { liveStats, lastRefresh: netxLastRefresh, refresh: refreshNetx, isLoading: isNetxLoading } = useNetxLiveData(30000);
 
   const [viewScope, setViewScope] = useState<"subscribers" | "all_hardware">("subscribers");
@@ -241,6 +241,27 @@ export function LiveStatusPage() {
       const res = bindMac(cust.id, s.mac);
       showToast(`Live MAC [${res.mac}] securely locked & bound to ${cust.name} (${cust.id})!`);
     }
+  };
+
+  const handleToggleLine = (s: Session) => {
+    const cust = customers.find(
+      c =>
+        c.id.toLowerCase() === s.id.toLowerCase() ||
+        (c.clientCode && c.clientCode.toLowerCase() === s.id.toLowerCase()) ||
+        (c.pppUser && c.pppUser.toLowerCase() === s.user.toLowerCase()) ||
+        c.name.toLowerCase() === s.customer.toLowerCase()
+    );
+
+    const targetId = cust ? cust.id : s.id;
+    const isCurrentlyActive = cust ? (!cust.disabledInMikrotik && cust.status !== "suspended") : s.status === "online";
+    const targetState = !isCurrentlyActive;
+
+    toggleNetStatus(targetId, targetState);
+    showToast(
+      targetState
+        ? `Network line turned ON for ${s.customer}. PPPoE secret authorized & live sync updated.`
+        : `Network line turned OFF (suspended) for ${s.customer}. PPPoE secret disabled & session terminated.`
+    );
   };
 
   const isSyncingInitial = isNetxLoading && liveStats.length === 0;
@@ -871,6 +892,7 @@ export function LiveStatusPage() {
                       c.name.toLowerCase() === s.customer.toLowerCase()
                   );
                   const isBound = cust ? (cust.macBound !== false && Boolean(cust.mac && cust.mac.trim() && cust.mac !== "—")) : false;
+                  const isLineActive = cust ? (!cust.disabledInMikrotik && cust.status !== "suspended") : s.status === "online";
 
                   return (
                     <tr
@@ -1048,20 +1070,37 @@ export function LiveStatusPage() {
                         </div>
                       </td>
 
-                      {/* Actions: Online MAC Bind / Unbind */}
+                      {/* Actions: Network On/Off & Online MAC Bind / Unbind */}
                       <td className="px-4 py-3 whitespace-nowrap text-center">
-                        <button
-                          onClick={() => handleToggleLiveMacBind(s)}
-                          title={isBound ? `Release MAC Lock (Unbind)` : `Lock & Bind Live MAC to ${s.customer}`}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
-                            isBound
-                              ? "bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30"
-                              : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                          }`}
-                        >
-                          <Shield size={12} />
-                          <span>{isBound ? "Unbind" : "Bind MAC"}</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Network Power Toggle */}
+                          <button
+                            onClick={() => handleToggleLine(s)}
+                            title={isLineActive ? `Turn Network Line OFF (Suspend PPPoE)` : `Turn Network Line ON (Restore PPPoE)`}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
+                              isLineActive
+                                ? "bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            }`}
+                          >
+                            <Power size={12} className={isLineActive ? "text-rose-600 dark:text-rose-400" : "text-white"} />
+                            <span>{isLineActive ? "Cut Off" : "Turn On"}</span>
+                          </button>
+
+                          {/* MAC Bind / Unbind */}
+                          <button
+                            onClick={() => handleToggleLiveMacBind(s)}
+                            title={isBound ? `Release MAC Lock (Unbind)` : `Lock & Bind Live MAC to ${s.customer}`}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
+                              isBound
+                                ? "bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                                : "bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
+                            }`}
+                          >
+                            <Shield size={12} />
+                            <span>{isBound ? "Unbind" : "Bind MAC"}</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
