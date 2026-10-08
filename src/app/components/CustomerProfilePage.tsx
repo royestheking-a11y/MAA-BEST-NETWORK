@@ -645,14 +645,16 @@ export function CustomerProfilePage({ onNavigate, customerId }: CustomerProfileP
       return;
     }
     if (id === "suspend") {
-      updateCustomer(targetId, { status: "suspended", netStatus: "offline" });
+      updateCustomer(targetId, { status: "suspended", netStatus: "offline", disabledInMikrotik: true, disabledInSystem: true });
+      toggleNetStatus(targetId, false);
       setCustomer(prev => ({ ...prev, currentStatus: "offline", status: "suspended" }));
       showToast(`✓ Account suspended for ${customer.name}`);
       setShowActionModal(null);
       return;
     }
     if (id === "unsuspend") {
-      updateCustomer(targetId, { status: "active", netStatus: "online" });
+      updateCustomer(targetId, { status: "active", netStatus: "online", disabledInMikrotik: false, disabledInSystem: false });
+      toggleNetStatus(targetId, true);
       setCustomer(prev => ({ ...prev, currentStatus: "online", status: "active" }));
       showToast(`✓ Account restored & active for ${customer.name}`);
       setShowActionModal(null);

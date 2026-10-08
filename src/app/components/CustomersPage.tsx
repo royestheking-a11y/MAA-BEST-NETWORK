@@ -3913,6 +3913,12 @@ export function CustomersPage({ onNavigate }: CustomersPageProps) {
                       disabledInMikrotik: false,
                       disabledInSystem: false,
                     };
+                    const billAmt = selectedCustomer.dueAmount > 0 ? selectedCustomer.dueAmount : (selectedCustomer.monthlyBill || selectedCustomer.price || 0);
+                    if (billAmt > 0 && processPayment) {
+                      try {
+                        processPayment(selectedCustomer.id, billAmt, "Cash", undefined, new Date());
+                      } catch (_) {}
+                    }
                     updateCustomer(selectedCustomer.id, updatedCust);
                     toggleNetStatus(selectedCustomer.id, true);
                     showToast(`Recharged and extended date to ${formattedDate} for ${selectedCustomer.name}`);
